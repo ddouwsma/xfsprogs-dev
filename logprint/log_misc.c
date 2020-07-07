@@ -392,8 +392,10 @@ xlog_print_trans_buffer(char **ptr, int len, int *i, int num_ops)
 		}
 	} else {
 		printf(_("BUF DATA\n"));
-		xlog_recover_print_data(*ptr, be32_to_cpu(head->oh_len));
 	}
+
+	xlog_recover_print_data(*ptr, be32_to_cpu(head->oh_len));
+
 	*ptr += be32_to_cpu(head->oh_len);
     }
     if (head && head->oh_flags & XLOG_CONTINUE_TRANS)

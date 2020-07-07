@@ -176,8 +176,8 @@ xlog_recover_print_buffer(
 		} else {
 			printf(_("	BUF DATA\n"));
 			if (!print_buffer) continue;
-			xlog_recover_print_data(p, len);
 		}
+		xlog_recover_print_data(p, len);
 	}
 }
 
