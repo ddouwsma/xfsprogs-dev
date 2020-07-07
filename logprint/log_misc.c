@@ -243,25 +243,21 @@ xlog_print_trans_buffer(char **ptr, int len, int *i, int num_ops)
 	xlog_print_op_header(head, *i, ptr);
 	if (super_block) {
 		printf(_("SUPER BLOCK Buffer: "));
-		if (be32_to_cpu(head->oh_len) < 4*8) {
+		if (be32_to_cpu(head->oh_len) < sizeof(struct xfs_sb)) {
 			printf(_("Out of space\n"));
 		} else {
-			__be64		 a, b;
+			struct xfs_sb *sb, sb_s;
 
 			printf("\n");
-			/*
-			 * memmove because *ptr may not be 8-byte aligned
-			 */
-			memmove(&a, *ptr, sizeof(__be64));
-			memmove(&b, *ptr+8, sizeof(__be64));
+			/* memmove because *ptr may not be 8-byte aligned */
+			sb = &sb_s;
+			memmove(sb, *ptr, sizeof(struct xfs_sb));
 			printf(_("icount: %llu  ifree: %llu  "),
-			       (unsigned long long) be64_to_cpu(a),
-			       (unsigned long long) be64_to_cpu(b));
-			memmove(&a, *ptr+16, sizeof(__be64));
-			memmove(&b, *ptr+24, sizeof(__be64));
+				be64_to_cpu(sb->sb_icount),
+				be64_to_cpu(sb->sb_ifree));
 			printf(_("fdblks: %llu  frext: %llu\n"),
-			       (unsigned long long) be64_to_cpu(a),
-			       (unsigned long long) be64_to_cpu(b));
+				be64_to_cpu(sb->sb_fdblocks),
+				be64_to_cpu(sb->sb_frextents));
 		}
 		super_block = 0;
 	} else if (be32_to_cpu(*(__be32 *)(*ptr)) == XFS_AGI_MAGIC) {
