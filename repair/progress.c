@@ -501,6 +501,8 @@ duration(int length, char *buf)
 			strcat(buf, _(", "));
 		strcat(buf, temp);
 	}
+	if (!(weeks|days|hours|minutes|seconds))
+		sprintf(buf, _("0 seconds"));
 
 	return(buf);
 }
