@@ -27,6 +27,8 @@
  *
  */
 
+#include "librmt.h"
+
 /*
  *	Note that local vs remote file descriptors are distinquished
  *	by adding a bias to the remote descriptors.  This is a quick

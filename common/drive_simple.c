@@ -45,6 +45,8 @@
 #include "media.h"
 #include "arch_xlate.h"
 
+#include "../librmt/librmt.h"
+
 /* this rmt junk is here because the rmt protocol supports writing ordinary
  * (non-device) files in the remote /dev directory! yuck!
  */
@@ -54,14 +56,6 @@
 #define ioctl   rmtioctl
 #define read    rmtread
 #define write   rmtwrite
-
-extern int rmtclose(int);
-extern int rmtcreat (char *path, int mode);
-extern int rmtioctl(int, int, ...);
-extern int rmtopen(char *, int, ...);
-extern int rmtread(int, void*, uint);
-extern int rmtwrite(int, const void *, uint);
-
 
 /* drive_simple.c - drive strategy for standard in or a file
  */
@@ -1137,8 +1131,8 @@ do_set_mark(drive_t *drivep,
 				     tmphdr->gh_dumplabel);
 
 				nwritten = write(contextp->dc_fd,
-						  tmphdr,
-						  sizeof(*tmphdr));
+						(char*)tmphdr,
+						sizeof(*tmphdr));
 				assert((size_t)nwritten == sizeof(*tmphdr));
 				free(tmphdr);
 

@@ -30,8 +30,6 @@
 #include <fcntl.h>		/* use this one for S5 with remote stuff */
 #include "rmtlib.h"
 
-extern int rmtopen(char*, int, int);
-
 int rmtcreat (path, mode)
 char *path;
 int mode;

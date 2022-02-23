@@ -50,6 +50,7 @@
 #include "arch_xlate.h"
 #include "ts_mtio.h"
 
+#include "../librmt/librmt.h"
 
 /* drive_minrmt.c - drive strategy for non-SGI rmt tape devices
  * This strategy is derived from the scsitape strategy. It is designed
@@ -246,16 +247,6 @@ extern void usage(void);
 #ifdef DUMP
 extern uint64_t hdr_mfilesz;
 #endif /* DUMP */
-
-/* remote tape protocol declarations (should be a system header file)
- */
-extern int rmtopen(char *, int, ...);
-extern int rmtclose(int);
-extern int rmtfstat(int, struct stat *);
-extern int rmtioctl(int, int, ...);
-extern int rmtread(int, void*, uint);
-extern int rmtwrite(int, const void *, uint);
-
 
 /* forward declarations of locally defined static functions ******************/
 

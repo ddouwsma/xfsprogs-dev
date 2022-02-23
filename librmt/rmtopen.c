@@ -31,13 +31,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdarg.h>
 
 #include "config.h"
 #include "rmtlib.h"
 
 #define RMT_DEBUG_FILE "/tmp/librmt_debug" /* file for debug output on server */
 
-static int _rmt_open(char *, int, int);
+static int _rmt_open(const char *path, int oflag, int mode);
 
 int _rmt_Ctp[MAXUNIT][2] = { {-1, -1}, {-1, -1}, {-1, -1}, {-1, -1} };
 int _rmt_Ptc[MAXUNIT][2] = { {-1, -1}, {-1, -1}, {-1, -1}, {-1, -1} };
@@ -58,11 +59,20 @@ struct uname_table uname_table[] =
  *	caller.
  */
 
-int rmtopen (path, oflag, mode)
-char *path;
-int oflag;
-int mode;
+int rmtopen(const char* path, int oflag, ...)
 {
+	mode_t mode;
+
+	if (__OPEN_NEEDS_MODE (oflag))
+	{
+		va_list arg;
+		va_start (arg, oflag);
+		mode = va_arg (arg, mode_t);
+		va_end (arg);
+	}
+	else
+		mode = 0;
+
 	if (strchr (path, ':') != NULL)
 	{
 		return (_rmt_open (path, oflag, mode) | REM_BIAS);
@@ -83,7 +93,7 @@ int mode;
 #define MAXDBGPATH	100
 
 /* ARGSUSED */
-static int _rmt_open (char *path, int oflag, int mode)
+static int _rmt_open(const char *path, int oflag, int mode)
 {
 	int i, rc;
 	char buffer[BUFMAGIC];

@@ -33,10 +33,7 @@ static int _rmt_write(int, char *, unsigned int);
  *	Write to stream.  Looks just like write(2) to caller.
  */
 
-int rmtwrite (fildes, buf, nbyte)
-int fildes;
-char *buf;
-unsigned int nbyte;
+int rmtwrite(int fildes, char *buf, unsigned int nbyte)
 {
 	if (isrmt (fildes))
 	{
