@@ -88,18 +88,12 @@ static int _rmt_open (char *path, int oflag, int mode)
 {
 	int i, rc;
 	char buffer[BUFMAGIC];
-	char system[MAXHOSTLEN];
-	char device[BUFMAGIC];
-	char login[BUFMAGIC];
-	char *sys, *dev, *user;
+	char *system, *device, *login;
+	int  path_len;
+	char *path_buf, *path_tok;
         char *rsh_path;
         char *rmt_path;
 	char rmt_cmd[MAXDBGPATH];
-
-
-	sys = system;
-	dev = device;
-	user = login;
 
 	if ((rsh_path = getenv("RSH")) == NULL) {
 	    rsh_path = RSH_PATH;
@@ -124,35 +118,22 @@ static int _rmt_open (char *path, int oflag, int mode)
 		return(-1);
 	}
 
-/*
- *	pull apart system and device, and optional user
- *	don't munge original string
- */
-	while (*path != '@' && *path != ':') {
-		*user++ = *path++;
+	/* Break out system, device, and optional user login */
+	path_len = strlen(path);
+	path_buf = path_tok = malloc(path_len+1);
+	if(!path_buf) {
+		perror("cannot allocate space for path");
+		return -1;
 	}
-	*user = '\0';
-	path++;
+	strcpy(path_buf, path);
 
-	if (*(path - 1) == '@')
-	{
-		while (*path != ':') {
-			*sys++ = *path++;
-		}
-		*sys = '\0';
-		path++;
-	}
+	if(strchr(path_buf, '@'))
+		login = strtok_r(path_buf, "@", &path_tok);
 	else
-	{
-		for (user = login; (*sys = *user); user++, sys++)
-			;
-		user = login;
-	}
+		login = "";
 
-	while (*path) {
-		*dev++ = *path++;
-	}
-	*dev = '\0';
+	system = strtok_r(path_tok, ":", &path_tok);
+	device = path_tok;
 
 	_rmt_turnonmsgsbyenv();
 
@@ -165,7 +146,7 @@ static int _rmt_open (char *path, int oflag, int mode)
 	    char uname[MAX_UNAME];
             struct uname_table *p;
 
-	    if (user != login) {
+	    if (strlen(login)) {
 		snprintf(cmd, sizeof(cmd), "%s -l %s %s uname", rsh_path, login, system);
 	    }
 	    else {
@@ -218,11 +199,15 @@ static int _rmt_open (char *path, int oflag, int mode)
  *	setup the pipes for the 'rsh' command and fork
  */
 do_rmt:
-	if (pipe(_rmt_Ptc[i]) == -1 || pipe(_rmt_Ctp[i]) == -1)
-		return(-1);
+	if (pipe(_rmt_Ptc[i]) == -1 || pipe(_rmt_Ctp[i]) == -1) {
+		i = -1;
+		goto out_path_buf;
+	}
 
-	if ((rc = fork()) == -1)
-		return(-1);
+	if ((rc = fork()) == -1) {
+		i = -1;
+		goto out_path_buf;
+	}
 
 	if (rc == 0)
 	{
@@ -241,7 +226,7 @@ do_rmt:
 		else {
 		    strncpy(rmt_cmd, rmt_path, sizeof(rmt_cmd));
 		}
-		if (user != login)
+		if (strlen(login))
 		{
 			execl(rsh_path, "rsh", system, "-l", login,
 				rmt_cmd, (char *) 0);
@@ -267,9 +252,12 @@ do_rmt:
  *	now attempt to open the tape device
  */
 
-	sprintf(buffer, "O%s\n%d\n", device, oflag);
+	snprintf(buffer, sizeof(buffer), "O%s\n%d\n", device, oflag);
 	if (_rmt_command(i, buffer) == -1 || _rmt_status(i) == -1)
-		return(-1);
+		i = -1;
+
+out_path_buf:
+	free(path_buf);
 
 	return(i);
 }

@@ -77,7 +77,7 @@ _rmt_msg(int level, const char *msg, ...)
 
     if (rmt_debug_code >= level) {
 	va_start(arg, msg);
-	vsprintf(msg_str, msg, arg);
+	vsnprintf(msg_str, sizeof(msg_str), msg, arg);
 	va_end(arg);
 
 	fprintf(stderr, "%s%s", level==RMTWARN ? _("WARNING: "):"", msg_str);
