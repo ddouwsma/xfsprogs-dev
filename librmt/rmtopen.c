@@ -80,7 +80,6 @@ int mode;
  *	file name has the form system[.user]:????
  */
 
-#define MAXHOSTLEN	257
 #define MAXDBGPATH	100
 
 /* ARGSUSED */
@@ -139,18 +138,25 @@ static int _rmt_open (char *path, int oflag, int mode)
 
         /* try to find out the uname of the remote host */
 	{
-#define MAX_UNAMECMD MAXHOSTLEN+40
 #define MAX_UNAME 20
 	    FILE *rmt_f;
-	    char cmd[MAX_UNAMECMD];
+	    char *cmd;
+	    int  cmd_len;
 	    char uname[MAX_UNAME];
             struct uname_table *p;
 
+	    cmd_len = strlen(rsh_path)+strlen(login)+strlen(system)+50;
+	    cmd = malloc(cmd_len);
+	    if(!path_buf) {
+		perror("cannot allocate space for command");
+		exit(1);
+	    }
+
 	    if (strlen(login)) {
-		snprintf(cmd, sizeof(cmd), "%s -l %s %s uname", rsh_path, login, system);
+		snprintf(cmd, cmd_len, "%s -l %s %s uname", rsh_path, login, system);
 	    }
 	    else {
-		snprintf(cmd, sizeof(cmd), "%s %s uname", rsh_path, system);
+		snprintf(cmd, cmd_len, "%s %s uname", rsh_path, system);
 	    }
 
 	    rmt_f = popen(cmd, "r");
@@ -159,6 +165,7 @@ static int _rmt_open (char *path, int oflag, int mode)
 		"rmtopen: failed to detect remote host type using \"%s\"\n"),
 			cmd);
 		RMTHOST(i) = UNAME_UNDEFINED;
+		free(cmd);
 		goto do_rmt;
 	    }
 	    else {
@@ -171,6 +178,7 @@ static int _rmt_open (char *path, int oflag, int mode)
 		"rmtopen: failed to detect remote host type reading \"%s\"\n"),
 			cmd);
 		    RMTHOST(i) = UNAME_UNDEFINED;
+		    free(cmd);
 		    goto do_rmt;
 		}
 		len = strlen(uname);
@@ -192,6 +200,7 @@ static int _rmt_open (char *path, int oflag, int mode)
 		RMTHOST(i) = p->id;
 		_rmt_msg(RMTDBG, "rmtopen: RMTHOST(%d) = %s\n", i, p->name);
 	    }
+	    free(cmd);
 	}
 
 
