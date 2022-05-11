@@ -82,7 +82,7 @@ global_hdr_alloc(int argc, char *argv[])
 
 	/* fill in the magic number
 	 */
-	strncpy(ghdrp->gh_magic, GLOBAL_HDR_MAGIC, GLOBAL_HDR_MAGIC_SZ);
+	memcpy(ghdrp->gh_magic, GLOBAL_HDR_MAGIC, GLOBAL_HDR_MAGIC_SZ);
 
 	/* fill in the hdr version
 	 */
