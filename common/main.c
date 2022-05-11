@@ -413,13 +413,13 @@ main(int argc, char *argv[])
 
 	/* if an inventory display is requested, do it and exit
 	 */
-	if (!inv_DEBUG_print(argc, argv)) {
+	if (!inv_print(argc, argv)) {
 		return mlog_exit(EXIT_NORMAL, RV_OK); /* normal termination */
 	}
 
 #ifdef DUMP
 	/* insist that the effective user id is root.
-	 * this must appear after inv_DEBUG_print(),
+	 * this must appear after inv_print(),
 	 * so it may be done without root privilege.
 	 */
 	euid = geteuid();

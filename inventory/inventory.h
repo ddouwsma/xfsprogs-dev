@@ -298,7 +298,7 @@ extern bool_t
 inv_delete_mediaobj(uuid_t *moid);
 
 extern bool_t
-inv_DEBUG_print(int argc, char **argv);
+inv_print(int argc, char **argv);
 
 extern int
 inv_setup_base(void);

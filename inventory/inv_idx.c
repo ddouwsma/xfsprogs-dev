@@ -543,14 +543,14 @@ idx_DEBUG_print (int fd)
 
 
 int
-DEBUG_displayallsessions(int fd, invt_seshdr_t *hdr, uint ref,
+displayallsessions(int fd, invt_seshdr_t *hdr, uint ref,
 			  invt_pr_ctx_t *prctx)
 {
 	inv_session_t *ses;
 	if (stobj_make_invsess(fd, &ses, hdr) < 1)
 		return -1;
 
-	DEBUG_sessionprint(ses, ref, prctx);
+	sessionprint(ses, ref, prctx);
 	free(ses->s_streams);
 	free(ses);
 

@@ -1085,7 +1085,7 @@ inv_getopt(int argc, char **argv, invt_pr_ctx_t *prctx)
 
 /* This prints out all the sessions of a filesystem that are in the inventory */
 bool_t
-inv_DEBUG_print(int argc, char **argv)
+inv_print(int argc, char **argv)
 {
 	invt_counter_t *cnt = NULL;
 	invt_fstab_t *arr = NULL;

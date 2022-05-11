@@ -161,7 +161,7 @@ sess_queries_byuuid(char *uu)
 		prctx.index = 0;
 		prctx.depth = PR_ALL;
 		prctx.mobj.type = INVT_NULLTYPE;
-		DEBUG_sessionprint(ses, 99, &prctx);
+		sessionprint(ses, 99, &prctx);
 		inv_free_session(&ses);
 		return 1;
 	}
@@ -183,7 +183,7 @@ sess_queries_bylabel(char *lab)
 		prctx.index = 0;
 		prctx.depth = PR_ALL;
 		prctx.mobj.type = INVT_NULLTYPE;
-		DEBUG_sessionprint(ses, 99, &prctx);
+		sessionprint(ses, 99, &prctx);
 		inv_free_session(&ses);
 		return 1;
 	}
@@ -224,14 +224,14 @@ query_test(int level)
 			free (tm);
 		}
 		if (inv_lastsession_level_lessthan(tok, level, &ses) && ses) {
-			DEBUG_sessionprint(ses, 99, &prctx);
+			sessionprint(ses, 99, &prctx);
 			free (ses->s_streams);
 			free (ses);
 		}
 
 		if (inv_lastsession_level_equalto(tok, level, &ses) && ses) {
 			printf("Gotcha\n");
-			DEBUG_sessionprint(ses, 99, &prctx);
+			sessionprint(ses, 99, &prctx);
 			free (ses->s_streams);
 			free (ses);
 		}
@@ -421,7 +421,7 @@ main(int argc, char *argv[])
 
 	mlog_init(argc, argv);
 
-	if (!inv_DEBUG_print(argc, argv))
+	if (!inv_print(argc, argv))
 		return 0;
 
 	optind = 1;

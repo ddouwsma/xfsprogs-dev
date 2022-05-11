@@ -407,8 +407,7 @@ invmgr_inv_print(
 				continue;
 			}
 
-			(void)DEBUG_displayallsessions(fd, &harr[s],
-						        ref++, prctx);
+			displayallsessions(fd, &harr[s], ref++, prctx);
 		}
 
 		INVLOCK(fd, LOCK_UN);

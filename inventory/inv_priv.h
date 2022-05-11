@@ -458,7 +458,7 @@ stobj_copy_invsess(int fd, invt_seshdr_t *hdr, invt_session_t *ses,
 		    inv_session_t **buf);
 
 void
-DEBUG_sessionprint(inv_session_t *ses, uint ref, invt_pr_ctx_t *prctx);
+sessionprint(inv_session_t *ses, uint ref, invt_pr_ctx_t *prctx);
 
 void
 DEBUG_sessprint(invt_session_t *ses);
@@ -563,8 +563,7 @@ bool_t
 lastsess_level_equalto(int fd, invt_seshdr_t *hdr,  void *arg, void **buf);
 
 int
-DEBUG_displayallsessions(int fd, invt_seshdr_t *hdr, uint ref,
-			  invt_pr_ctx_t *prctx);
+displayallsessions(int fd, invt_seshdr_t *hdr, uint ref, invt_pr_ctx_t *prctx);
 
 int
 make_invdirectory(inv_oflag_t forwhat);

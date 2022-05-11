@@ -1391,7 +1391,7 @@ check_for_mobj (inv_session_t *ses, invt_mobjinfo_t *mobj)
 
 
 void
-DEBUG_sessionprint(inv_session_t *ses, uint ref, invt_pr_ctx_t *prctx)
+sessionprint(inv_session_t *ses, uint ref, invt_pr_ctx_t *prctx)
 {
 	char str[UUID_STR_LEN + 1];
 	int i;
