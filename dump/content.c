@@ -6377,7 +6377,7 @@ static bool_t
 Media_prompt_erase(drive_t *drivep)
 {
 	fold_t fold;
-	char question[100];
+	char question[200];
 	char *preamblestr[PREAMBLEMAX];
 	size_t preamblecnt;
 	char *querystr[QUERYMAX];
@@ -6404,7 +6404,7 @@ retry:
 
 	/* query: ask if overwrite ok
 	 */
-	sprintf(question,
+	snprintf(question, sizeof(question),
 		 "pre-erase (-%c) option specified "
 		 "and non-blank media encountered:\n"
 		 "please confirm media erase "
