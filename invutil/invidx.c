@@ -75,6 +75,7 @@ invidx_commit(WINDOW *win, node_t *current, node_t *list)
     node_t *n;
     data_t *d;
     invt_entry_t *inv_entry;
+    int ret;
 
     n = current;
     if(n == NULL || n->data == NULL)
@@ -250,7 +251,10 @@ invidx_commit(WINDOW *win, node_t *current, node_t *list)
 		    return 0;
 		}
 
-		snprintf(cmd, sizeof(cmd), "cp %s %s", stobjfile, dst_stobjfile);
+		ret = snprintf(cmd, sizeof(cmd), "cp %s %s", stobjfile, dst_stobjfile);
+		if(ret > 5 + MAXPATHLEN * 2) {
+			printf("pathnames to long\n");
+		}
 		if(system(cmd) != 0) {
 		    put_error("Error: unable to copy stobj file: cp failed");
 		    return 0;
@@ -320,7 +324,10 @@ invidx_commit(WINDOW *win, node_t *current, node_t *list)
 		return 0;
 	    }
 
-	    snprintf(cmd, sizeof(cmd), "cp %s %s", stobjfile, dst_stobjfile);
+	    ret = snprintf(cmd, sizeof(cmd), "cp %s %s", stobjfile, dst_stobjfile);
+	    if(ret > 5 + MAXPATHLEN * 2) {
+		    printf("pathnames to long\n");
+	    }
 	    if(system(cmd) != 0) {
 		put_error("Error: unable to copy stobj file: cp failed");
 		return 0;
@@ -691,6 +698,7 @@ invidx_highlight(WINDOW *win, node_t *current, node_t *list)
     static char txt[256];
     data_t *d;
     invt_entry_t *invtentry;
+    int ret;
 
     if(current == NULL || current->data == NULL) {
 	return 0;
@@ -702,7 +710,10 @@ invidx_highlight(WINDOW *win, node_t *current, node_t *list)
 
     put_info_header("inventory index entry");
 
-    snprintf(txt, sizeof(txt), "path:  %s", invtentry->ie_filename);
+    ret = snprintf(txt, sizeof(txt), "path:  %s", invtentry->ie_filename);
+    if(ret > 5 + MAXPATHLEN * 2) {
+	    printf("Inventory filename entry too long\n");
+    }
     put_info_line(1, txt);
 
     snprintf(txt, sizeof(txt), "start: %s", ctime32(&invtentry->ie_timeperiod.tp_start));

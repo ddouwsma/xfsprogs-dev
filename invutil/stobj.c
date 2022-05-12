@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <uuid/uuid.h>
+#include <assert.h>
 
 #include "types.h"
 #include "mlog.h"
@@ -176,6 +177,7 @@ stobjsess_highlight(WINDOW *win, node_t *current, node_t *list)
     data_t *d;
     invt_seshdr_t *stobjhdr;
     invt_session_t *stobjses;
+    int ret;
 
     if(current == NULL || current->data == NULL) {
 	return 0;
@@ -196,11 +198,13 @@ stobjsess_highlight(WINDOW *win, node_t *current, node_t *list)
     put_info_line(1, txt);
 
     uuid_unparse(stobjses->s_fsid, uuidstr);
-    snprintf(txt, sizeof(txt), "mountpt: %s, fsid: %s", stobjses->s_mountpt, uuidstr);
+    ret = snprintf(txt, sizeof(txt), "mountpt: %s, fsid: %s", stobjses->s_mountpt, uuidstr);
+    assert( ret < sizeof(txt) );
     put_info_line(2, txt);
 
     uuid_unparse(stobjses->s_sesid, uuidstr);
-    snprintf(txt, sizeof(txt), "device:  %s, sesid: %s", stobjses->s_devpath, uuidstr);
+    ret = snprintf(txt, sizeof(txt), "device:  %s, sesid: %s", stobjses->s_devpath, uuidstr);
+    assert( ret < sizeof(txt) );
     put_info_line(3, txt);
 
     return FALSE;
@@ -213,6 +217,7 @@ stobjstrm_highlight(WINDOW *win, node_t *current, node_t *list)
     static char txt[256];
     data_t *d;
     invt_stream_t *stobjstrm;
+    int ret;
 
     if(current == NULL || current->data == NULL) {
 	return 0;
@@ -224,9 +229,10 @@ stobjstrm_highlight(WINDOW *win, node_t *current, node_t *list)
 
     put_info_header("session stream");
 
-    snprintf(txt, sizeof(txt), "interrupted: %s, cmdarg: %s",
+    ret = snprintf(txt, sizeof(txt), "interrupted: %s, cmdarg: %s",
 	    (stobjstrm->st_interrupted == BOOL_TRUE) ? "yes" : "no",
 	    stobjstrm->st_cmdarg);
+    assert( ret < sizeof(txt) );
     put_info_line(1, txt);
 
     snprintf(txt, sizeof(txt), "start ino: %llu, offset %lld",

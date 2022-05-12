@@ -26,6 +26,7 @@
 #include <sys/mman.h>
 #include <string.h>
 #include <uuid/uuid.h>
+#include <assert.h>
 
 #include "types.h"
 #include "mlog.h"
@@ -153,6 +154,7 @@ fstab_highlight(WINDOW *win, node_t *current, node_t *list)
     char uuidstr[UUID_STR_LEN + 1];
     data_t *d;
     invt_fstab_t *fstabentry;
+    int ret;
 
     if(current == NULL || current->data == NULL) {
 	return 0;
@@ -164,7 +166,8 @@ fstab_highlight(WINDOW *win, node_t *current, node_t *list)
 
     put_info_header("fstab entry");
 
-    snprintf(txt, sizeof(txt), "device: %s", fstabentry->ft_devpath);
+    ret = snprintf(txt, sizeof(txt), "device: %s", fstabentry->ft_devpath);
+    assert(ret < INV_STRLEN + 9);
     put_info_line(1, txt);
 
     uuid_unparse(fstabentry->ft_uuid, uuidstr);
