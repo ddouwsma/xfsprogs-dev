@@ -799,11 +799,14 @@ HsmBeginRestoreFile(
 		dmattr.fsys = FSYS_TYPE_XFS;
 		msb_store(dmattr.state, DMF_ST_NOMIGR, sizeof(dmattr.state));
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 		rv = attr_setf(fd,
 			       DMF_ATTR_NAME,
 			       (char *)&dmattr,
 			       sizeof(dmattr),
 			       ATTR_ROOT);
+#pragma GCC diagnostic pop
 		if (rv == 0)
 			*hsm_flagp = 1;
 	}
@@ -871,7 +874,10 @@ HsmEndRestoreFile(
 	 */
 	if (*hsm_flagp) {
 		int rv;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 		rv = attr_removef(fd, DMF_ATTR_NAME, ATTR_ROOT);
+#pragma GCC diagnostic pop
 		if (rv) {
 			mlog(MLOG_NORMAL | MLOG_WARNING,
 			     _("error removing temp DMF attr on %s: %s\n"),

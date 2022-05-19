@@ -8867,11 +8867,14 @@ setextattr(char *path, extattrhdr_t *ahdrp)
 		attr_namespace = 0;
 	}
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	rval = attr_set(path,
 			 (char *)(&ahdrp[1]),
 			 ((char *)ahdrp) + (u_long_t)ahdrp->ah_valoff,
 			 (int)ahdrp->ah_valsz,
 			 attr_namespace | ATTR_DONTFOLLOW);
+#pragma GCC diagnostic pop
 	if (rval) {
 		char *namespace;
 		if (isrootpr) {
