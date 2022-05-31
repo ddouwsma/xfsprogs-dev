@@ -229,11 +229,19 @@ do_rmt:
 		(void) setuid (getuid ());
 		(void) setgid (getgid ());
 		if (_rmt_msgson() == RMTDBG) {
-		    snprintf(rmt_cmd, sizeof(rmt_cmd), "%s %s.%d",
+			/* This debug functionality may be specific to other
+			 * *nix, Linux distros are likely to ship the enhanced
+			 * Shilly version of rmt which documents the DEBUG
+			 * functionality as being set by the environment. Its
+			 * unclear if it supports evoking debug logging in this
+			 * way.
+			 */
+			snprintf(rmt_cmd, sizeof(rmt_cmd), "%s %s.%d",
 				rmt_path, RMT_DEBUG_FILE, getpid());
 		}
 		else {
-		    strncpy(rmt_cmd, rmt_path, sizeof(rmt_cmd));
+			strncpy(rmt_cmd, rmt_path, sizeof(rmt_cmd) - 1);
+			rmt_cmd[sizeof(rmt_cmd) - 1] = '\0';
 		}
 		if (strlen(login))
 		{
