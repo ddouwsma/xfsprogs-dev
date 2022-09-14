@@ -1008,7 +1008,7 @@ stobj_unpack_sessinfo(
         size_t             bufsz,
 	invt_sessinfo_t   *s)
 {
-	uint 		 i;
+	uint 		 i, j;
 	char	         *tmpbuf;
 	char 		 *p = (char *)bufp;
 
@@ -1087,26 +1087,13 @@ stobj_unpack_sessinfo(
 
 	/* all the media files */
 	s->mfiles = (invt_mediafile_t *)p;
-
-#ifdef INVT_DELETION
-	{
-		int tmpfd = open("moids", O_RDWR | O_CREAT, S_IRUSR|S_IWUSR);
-		uint j;
-		invt_mediafile_t *mmf = s->mfiles;
-		for (i=0; i< s->ses->s_cur_nstreams; i++) {
-			for (j=0; j< s->strms[i].st_nmediafiles;
-			     j++, mmf++)
-				xlate_invt_mediafile((invt_mediafile_t *)mmf, (invt_mediafile_t *)tmpbuf, 1);
-				bcopy(tmpbuf, mmf, sizeof(invt_mediafile_t));
-				put_invtrecord(tmpfd, &mmf->mf_moid,
-					 sizeof(uuid_t), 0, SEEK_END, 0);
+	for (i=0; i< s->ses->s_cur_nstreams; i++) {
+		for (j=0; j < s->strms[i].st_nmediafiles; j++) {
+			xlate_invt_mediafile((invt_mediafile_t *)p, 
+					     (invt_mediafile_t *)tmpbuf, 1);
+			bcopy(tmpbuf, p, sizeof(invt_mediafile_t));
+			p +=  sizeof(invt_mediafile_t);
 		}
-		close(tmpfd);
-	}
-#endif
-	for (i = 0; i < s->ses->s_cur_nstreams; i++) {
-		p += (size_t) (s->strms[i].st_nmediafiles)
-			* sizeof(invt_mediafile_t);
 	}
 
 	/* sanity check the size of the buffer given to us vs. the size it
