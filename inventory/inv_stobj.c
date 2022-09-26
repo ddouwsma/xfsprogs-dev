@@ -1065,14 +1065,12 @@ stobj_unpack_sessinfo(
 		return BOOL_FALSE;
 	}
 
+	/* get the seshdr and then, the remainder of the session */
 	xlate_invt_seshdr((invt_seshdr_t *)p, (invt_seshdr_t *)tmpbuf, 1);
 	bcopy(tmpbuf, p, sizeof(invt_seshdr_t));
-
-	/* get the seshdr and then, the remainder of the session */
 	s->seshdr = (invt_seshdr_t *)p;
 	s->seshdr->sh_sess_off = -1;
 	p += sizeof(invt_seshdr_t);
-
 
 	xlate_invt_session((invt_session_t *)p, (invt_session_t *)tmpbuf, 1);
 	bcopy (tmpbuf, p, sizeof(invt_session_t));
@@ -1080,10 +1078,13 @@ stobj_unpack_sessinfo(
 	p += sizeof(invt_session_t);
 
 	/* the array of all the streams belonging to this session */
-	xlate_invt_stream((invt_stream_t *)p, (invt_stream_t *)tmpbuf, 1);
-	bcopy(tmpbuf, p, sizeof(invt_stream_t));
 	s->strms = (invt_stream_t *)p;
-	p += s->ses->s_cur_nstreams * sizeof(invt_stream_t);
+        for (i = 0; i < s->ses->s_cur_nstreams; i++) {
+                xlate_invt_stream((invt_stream_t *)p, 
+				  (invt_stream_t *)tmpbuf, 1);
+                bcopy(tmpbuf, p, sizeof(invt_stream_t));
+                p += sizeof(invt_stream_t);
+        }
 
 	/* all the media files */
 	s->mfiles = (invt_mediafile_t *)p;
