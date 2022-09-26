@@ -5463,17 +5463,14 @@ pi_addfile(Media_t *Mediap,
 			 * desc.
 			 */
 			sessp = 0;
-			if (!buflen) {
-				ok = BOOL_FALSE;
-			} else {
-			    /* extract the session information from the buffer */
-			    if (stobj_unpack_sessinfo(bufp, buflen, &sessinfo)<0) {
-				ok = BOOL_FALSE;
-			    } else {
+			ok = BOOL_FALSE;
+			/* extract the session information from the buffer */
+			if (buflen && 
+			    stobj_unpack_sessinfo(bufp, buflen, &sessinfo)) {
 				stobj_convert_sessinfo(&sessp, &sessinfo);
 				ok = BOOL_TRUE;
-			    }
 			}
+
 			if (!ok || !sessp) {
 				mlog(MLOG_DEBUG | MLOG_WARNING | MLOG_MEDIA, _(
 				      "on-media session "
