@@ -20,6 +20,7 @@
 #include "xfs_trans.h"
 #include "xfs_rmap.h"
 #include "xfs_ag.h"
+#include "xfs_health.h"
 
 static struct kmem_cache	*xfs_inobt_cur_cache;
 
@@ -407,6 +408,7 @@ const struct xfs_btree_ops xfs_inobt_ops = {
 
 	.lru_refs		= XFS_INO_BTREE_REF,
 	.statoff		= XFS_STATS_CALC_INDEX(xs_ibt_2),
+	.sick_mask		= XFS_SICK_AG_INOBT,
 
 	.dup_cursor		= xfs_inobt_dup_cursor,
 	.set_root		= xfs_inobt_set_root,
@@ -436,6 +438,7 @@ const struct xfs_btree_ops xfs_finobt_ops = {
 
 	.lru_refs		= XFS_INO_BTREE_REF,
 	.statoff		= XFS_STATS_CALC_INDEX(xs_fibt_2),
+	.sick_mask		= XFS_SICK_AG_FINOBT,
 
 	.dup_cursor		= xfs_inobt_dup_cursor,
 	.set_root		= xfs_finobt_set_root,

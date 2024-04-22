@@ -19,6 +19,7 @@
 #include "xfs_trace.h"
 #include "xfs_ag.h"
 #include "xfs_ag_resv.h"
+#include "xfs_health.h"
 
 static struct kmem_cache	*xfs_rmapbt_cur_cache;
 
@@ -481,6 +482,7 @@ const struct xfs_btree_ops xfs_rmapbt_ops = {
 
 	.lru_refs		= XFS_RMAP_BTREE_REF,
 	.statoff		= XFS_STATS_CALC_INDEX(xs_rmap_2),
+	.sick_mask		= XFS_SICK_AG_RMAPBT,
 
 	.dup_cursor		= xfs_rmapbt_dup_cursor,
 	.set_root		= xfs_rmapbt_set_root,
