@@ -494,7 +494,7 @@ pf_batch_read(
 						args->last_bno_read, &fsbno);
 			max_fsbno = fsbno + pf_max_fsbs;
 		}
-		while (bplist[num] && num < MAX_BUFS && fsbno < max_fsbno) {
+		while (num < MAX_BUFS && bplist[num] && fsbno < max_fsbno) {
 			/*
 			 * Discontiguous buffers need special handling, so stop
 			 * gathering new buffers and process the list and this
