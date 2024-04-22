@@ -466,6 +466,7 @@ xfs_allocbt_keys_contiguous(
 }
 
 const struct xfs_btree_ops xfs_bnobt_ops = {
+	.name			= "bno",
 	.type			= XFS_BTREE_TYPE_AG,
 
 	.rec_len		= sizeof(xfs_alloc_rec_t),
@@ -495,6 +496,7 @@ const struct xfs_btree_ops xfs_bnobt_ops = {
 };
 
 const struct xfs_btree_ops xfs_cntbt_ops = {
+	.name			= "cnt",
 	.type			= XFS_BTREE_TYPE_AG,
 	.geom_flags		= XFS_BTGEO_LASTREC_UPDATE,
 
