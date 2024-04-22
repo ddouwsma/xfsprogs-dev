@@ -643,6 +643,11 @@ libxfs_mount(
 		xfs_set_reporting_corruption(mp);
 	libxfs_buftarg_init(mp, xi);
 
+	if (xi->data.name)
+		mp->m_fsname = strdup(xi->data.name);
+	else
+		mp->m_fsname = NULL;
+
 	mp->m_finobt_nores = true;
 	xfs_set_inode32(mp);
 	mp->m_sb = *sb;
@@ -902,6 +907,9 @@ libxfs_umount(
 
 	kmem_free(mp->m_attr_geo);
 	kmem_free(mp->m_dir_geo);
+
+	free(mp->m_fsname);
+	mp->m_fsname = NULL;
 
 	kmem_free(mp->m_rtdev_targp);
 	if (mp->m_logdev_targp != mp->m_ddev_targp)
