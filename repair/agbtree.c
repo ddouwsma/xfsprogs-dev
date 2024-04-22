@@ -719,8 +719,8 @@ init_refc_cursor(
 		return;
 
 	init_rebuild(sc, &XFS_RMAP_OINFO_REFC, est_agfreeblocks, btr);
-	btr->cur = libxfs_refcountbt_stage_cursor(sc->mp, &btr->newbt.afake,
-			pag);
+	btr->cur = libxfs_refcountbt_init_cursor(sc->mp, NULL, NULL, pag);
+	libxfs_btree_stage_afakeroot(btr->cur, &btr->newbt.afake);
 
 	btr->bload.get_records = get_refcountbt_records;
 	btr->bload.claim_block = rebuild_claim_block;
