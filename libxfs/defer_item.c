@@ -606,7 +606,7 @@ xfs_attr_free_item(
 	if (attr->xattri_da_state)
 		xfs_da_state_free(attr->xattri_da_state);
 	if (attr->xattri_da_args->op_flags & XFS_DA_OP_RECOVERY)
-		kmem_free(attr);
+		kfree(attr);
 	else
 		kmem_cache_free(xfs_attr_intent_cache, attr);
 }

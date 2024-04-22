@@ -50,15 +50,7 @@ kmem_cache_free(struct kmem_cache *cache, void *ptr)
 	free(ptr);
 }
 
-extern void	*kmem_alloc(size_t, int);
 extern void	*kvmalloc(size_t, gfp_t);
-extern void	*kmem_zalloc(size_t, int);
-
-static inline void
-kmem_free(const void *ptr) {
-	free((void *)ptr);
-}
-
 extern void	*krealloc(void *, size_t, int);
 
 static inline void *kmalloc(size_t size, gfp_t flags)
@@ -70,7 +62,7 @@ static inline void *kmalloc(size_t size, gfp_t flags)
 
 static inline void kfree(const void *ptr)
 {
-	return kmem_free(ptr);
+	free((void *)ptr);
 }
 
 #endif

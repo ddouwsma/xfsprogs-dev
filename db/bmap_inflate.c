@@ -327,7 +327,7 @@ out_resv_list:
 	/* Leak any unused blocks */
 	list_for_each_entry_safe(resv, n, &bd.resv_list, list) {
 		list_del(&resv->list);
-		kmem_free(resv);
+		kfree(resv);
 	}
 	return error;
 }

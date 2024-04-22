@@ -893,7 +893,7 @@ libxfs_buftarg_free(
 	struct xfs_buftarg	*btp)
 {
 	cache_destroy(btp->bcache);
-	kmem_free(btp);
+	kfree(btp);
 }
 
 /*
