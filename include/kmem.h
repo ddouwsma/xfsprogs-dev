@@ -65,4 +65,7 @@ static inline void kfree(const void *ptr)
 	free((void *)ptr);
 }
 
+__attribute__((format(printf,2,3)))
+char *kasprintf(gfp_t gfp, const char *fmt, ...);
+
 #endif

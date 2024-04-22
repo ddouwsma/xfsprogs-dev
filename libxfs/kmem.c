@@ -104,3 +104,16 @@ krealloc(void *ptr, size_t new_size, int flags)
 	}
 	return ptr;
 }
+
+char *kasprintf(gfp_t gfp, const char *fmt, ...)
+{
+	va_list ap;
+	char *p;
+
+	va_start(ap, fmt);
+	if (vasprintf(&p, fmt, ap) < 0)
+		p = NULL;
+	va_end(ap);
+
+	return p;
+}
