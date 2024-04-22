@@ -26,6 +26,7 @@ HFILES = \
 	libxfs_priv.h \
 	linux-err.h \
 	topology.h \
+	buf_mem.h \
 	xfile.h \
 	xfs_ag_resv.h \
 	xfs_alloc.h \
@@ -58,7 +59,8 @@ HFILES = \
 	xfs_trans_space.h \
 	xfs_dir2_priv.h
 
-CFILES = cache.c \
+CFILES = buf_mem.c \
+	cache.c \
 	defer_item.c \
 	init.c \
 	kmem.c \

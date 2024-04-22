@@ -27,6 +27,7 @@ struct xfs_buftarg {
 	unsigned long		writes_left;
 	dev_t			bt_bdev;
 	int			bt_bdev_fd;
+	struct xfile		*bt_xfile;
 	unsigned int		flags;
 	struct cache		*bcache;	/* buffer cache */
 };
@@ -57,6 +58,27 @@ xfs_buftarg_trip_write(
 
 void libxfs_buftarg_init(struct xfs_mount *mp, struct libxfs_init *xi);
 int libxfs_blkdev_issue_flush(struct xfs_buftarg *btp);
+
+/*
+ * The bufkey is used to pass the new buffer information to the cache object
+ * allocation routine. Because discontiguous buffers need to pass different
+ * information, we need fields to pass that information. However, because the
+ * blkno and bblen is needed for the initial cache entry lookup (i.e. for
+ * bcompare) the fact that the map/nmaps is non-null to switch to discontiguous
+ * buffer initialisation instead of a contiguous buffer.
+ */
+struct xfs_bufkey {
+	struct xfs_buftarg	*buftarg;
+	xfs_daddr_t		blkno;
+	unsigned int		bblen;
+	struct xfs_buf_map	*map;
+	int			nmaps;
+};
+
+/* for buf_mem.c only: */
+unsigned int libxfs_bhash(cache_key_t key, unsigned int hashsize,
+		unsigned int hashshift);
+int libxfs_bcompare(struct cache_node *node, cache_key_t key);
 
 #define LIBXFS_BBTOOFF64(bbs)	(((xfs_off_t)(bbs)) << BBSHIFT)
 
