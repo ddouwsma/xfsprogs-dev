@@ -914,7 +914,7 @@ xfs_alloc_cur_check(
 	bool			busy;
 	unsigned		busy_gen = 0;
 	bool			deactivate = false;
-	bool			isbnobt = cur->bc_btnum == XFS_BTNUM_BNO;
+	bool			isbnobt = xfs_btree_is_bno(cur->bc_ops);
 
 	*new = 0;
 
@@ -4022,7 +4022,7 @@ xfs_alloc_query_range(
 	union xfs_btree_irec			high_brec = { .a = *high_rec };
 	struct xfs_alloc_query_range_info	query = { .priv = priv, .fn = fn };
 
-	ASSERT(cur->bc_btnum == XFS_BTNUM_BNO);
+	ASSERT(xfs_btree_is_bno(cur->bc_ops));
 	return xfs_btree_query_range(cur, &low_brec, &high_brec,
 			xfs_alloc_query_range_helper, &query);
 }
@@ -4036,7 +4036,7 @@ xfs_alloc_query_all(
 {
 	struct xfs_alloc_query_range_info	query;
 
-	ASSERT(cur->bc_btnum == XFS_BTNUM_BNO);
+	ASSERT(xfs_btree_is_bno(cur->bc_ops));
 	query.priv = priv;
 	query.fn = fn;
 	return xfs_btree_query_all(cur, xfs_alloc_query_range_helper, &query);

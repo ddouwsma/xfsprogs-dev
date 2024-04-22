@@ -304,11 +304,9 @@ build_agf_agfl(
 	}
 
 #ifdef XR_BLD_FREE_TRACE
-	fprintf(stderr, "bno root = %u, bcnt root = %u, indices = %u %u\n",
+	fprintf(stderr, "bno root = %u, bcnt root = %u\n",
 			be32_to_cpu(agf->agf_bno_root),
-			be32_to_cpu(agf->agf_cnt_root),
-			XFS_BTNUM_BNO,
-			XFS_BTNUM_CNT);
+			be32_to_cpu(agf->agf_cnt_root));
 #endif
 
 	if (xfs_has_crc(mp))

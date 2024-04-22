@@ -204,7 +204,7 @@ get_bno_rec(
 {
 	xfs_agnumber_t		agno = cur->bc_ag.pag->pag_agno;
 
-	if (cur->bc_btnum == XFS_BTNUM_BNO) {
+	if (xfs_btree_is_bno(cur->bc_ops)) {
 		if (!prev_value)
 			return findfirst_bno_extent(agno);
 		return findnext_bno_extent(prev_value);
@@ -378,7 +378,7 @@ get_ino_rec(
 {
 	xfs_agnumber_t		agno = cur->bc_ag.pag->pag_agno;
 
-	if (cur->bc_btnum == XFS_BTNUM_INO) {
+	if (xfs_btree_is_ino(cur->bc_ops)) {
 		if (!prev_value)
 			return findfirst_inode_rec(agno);
 		return next_ino_rec(prev_value);
