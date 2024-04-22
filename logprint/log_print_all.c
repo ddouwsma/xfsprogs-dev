@@ -152,11 +152,11 @@ xlog_recover_print_buffer(
 				be32_to_cpu(agf->agf_seqno),
 				be32_to_cpu(agf->agf_length));
 			printf(_("		root BNO:%d  CNT:%d\n"),
-				be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNOi]),
-				be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNTi]));
+				be32_to_cpu(agf->agf_bno_root),
+				be32_to_cpu(agf->agf_cnt_root));
 			printf(_("		level BNO:%d  CNT:%d\n"),
-				be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNOi]),
-				be32_to_cpu(agf->agf_levels[XFS_BTNUM_CNTi]));
+				be32_to_cpu(agf->agf_bno_level),
+				be32_to_cpu(agf->agf_cnt_level));
 			printf(_("		1st:%d  last:%d  cnt:%d  "
 				"freeblks:%d  longest:%d\n"),
 				be32_to_cpu(agf->agf_flfirst),

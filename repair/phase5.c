@@ -255,20 +255,20 @@ build_agf_agfl(
 		agf->agf_length = cpu_to_be32(mp->m_sb.sb_dblocks -
 			(xfs_rfsblock_t) mp->m_sb.sb_agblocks * agno);
 
-	agf->agf_roots[XFS_BTNUM_BNO] =
+	agf->agf_bno_root =
 			cpu_to_be32(btr_bno->newbt.afake.af_root);
-	agf->agf_levels[XFS_BTNUM_BNO] =
+	agf->agf_bno_level =
 			cpu_to_be32(btr_bno->newbt.afake.af_levels);
-	agf->agf_roots[XFS_BTNUM_CNT] =
+	agf->agf_cnt_root =
 			cpu_to_be32(btr_cnt->newbt.afake.af_root);
-	agf->agf_levels[XFS_BTNUM_CNT] =
+	agf->agf_cnt_level =
 			cpu_to_be32(btr_cnt->newbt.afake.af_levels);
 	agf->agf_freeblks = cpu_to_be32(btr_bno->freeblks);
 
 	if (xfs_has_rmapbt(mp)) {
-		agf->agf_roots[XFS_BTNUM_RMAP] =
+		agf->agf_rmap_root =
 				cpu_to_be32(btr_rmap->newbt.afake.af_root);
-		agf->agf_levels[XFS_BTNUM_RMAP] =
+		agf->agf_rmap_level =
 				cpu_to_be32(btr_rmap->newbt.afake.af_levels);
 		agf->agf_rmap_blocks =
 				cpu_to_be32(btr_rmap->newbt.afake.af_blocks);
@@ -305,8 +305,8 @@ build_agf_agfl(
 
 #ifdef XR_BLD_FREE_TRACE
 	fprintf(stderr, "bno root = %u, bcnt root = %u, indices = %u %u\n",
-			be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNO]),
-			be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNT]),
+			be32_to_cpu(agf->agf_bno_root),
+			be32_to_cpu(agf->agf_cnt_root),
 			XFS_BTNUM_BNO,
 			XFS_BTNUM_CNT);
 #endif
@@ -367,12 +367,12 @@ build_agf_agfl(
 	agf->agf_longest = cpu_to_be32((ext_ptr != NULL) ?
 						ext_ptr->ex_blockcount : 0);
 
-	ASSERT(be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNOi]) !=
-		be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNTi]));
+	ASSERT(be32_to_cpu(agf->agf_bno_root) !=
+		be32_to_cpu(agf->agf_cnt_root));
 	ASSERT(be32_to_cpu(agf->agf_refcount_root) !=
-		be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNOi]));
+		be32_to_cpu(agf->agf_bno_root));
 	ASSERT(be32_to_cpu(agf->agf_refcount_root) !=
-		be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNTi]));
+		be32_to_cpu(agf->agf_cnt_root));
 
 	libxfs_buf_mark_dirty(agf_buf);
 	libxfs_buf_relse(agf_buf);

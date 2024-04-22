@@ -1016,10 +1016,10 @@ main(int argc, char **argv)
 
 		/* traverse btree until we get to the leftmost leaf node */
 
-		bno = be32_to_cpu(ag_hdr.xfs_agf->agf_roots[XFS_BTNUM_BNOi]);
+		bno = be32_to_cpu(ag_hdr.xfs_agf->agf_bno_root);
 		current_level = 0;
 		btree_levels = be32_to_cpu(ag_hdr.xfs_agf->
-						agf_levels[XFS_BTNUM_BNOi]);
+						agf_bno_level);
 
 		ag_end = XFS_AGB_TO_DADDR(mp, agno,
 				be32_to_cpu(ag_hdr.xfs_agf->agf_length) - 1)
