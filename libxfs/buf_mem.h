@@ -23,4 +23,6 @@ void xmbuf_free(struct xfs_buftarg *btp);
 int xmbuf_map_page(struct xfs_buf *bp);
 void xmbuf_unmap_page(struct xfs_buf *bp);
 
+bool xmbuf_verify_daddr(struct xfs_buftarg *btp, xfs_daddr_t daddr);
+
 #endif /* __XFS_BUF_MEM_H__ */

@@ -38,6 +38,7 @@
 #define __LIBXFS_INTERNAL_XFS_H__
 
 #define CONFIG_XFS_RT
+#define CONFIG_XFS_BTREE_IN_MEM
 
 #include "libxfs_api_defs.h"
 #include "platform_defs.h"
@@ -389,11 +390,14 @@ void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 
 #define xfs_trans_buf_copy_type(dbp, sbp)
 
-/* no readahead, need to avoid set-but-unused var warnings. */
-#define xfs_buf_readahead(a,d,c,ops)		({	\
-	xfs_daddr_t __d = d;				\
-	__d = __d; /* no set-but-unused warning */	\
-})
+static inline void
+xfs_buf_readahead(
+	struct xfs_buftarg	*target,
+	xfs_daddr_t		blkno,
+	size_t			numblks,
+	const struct xfs_buf_ops *ops)
+{
+}
 #define xfs_buf_readahead_map(a,b,c,ops)	((void) 0)	/* no readahead */
 
 #define xfs_sort					qsort

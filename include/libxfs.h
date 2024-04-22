@@ -9,6 +9,8 @@
 
 /* For userspace XFS_RT is always defined */
 #define CONFIG_XFS_RT
+/* Ditto in-memory btrees */
+#define CONFIG_XFS_BTREE_IN_MEM
 
 #include "libxfs_api_defs.h"
 #include "platform_defs.h"

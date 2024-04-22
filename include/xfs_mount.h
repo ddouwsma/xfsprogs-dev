@@ -301,4 +301,9 @@ struct xfs_defer_drain { /* empty */ };
 static inline void xfs_perag_intent_hold(struct xfs_perag *pag) {}
 static inline void xfs_perag_intent_rele(struct xfs_perag *pag) {}
 
+static inline void libxfs_buftarg_drain(struct xfs_buftarg *btp)
+{
+	cache_purge(btp->bcache);
+}
+
 #endif	/* __XFS_MOUNT_H__ */
