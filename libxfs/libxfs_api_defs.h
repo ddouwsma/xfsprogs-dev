@@ -54,6 +54,7 @@
 #define xfs_bmbt_commit_staged_btree	libxfs_bmbt_commit_staged_btree
 #define xfs_bmbt_disk_get_startoff	libxfs_bmbt_disk_get_startoff
 #define xfs_bmbt_disk_set_all		libxfs_bmbt_disk_set_all
+#define xfs_bmbt_init_cursor		libxfs_bmbt_init_cursor
 #define xfs_bmbt_maxlevels_ondisk	libxfs_bmbt_maxlevels_ondisk
 #define xfs_bmbt_maxrecs		libxfs_bmbt_maxrecs
 #define xfs_bmbt_stage_cursor		libxfs_bmbt_stage_cursor
@@ -65,6 +66,7 @@
 #define xfs_btree_init_block		libxfs_btree_init_block
 #define xfs_btree_rec_addr		libxfs_btree_rec_addr
 #define xfs_btree_stage_afakeroot	libxfs_btree_stage_afakeroot
+#define xfs_btree_stage_ifakeroot	libxfs_btree_stage_ifakeroot
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
 #define xfs_buf_get			libxfs_buf_get
 #define xfs_buf_get_uncached		libxfs_buf_get_uncached

@@ -351,7 +351,9 @@ build_new_datafork(
 	/* Set up staging for the new bmbt */
 	ifake.if_fork = kmem_cache_zalloc(xfs_ifork_cache, 0);
 	ifake.if_fork_size = xfs_inode_fork_size(ip, XFS_DATA_FORK);
-	bmap_cur = libxfs_bmbt_stage_cursor(ip->i_mount, ip, &ifake);
+	bmap_cur = libxfs_bmbt_init_cursor(ip->i_mount, NULL, ip,
+			XFS_STAGING_FORK);
+	libxfs_btree_stage_ifakeroot(bmap_cur, &ifake);
 
 	/*
 	 * Figure out the size and format of the new fork, then fill it with
@@ -405,7 +407,9 @@ estimate_size(
 	ifake.if_fork = kmem_cache_zalloc(xfs_ifork_cache, 0);
 	ifake.if_fork_size = xfs_inode_fork_size(ip, XFS_DATA_FORK);
 
-	bmap_cur = libxfs_bmbt_stage_cursor(ip->i_mount, ip, &ifake);
+	bmap_cur = libxfs_bmbt_init_cursor(ip->i_mount, NULL, ip,
+			XFS_STAGING_FORK);
+	libxfs_btree_stage_ifakeroot(bmap_cur, &ifake);
 	error = -libxfs_btree_bload_compute_geometry(bmap_cur, &bmap_bload,
 			nextents);
 	libxfs_btree_del_cursor(bmap_cur, error);
