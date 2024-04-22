@@ -2765,13 +2765,13 @@ _("data stripe width (%lld) is too large of a multiple of the data stripe unit (
 		}
 
 		if (!libxfs_validate_stripe_geometry(NULL, dsu, big_dswidth,
-						     cfg->sectorsize, false))
+					cfg->sectorsize, false, false))
 			usage();
 
 		dsunit = BTOBBT(dsu);
 		dswidth = BTOBBT(big_dswidth);
 	} else if (!libxfs_validate_stripe_geometry(NULL, BBTOB(dsunit),
-			BBTOB(dswidth), cfg->sectorsize, false)) {
+			BBTOB(dswidth), cfg->sectorsize, false, false)) {
 		usage();
 	}
 
@@ -2791,7 +2791,7 @@ _("data stripe width (%lld) is too large of a multiple of the data stripe unit (
 	if (!dsunit) {
 		/* Ignore nonsense from device report. */
 		if (!libxfs_validate_stripe_geometry(NULL, BBTOB(ft->data.sunit),
-				BBTOB(ft->data.swidth), 0, true)) {
+				BBTOB(ft->data.swidth), 0, false, true)) {
 			fprintf(stderr,
 _("%s: Volume reports invalid stripe unit (%d) and stripe width (%d), ignoring.\n"),
 				progname,
