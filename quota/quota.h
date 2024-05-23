@@ -49,6 +49,26 @@ extern char *pct_to_string(uint64_t __v, uint64_t __t, char *__c, uint __s);
 
 extern FILE *fopen_write_secure(char *__filename);
 
+void __dquot_fudge_numbers(struct fs_disk_quota *d);
+
+extern int expert;
+
+/*
+ * Fudge the rtblock quota numbers if we're running in fstests so we don't have
+ * to rewrite fstests.
+ */
+static inline bool
+dquot_want_fudged_numbers(void)
+{
+	return expert && getenv("XFSTESTS_RTQUOTA_FAKERY") != NULL;
+}
+
+static inline void dquot_fudge_numbers(struct fs_disk_quota *d)
+{
+	if (dquot_want_fudged_numbers())
+		__dquot_fudge_numbers(d);
+}
+
 /*
  * Various utility routine flags
  */
