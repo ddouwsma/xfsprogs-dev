@@ -304,7 +304,7 @@ collide_xattrs(
 	struct dup_table	*tab = NULL;
 	xfs_dahash_t		old_hash;
 	unsigned long		i;
-	int			error;
+	int			error = 0;
 
 	old_hash = libxfs_da_hashname((uint8_t *)name, namelen);
 
