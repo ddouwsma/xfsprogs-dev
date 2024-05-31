@@ -40,7 +40,9 @@ madvise_help(void)
 " -H -- enable transparent hugepages (MADV_HUGEPAGE)\n"
 " -m -- mark the range mergeable (MADV_MERGEABLE)\n"
 " -M -- mark the range unmergeable (MADV_UNMERGEABLE)\n"
+#ifdef MADV_SOFT_OFFLINE
 " -o -- mark the range offline (MADV_SOFT_OFFLINE)\n"
+#endif
 " -p -- punch a hole in the file (MADV_REMOVE)\n"
 " -P -- poison the page cache (MADV_HWPOISON)\n"
 #ifdef MADV_POPULATE_READ
@@ -101,9 +103,12 @@ madvise_f(
 		case 'M':	/* disable merging */
 			advise = MADV_UNMERGEABLE;
 			break;
+#ifdef MADV_SOFT_OFFLINE
+/* MADV_SOFT_OFFLINE is undefined on mips as if Linux 6.9 */
 		case 'o':	/* offline */
 			advise = MADV_SOFT_OFFLINE;
 			break;
+#endif
 		case 'p':	/* punch hole */
 			advise = MADV_REMOVE;
 			break;
