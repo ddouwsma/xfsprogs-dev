@@ -38,7 +38,7 @@ extern void summary_report(void);
 extern int  set_progress_msg(int report, uint64_t total);
 extern uint64_t print_final_rpt(void);
 extern char *timestamp(struct xfs_mount *mp, int end, int phase, char *buf);
-extern char *duration(time_t val, char *buf);
+char *duration(time_t val, char *buf) __attribute__((nonnull(2)));
 extern int do_parallel;
 
 #define	PROG_RPT_INC(a,b) if (ag_stride && prog_rpt_done) (a) += (b)
