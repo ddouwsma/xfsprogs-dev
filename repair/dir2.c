@@ -1031,8 +1031,13 @@ _("bad directory block magic # %#x in block %u for directory inode %" PRIu64 "\n
 	rval = process_dir2_data(mp, ino, dip, ino_discovery, dirname, parent,
 		bp, dot, dotdot, mp->m_dir_geo->datablk, (char *)blp, &dirty);
 	/* If block looks ok but CRC didn't match, make sure to recompute it. */
-	if (!rval && bp->b_error == -EFSBADCRC)
-		dirty = 1;
+	if (bp->b_error == -EFSBADCRC) {
+		do_warn(
+ _("corrupt directory block %u for inode %" PRIu64 "\n"),
+				mp->m_dir_geo->datablk, ino);
+		if (!rval)
+			dirty = 1;
+	}
 	if (dirty && !no_modify) {
 		*repair = 1;
 		libxfs_buf_mark_dirty(bp);
@@ -1208,8 +1213,14 @@ _("bad sibling back pointer for block %u in directory inode %" PRIu64 "\n"),
 		 * If block looks ok but CRC didn't match, make sure to
 		 * recompute it.
 		 */
-		if (!no_modify && bp->b_error == -EFSBADCRC)
-			buf_dirty = 1;
+		if (bp->b_error == -EFSBADCRC) {
+			do_warn(
+ _("bad checksum for directory leafn block %u for inode %" PRIu64 "\n"),
+				da_bno, ino);
+			if (!no_modify)
+				buf_dirty = 1;
+		}
+
 		ASSERT(buf_dirty == 0 || (buf_dirty && !no_modify));
 		if (buf_dirty && !no_modify) {
 			*repair = 1;
@@ -1372,10 +1383,13 @@ _("bad directory block magic # %#x in block %" PRIu64 " for directory inode %" P
 		i = process_dir2_data(mp, ino, dip, ino_discovery, dirname,
 			parent, bp, dot, dotdot, (xfs_dablk_t)dbno,
 			(char *)data + mp->m_dir_geo->blksize, &dirty);
-		if (i == 0) {
+		if (i == 0)
 			good++;
-			/* Maybe just CRC is wrong. Make sure we correct it. */
-			if (bp->b_error == -EFSBADCRC)
+		if (bp->b_error == -EFSBADCRC) {
+			do_warn(
+ _("bad checksum in directory data block %" PRIu64 " for inode %" PRIu64 "\n"),
+				dbno, ino);
+			if (i == 0)
 				dirty = 1;
 		}
 		if (dirty && !no_modify) {
