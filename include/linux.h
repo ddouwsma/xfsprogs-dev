@@ -174,24 +174,6 @@ static inline void platform_mntent_close(struct mntent_cursor * cursor)
 	endmntent(cursor->mtabp);
 }
 
-#if defined(FALLOC_FL_ZERO_RANGE)
-static inline int
-platform_zero_range(
-	int		fd,
-	xfs_off_t	start,
-	size_t		len)
-{
-	int ret;
-
-	ret = fallocate(fd, FALLOC_FL_ZERO_RANGE, start, len);
-	if (!ret)
-		return 0;
-	return -errno;
-}
-#else
-#define platform_zero_range(fd, s, l)	(-EOPNOTSUPP)
-#endif
-
 /*
  * Use SIGKILL to simulate an immediate program crash, without a chance to run
  * atexit handlers.
