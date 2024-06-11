@@ -471,34 +471,26 @@ mread_f(
 		dumplen = pagesize;
 
 	if (rflag) {
-		for (tmp = length - 1, c = 0; tmp >= 0; tmp--, c = 1) {
-			*bp = *(((char *)mapping->addr) + dumpoffset + tmp);
-			cnt++;
-			if (c && cnt == dumplen) {
+		for (tmp = length - 1; tmp >= 0; tmp--) {
+			bp[cnt++] = ((char *)mapping->addr)[dumpoffset + tmp];
+			if (cnt == dumplen) {
 				if (dump) {
 					dump_buffer(printoffset, dumplen);
 					printoffset += dumplen;
 				}
-				bp = (char *)io_buffer;
 				dumplen = pagesize;
 				cnt = 0;
-			} else {
-				bp++;
 			}
 		}
 	} else {
-		for (tmp = 0, c = 0; tmp < length; tmp++, c = 1) {
-			*bp = *(((char *)mapping->addr) + dumpoffset + tmp);
-			cnt++;
-			if (c && cnt == dumplen) {
+		for (tmp = 0; tmp < length; tmp++) {
+			bp[cnt++] = ((char *)mapping->addr)[dumpoffset + tmp];
+			if (cnt == dumplen) {
 				if (dump)
 					dump_buffer(printoffset + tmp -
 						(dumplen - 1), dumplen);
-				bp = (char *)io_buffer;
 				dumplen = pagesize;
 				cnt = 0;
-			} else {
-				bp++;
 			}
 		}
 	}
