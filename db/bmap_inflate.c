@@ -340,7 +340,7 @@ build_new_datafork(
 	const struct xfs_bmbt_irec	*irec,
 	xfs_extnum_t			nextents)
 {
-	struct xbtree_ifakeroot		ifake;
+	struct xbtree_ifakeroot		ifake = {};
 	struct xfs_btree_cur		*bmap_cur;
 	int				error;
 
@@ -396,7 +396,7 @@ estimate_size(
 		.leaf_slack		= 1,
 		.node_slack		= 1,
 	};
-	struct xbtree_ifakeroot		ifake;
+	struct xbtree_ifakeroot		ifake = {};
 	struct xfs_btree_cur		*bmap_cur;
 	int				error;
 
