@@ -3678,7 +3678,7 @@ calc_concurrency_logblocks(
 	 * without blocking for space.  Increase the figure by 50% so that
 	 * background threads can also run.
 	 */
-	log_bytes = max_tx_bytes * 3 * cli->log_concurrency / 2;
+	log_bytes = (uint64_t)max_tx_bytes * 3 * cli->log_concurrency / 2;
 	new_logblocks = min(XFS_MAX_LOG_BYTES >> cfg->blocklog,
 				log_bytes >> cfg->blocklog);
 
