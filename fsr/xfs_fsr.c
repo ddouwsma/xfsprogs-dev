@@ -426,7 +426,8 @@ fsrallfs(char *mtab, time_t howlong, char *leftofffile)
 	fsdesc_t *fsp;
 	struct stat sb, sb2;
 
-	fsrprintf("xfs_fsr -m %s -t %d -f %s ...\n", mtab, howlong, leftofffile);
+	fsrprintf("xfs_fsr -m %s -t %lld -f %s ...\n", mtab,
+		  (long long)howlong, leftofffile);
 
 	endtime = starttime + howlong;
 	fs = fsbase;
