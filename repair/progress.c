@@ -91,7 +91,7 @@ typedef struct msg_block_s {
 	uint64_t	*done;
 	uint64_t	*total;
 	int		count;
-	int		interval;
+	time_t		interval;
 } msg_block_t;
 static msg_block_t 	global_msgs;
 
