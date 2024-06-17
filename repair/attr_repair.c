@@ -870,8 +870,13 @@ process_leaf_attr_level(xfs_mount_t	*mp,
 		 * If block looks ok but CRC didn't match, make sure to
 		 * recompute it.
 		 */
-		if (!no_modify && bp->b_error == -EFSBADCRC)
-			repair++;
+		if (bp->b_error == -EFSBADCRC) {
+			do_warn(
+ _("bad checksum for block %u in attribute fork for inode %" PRIu64 "\n"),
+				da_bno, ino);
+			if (!no_modify)
+				repair++;
+		}
 
 		if (repair && !no_modify) {
 			libxfs_buf_mark_dirty(bp);
@@ -1151,8 +1156,12 @@ process_longform_attr(
 		return 1;
 	}
 
-	if (bp->b_error == -EFSBADCRC)
+	if (bp->b_error == -EFSBADCRC) {
+		do_warn(
+ _("bad checksum for block 0 in attribute fork for inode %" PRIu64 "\n"),
+				ino);
 		(*repair)++;
+	}
 
 	/* is this block sane? */
 	if (__check_attr_header(mp, bp, ino)) {

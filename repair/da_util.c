@@ -562,7 +562,7 @@ _("can't read %s block %u for inode %" PRIu64 "\n"),
 				FORKNAME(whichfork), dabno, cursor->ino);
 			return 1;
 		}
-		if (bp->b_error == -EFSCORRUPTED || bp->b_error == -EFSBADCRC) {
+		if (bp->b_error == -EFSCORRUPTED) {
 			do_warn(
 _("corrupt %s tree block %u for inode %" PRIu64 "\n"),
 				FORKNAME(whichfork), dabno, cursor->ino);
@@ -625,9 +625,13 @@ _("bad level %d in %s block %u for inode %" PRIu64 "\n"),
 		 * If block looks ok but CRC didn't match, make sure to
 		 * recompute it.
 		 */
-		if (!no_modify &&
-		    cursor->level[this_level].bp->b_error == -EFSBADCRC)
-			cursor->level[this_level].dirty = 1;
+		if (cursor->level[this_level].bp->b_error == -EFSBADCRC) {
+			do_warn(
+ _("bad checksum in %s tree block %u for inode %" PRIu64 "\n"),
+				FORKNAME(whichfork), dabno, cursor->ino);
+			if (!no_modify)
+				cursor->level[this_level].dirty = 1;
+		}
 
 		if (cursor->level[this_level].dirty && !no_modify) {
 			libxfs_buf_mark_dirty(cursor->level[this_level].bp);
