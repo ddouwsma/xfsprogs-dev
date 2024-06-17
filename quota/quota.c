@@ -58,6 +58,8 @@ quota_mount(
 	if (xfsquotactl(XFS_GETQUOTA, dev, type, id, (void *)&d) < 0)
 		return 0;
 
+	dquot_fudge_numbers(&d);
+
 	if (!(flags & VERBOSE_FLAG)) {
 		count = 0;
 		if ((form & XFS_BLOCK_QUOTA) && d.d_bcount)

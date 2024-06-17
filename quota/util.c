@@ -427,3 +427,29 @@ fopen_write_secure(
 	}
 	return fp;
 }
+
+/*
+ * Push the rt block quota numbers into the regular block quota numbers so that
+ * we don't have to rewrite fstests.  The limits have to match, and the regular
+ * block timer cannot be active.  Only call this if you know what you are
+ * doing!
+ */
+void
+__dquot_fudge_numbers(
+	struct fs_disk_quota	*d)
+{
+	if (!d->d_btimer && !d->d_btimer_hi) {
+		d->d_btimer = d->d_rtbtimer;
+		d->d_btimer_hi = d->d_rtbtimer_hi;
+		d->d_rtbtimer = 0;
+		d->d_rtbtimer_hi = 0;
+	}
+
+	if (d->d_blk_hardlimit == d->d_rtb_hardlimit)
+		d->d_rtb_hardlimit = 0;
+	if (d->d_blk_softlimit == d->d_rtb_softlimit)
+		d->d_rtb_softlimit = 0;
+
+	d->d_bcount += d->d_rtbcount;
+	d->d_rtbcount = 0;
+}
