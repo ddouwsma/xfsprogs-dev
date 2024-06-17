@@ -87,6 +87,9 @@ struct iomap;
 #include "xfs_btree_staging.h"
 #include "xfs_rtbitmap.h"
 #include "xfs_symlink_remote.h"
+#include "libxfs/xfile.h"
+#include "libxfs/buf_mem.h"
+#include "xfs_btree_mem.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))

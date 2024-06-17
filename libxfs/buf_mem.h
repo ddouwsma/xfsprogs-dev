@@ -27,4 +27,9 @@ bool xmbuf_verify_daddr(struct xfs_buftarg *btp, xfs_daddr_t daddr);
 void xmbuf_trans_bdetach(struct xfs_trans *tp, struct xfs_buf *bp);
 int xmbuf_finalize(struct xfs_buf *bp);
 
+static inline unsigned long long xmbuf_bytes(struct xfs_buftarg *btp)
+{
+	return xfile_bytes(btp->bt_xfile);
+}
+
 #endif /* __XFS_BUF_MEM_H__ */
