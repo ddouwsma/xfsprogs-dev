@@ -20,12 +20,15 @@ PKGHFILES = xfs_fs.h \
 	xfs_log_format.h
 
 HFILES = \
+	defer_item.h \
 	libxfs_io.h \
 	libxfs_api_defs.h \
 	init.h \
 	libxfs_priv.h \
 	linux-err.h \
 	topology.h \
+	buf_mem.h \
+	xfile.h \
 	xfs_ag_resv.h \
 	xfs_alloc.h \
 	xfs_alloc_btree.h \
@@ -35,6 +38,7 @@ HFILES = \
 	xfs_bmap.h \
 	xfs_bmap_btree.h \
 	xfs_btree.h \
+	xfs_btree_mem.h \
 	xfs_btree_staging.h \
 	xfs_attr_remote.h \
 	xfs_cksum.h \
@@ -57,7 +61,8 @@ HFILES = \
 	xfs_trans_space.h \
 	xfs_dir2_priv.h
 
-CFILES = cache.c \
+CFILES = buf_mem.c \
+	cache.c \
 	defer_item.c \
 	init.c \
 	kmem.c \
@@ -66,6 +71,7 @@ CFILES = cache.c \
 	topology.c \
 	trans.c \
 	util.c \
+	xfile.c \
 	xfs_ag.c \
 	xfs_ag_resv.c \
 	xfs_alloc.c \
@@ -77,6 +83,7 @@ CFILES = cache.c \
 	xfs_bmap.c \
 	xfs_bmap_btree.c \
 	xfs_btree.c \
+	xfs_btree_mem.c \
 	xfs_btree_staging.c \
 	xfs_da_btree.c \
 	xfs_defer.c \

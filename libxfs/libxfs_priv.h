@@ -38,6 +38,7 @@
 #define __LIBXFS_INTERNAL_XFS_H__
 
 #define CONFIG_XFS_RT
+#define CONFIG_XFS_BTREE_IN_MEM
 
 #include "libxfs_api_defs.h"
 #include "platform_defs.h"
@@ -389,11 +390,14 @@ void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 
 #define xfs_trans_buf_copy_type(dbp, sbp)
 
-/* no readahead, need to avoid set-but-unused var warnings. */
-#define xfs_buf_readahead(a,d,c,ops)		({	\
-	xfs_daddr_t __d = d;				\
-	__d = __d; /* no set-but-unused warning */	\
-})
+static inline void
+xfs_buf_readahead(
+	struct xfs_buftarg	*target,
+	xfs_daddr_t		blkno,
+	size_t			numblks,
+	const struct xfs_buf_ops *ops)
+{
+}
 #define xfs_buf_readahead_map(a,b,c,ops)	((void) 0)	/* no readahead */
 
 #define xfs_sort					qsort
@@ -406,6 +410,7 @@ void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 	__mode = __mode; /* no set-but-unused warning */	\
 })
 #define xfs_lock_two_inodes(ip0,mode0,ip1,mode1)	((void) 0)
+#define xfs_assert_ilocked(ip, flags)			((void) 0)
 
 /* space allocation */
 #define XFS_EXTENT_BUSY_DISCARDED	0x01	/* undergoing a discard op. */
@@ -549,8 +554,8 @@ unsigned int hweight8(unsigned int w);
 unsigned int hweight32(unsigned int w);
 unsigned int hweight64(__u64 w);
 
-static inline int xfs_buf_hash_init(struct xfs_perag *pag) { return 0; }
-static inline void xfs_buf_hash_destroy(struct xfs_perag *pag) { }
+#define xfs_buf_cache_init(bch)		(0)
+#define xfs_buf_cache_destroy(bch)	((void)0)
 
 static inline int xfs_iunlink_init(struct xfs_perag *pag) { return 0; }
 static inline void xfs_iunlink_destroy(struct xfs_perag *pag) { }

@@ -314,7 +314,7 @@ bulkload_claim_block(
 	if (resv->used == resv->len)
 		list_move_tail(&resv->list, &bkl->resv_list);
 
-	if (cur->bc_flags & XFS_BTREE_LONG_PTRS)
+	if (cur->bc_ops->ptr_len == XFS_BTREE_LONG_PTR_LEN)
 		ptr->l = cpu_to_be64(XFS_AGB_TO_FSB(mp, resv->pag->pag_agno,
 								agbno));
 	else

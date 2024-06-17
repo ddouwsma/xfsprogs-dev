@@ -4095,18 +4095,18 @@ scan_ag(
 	scan_freelist(agf);
 	fdblocks--;
 	scan_sbtree(agf,
-		be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNO]),
-		be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNO]),
+		be32_to_cpu(agf->agf_bno_root),
+		be32_to_cpu(agf->agf_bno_level),
 		1, scanfunc_bno, TYP_BNOBT);
 	fdblocks--;
 	scan_sbtree(agf,
-		be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNT]),
-		be32_to_cpu(agf->agf_levels[XFS_BTNUM_CNT]),
+		be32_to_cpu(agf->agf_cnt_root),
+		be32_to_cpu(agf->agf_cnt_level),
 		1, scanfunc_cnt, TYP_CNTBT);
-	if (agf->agf_roots[XFS_BTNUM_RMAP]) {
+	if (agf->agf_rmap_root) {
 		scan_sbtree(agf,
-			be32_to_cpu(agf->agf_roots[XFS_BTNUM_RMAP]),
-			be32_to_cpu(agf->agf_levels[XFS_BTNUM_RMAP]),
+			be32_to_cpu(agf->agf_rmap_root),
+			be32_to_cpu(agf->agf_rmap_level),
 			1, scanfunc_rmap, TYP_RMAPBT);
 	}
 	if (agf->agf_refcount_root) {

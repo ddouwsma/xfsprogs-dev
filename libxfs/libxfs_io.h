@@ -27,7 +27,9 @@ struct xfs_buftarg {
 	unsigned long		writes_left;
 	dev_t			bt_bdev;
 	int			bt_bdev_fd;
+	struct xfile		*bt_xfile;
 	unsigned int		flags;
+	struct cache		*bcache;	/* buffer cache */
 };
 
 /* We purged a dirty buffer and lost a write. */
@@ -36,6 +38,8 @@ struct xfs_buftarg {
 #define XFS_BUFTARG_CORRUPT_WRITE	(1 << 1)
 /* Simulate failure after a certain number of writes. */
 #define XFS_BUFTARG_INJECT_WRITE_FAIL	(1 << 2)
+/* purge buffers when lookups find a size mismatch */
+#define XFS_BUFTARG_MISCOMPARE_PURGE	(1 << 3)
 
 /* Simulate the system crashing after a certain number of writes. */
 static inline void
@@ -54,6 +58,27 @@ xfs_buftarg_trip_write(
 
 void libxfs_buftarg_init(struct xfs_mount *mp, struct libxfs_init *xi);
 int libxfs_blkdev_issue_flush(struct xfs_buftarg *btp);
+
+/*
+ * The bufkey is used to pass the new buffer information to the cache object
+ * allocation routine. Because discontiguous buffers need to pass different
+ * information, we need fields to pass that information. However, because the
+ * blkno and bblen is needed for the initial cache entry lookup (i.e. for
+ * bcompare) the fact that the map/nmaps is non-null to switch to discontiguous
+ * buffer initialisation instead of a contiguous buffer.
+ */
+struct xfs_bufkey {
+	struct xfs_buftarg	*buftarg;
+	xfs_daddr_t		blkno;
+	unsigned int		bblen;
+	struct xfs_buf_map	*map;
+	int			nmaps;
+};
+
+/* for buf_mem.c only: */
+unsigned int libxfs_bhash(cache_key_t key, unsigned int hashsize,
+		unsigned int hashshift);
+int libxfs_bcompare(struct cache_node *node, cache_key_t key);
 
 #define LIBXFS_BBTOOFF64(bbs)	(((xfs_off_t)(bbs)) << BBSHIFT)
 
@@ -140,7 +165,6 @@ int libxfs_buf_priority(struct xfs_buf *bp);
 
 /* Buffer Cache Interfaces */
 
-extern struct cache	*libxfs_bcache;
 extern struct cache_operations	libxfs_bcache_operations;
 
 #define LIBXFS_GETBUF_TRYLOCK	(1 << 0)
@@ -184,10 +208,10 @@ libxfs_buf_read(
 
 int libxfs_readbuf_verify(struct xfs_buf *bp, const struct xfs_buf_ops *ops);
 struct xfs_buf *libxfs_getsb(struct xfs_mount *mp);
-extern void	libxfs_bcache_purge(void);
+extern void	libxfs_bcache_purge(struct xfs_mount *mp);
 extern void	libxfs_bcache_free(void);
-extern void	libxfs_bcache_flush(void);
-extern int	libxfs_bcache_overflowed(void);
+extern void	libxfs_bcache_flush(struct xfs_mount *mp);
+extern int	libxfs_bcache_overflowed(struct xfs_mount *mp);
 
 /* Buffer (Raw) Interfaces */
 int		libxfs_bwrite(struct xfs_buf *bp);
@@ -257,5 +281,15 @@ xfs_buf_delwri_queue_here(struct xfs_buf *bp, struct list_head *buffer_list)
 
 int xfs_buf_delwri_submit(struct list_head *buffer_list);
 void xfs_buf_delwri_cancel(struct list_head *list);
+
+xfs_daddr_t xfs_buftarg_nr_sectors(struct xfs_buftarg *btp);
+
+static inline bool
+xfs_buftarg_verify_daddr(
+	struct xfs_buftarg	*btp,
+	xfs_daddr_t		daddr)
+{
+	return daddr < xfs_buftarg_nr_sectors(btp);
+}
 
 #endif	/* __LIBXFS_IO_H__ */

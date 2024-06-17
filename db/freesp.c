@@ -209,12 +209,12 @@ scan_ag(
 	agf = iocur_top->data;
 	scan_freelist(agf);
 	if (countflag)
-		scan_sbtree(agf, be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNT]),
-			TYP_CNTBT, be32_to_cpu(agf->agf_levels[XFS_BTNUM_CNT]),
+		scan_sbtree(agf, be32_to_cpu(agf->agf_cnt_root),
+			TYP_CNTBT, be32_to_cpu(agf->agf_cnt_level),
 			scanfunc_cnt);
 	else
-		scan_sbtree(agf, be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNO]),
-			TYP_BNOBT, be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNO]),
+		scan_sbtree(agf, be32_to_cpu(agf->agf_bno_root),
+			TYP_BNOBT, be32_to_cpu(agf->agf_bno_level),
 			scanfunc_bno);
 	pop_cur();
 }

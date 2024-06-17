@@ -460,8 +460,8 @@ copy_free_bno_btree(
 	xfs_agblock_t	root;
 	int		levels;
 
-	root = be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNO]);
-	levels = be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNO]);
+	root = be32_to_cpu(agf->agf_bno_root);
+	levels = be32_to_cpu(agf->agf_bno_level);
 
 	/* validate root and levels before processing the tree */
 	if (root == 0 || root > mp->m_sb.sb_agblocks) {
@@ -488,8 +488,8 @@ copy_free_cnt_btree(
 	xfs_agblock_t	root;
 	int		levels;
 
-	root = be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNT]);
-	levels = be32_to_cpu(agf->agf_levels[XFS_BTNUM_CNT]);
+	root = be32_to_cpu(agf->agf_cnt_root);
+	levels = be32_to_cpu(agf->agf_cnt_level);
 
 	/* validate root and levels before processing the tree */
 	if (root == 0 || root > mp->m_sb.sb_agblocks) {
@@ -560,8 +560,8 @@ copy_rmap_btree(
 	if (!xfs_has_rmapbt(mp))
 		return 1;
 
-	root = be32_to_cpu(agf->agf_roots[XFS_BTNUM_RMAP]);
-	levels = be32_to_cpu(agf->agf_levels[XFS_BTNUM_RMAP]);
+	root = be32_to_cpu(agf->agf_rmap_root);
+	levels = be32_to_cpu(agf->agf_rmap_level);
 
 	/* validate root and levels before processing the tree */
 	if (root == 0 || root > mp->m_sb.sb_agblocks) {

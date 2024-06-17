@@ -475,7 +475,9 @@ xrep_bmap_build_new_fork(
 	 */
 	libxfs_rmap_ino_bmbt_owner(&oinfo, sc->ip->i_ino, rb->whichfork);
 	bulkload_init_inode(&rb->new_fork_info, sc, rb->whichfork, &oinfo);
-	bmap_cur = libxfs_bmbt_stage_cursor(sc->mp, sc->ip, ifake);
+	bmap_cur = libxfs_bmbt_init_cursor(sc->mp, NULL, sc->ip,
+			XFS_STAGING_FORK);
+	libxfs_btree_stage_ifakeroot(bmap_cur, ifake);
 
 	/*
 	 * Figure out the size and format of the new fork, then fill it with

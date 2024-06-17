@@ -9,6 +9,8 @@
 
 /* For userspace XFS_RT is always defined */
 #define CONFIG_XFS_RT
+/* Ditto in-memory btrees */
+#define CONFIG_XFS_BTREE_IN_MEM
 
 #include "libxfs_api_defs.h"
 #include "platform_defs.h"
@@ -84,6 +86,7 @@ struct iomap;
 #include "xfs_refcount.h"
 #include "xfs_btree_staging.h"
 #include "xfs_rtbitmap.h"
+#include "xfs_symlink_remote.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -147,7 +150,6 @@ int		libxfs_init(struct libxfs_init *);
 void		libxfs_destroy(struct libxfs_init *li);
 
 extern int	libxfs_device_alignment (void);
-extern void	libxfs_report(FILE *);
 
 /* check or write log footer: specify device, log size in blocks & uuid */
 typedef char	*(libxfs_get_block_t)(char *, int, void *);

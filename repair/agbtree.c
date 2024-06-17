@@ -204,7 +204,7 @@ get_bno_rec(
 {
 	xfs_agnumber_t		agno = cur->bc_ag.pag->pag_agno;
 
-	if (cur->bc_btnum == XFS_BTNUM_BNO) {
+	if (xfs_btree_is_bno(cur->bc_ops)) {
 		if (!prev_value)
 			return findfirst_bno_extent(agno);
 		return findnext_bno_extent(prev_value);
@@ -262,10 +262,11 @@ init_freespace_cursors(
 	init_rebuild(sc, &XFS_RMAP_OINFO_AG, est_agfreeblocks, btr_bno);
 	init_rebuild(sc, &XFS_RMAP_OINFO_AG, est_agfreeblocks, btr_cnt);
 
-	btr_bno->cur = libxfs_allocbt_stage_cursor(sc->mp,
-			&btr_bno->newbt.afake, pag, XFS_BTNUM_BNO);
-	btr_cnt->cur = libxfs_allocbt_stage_cursor(sc->mp,
-			&btr_cnt->newbt.afake, pag, XFS_BTNUM_CNT);
+	btr_bno->cur = libxfs_bnobt_init_cursor(sc->mp, NULL, NULL, pag);
+	libxfs_btree_stage_afakeroot(btr_bno->cur, &btr_bno->newbt.afake);
+
+	btr_cnt->cur = libxfs_cntbt_init_cursor(sc->mp, NULL, NULL, pag);
+	libxfs_btree_stage_afakeroot(btr_cnt->cur, &btr_cnt->newbt.afake);
 
 	btr_bno->bload.get_records = get_bnobt_records;
 	btr_bno->bload.claim_block = rebuild_claim_block;
@@ -377,7 +378,7 @@ get_ino_rec(
 {
 	xfs_agnumber_t		agno = cur->bc_ag.pag->pag_agno;
 
-	if (cur->bc_btnum == XFS_BTNUM_INO) {
+	if (xfs_btree_is_ino(cur->bc_ops)) {
 		if (!prev_value)
 			return findfirst_inode_rec(agno);
 		return next_ino_rec(prev_value);
@@ -521,8 +522,8 @@ init_ino_cursors(
 			fino_recs++;
 	}
 
-	btr_ino->cur = libxfs_inobt_stage_cursor(pag, &btr_ino->newbt.afake,
-			XFS_BTNUM_INO);
+	btr_ino->cur = libxfs_inobt_init_cursor(pag, NULL, NULL);
+	libxfs_btree_stage_afakeroot(btr_ino->cur, &btr_ino->newbt.afake);
 
 	btr_ino->bload.get_records = get_inobt_records;
 	btr_ino->bload.claim_block = rebuild_claim_block;
@@ -541,8 +542,8 @@ _("Unable to compute inode btree geometry, error %d.\n"), error);
 		return;
 
 	init_rebuild(sc, &XFS_RMAP_OINFO_INOBT, est_agfreeblocks, btr_fino);
-	btr_fino->cur = libxfs_inobt_stage_cursor(pag,
-			&btr_fino->newbt.afake, XFS_BTNUM_FINO);
+	btr_fino->cur = libxfs_finobt_init_cursor(pag, NULL, NULL);
+	libxfs_btree_stage_afakeroot(btr_fino->cur, &btr_fino->newbt.afake);
 
 	btr_fino->bload.get_records = get_inobt_records;
 	btr_fino->bload.claim_block = rebuild_claim_block;
@@ -632,7 +633,8 @@ init_rmapbt_cursor(
 		return;
 
 	init_rebuild(sc, &XFS_RMAP_OINFO_AG, est_agfreeblocks, btr);
-	btr->cur = libxfs_rmapbt_stage_cursor(sc->mp, &btr->newbt.afake, pag);
+	btr->cur = libxfs_rmapbt_init_cursor(sc->mp, NULL, NULL, pag);
+	libxfs_btree_stage_afakeroot(btr->cur, &btr->newbt.afake);
 
 	btr->bload.get_records = get_rmapbt_records;
 	btr->bload.claim_block = rebuild_claim_block;
@@ -714,8 +716,8 @@ init_refc_cursor(
 		return;
 
 	init_rebuild(sc, &XFS_RMAP_OINFO_REFC, est_agfreeblocks, btr);
-	btr->cur = libxfs_refcountbt_stage_cursor(sc->mp, &btr->newbt.afake,
-			pag);
+	btr->cur = libxfs_refcountbt_init_cursor(sc->mp, NULL, NULL, pag);
+	libxfs_btree_stage_afakeroot(btr->cur, &btr->newbt.afake);
 
 	btr->bload.get_records = get_refcountbt_records;
 	btr->bload.claim_block = rebuild_claim_block;

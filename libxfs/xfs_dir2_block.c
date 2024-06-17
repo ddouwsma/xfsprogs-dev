@@ -17,6 +17,7 @@
 #include "xfs_dir2.h"
 #include "xfs_dir2_priv.h"
 #include "xfs_trace.h"
+#include "xfs_health.h"
 
 /*
  * Local function prototypes.
@@ -149,6 +150,7 @@ xfs_dir3_block_read(
 		__xfs_buf_mark_corrupt(*bpp, fa);
 		xfs_trans_brelse(tp, *bpp);
 		*bpp = NULL;
+		xfs_dirattr_mark_sick(dp, XFS_DATA_FORK);
 		return -EFSCORRUPTED;
 	}
 
@@ -1105,7 +1107,7 @@ xfs_dir2_sf_to_block(
 	 * Copy the directory into a temporary buffer.
 	 * Then pitch the incore inode data so we can make extents.
 	 */
-	sfp = kmem_alloc(ifp->if_bytes, 0);
+	sfp = kmalloc(ifp->if_bytes, GFP_KERNEL | __GFP_NOFAIL);
 	memcpy(sfp, oldsfp, ifp->if_bytes);
 
 	xfs_idata_realloc(dp, -ifp->if_bytes, XFS_DATA_FORK);
@@ -1250,7 +1252,7 @@ xfs_dir2_sf_to_block(
 			sfep = xfs_dir2_sf_nextentry(mp, sfp, sfep);
 	}
 	/* Done with the temporary buffer */
-	kmem_free(sfp);
+	kfree(sfp);
 	/*
 	 * Sort the leaf entries by hash value.
 	 */
@@ -1265,6 +1267,6 @@ xfs_dir2_sf_to_block(
 	xfs_dir3_data_check(dp, bp);
 	return 0;
 out_free:
-	kmem_free(sfp);
+	kfree(sfp);
 	return error;
 }
