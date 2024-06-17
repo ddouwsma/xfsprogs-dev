@@ -595,7 +595,7 @@ xrep_bmap(
 	if (error)
 		return error;
 
-	rb = kmem_zalloc(sizeof(struct xrep_bmap), KM_NOFS | KM_MAYFAIL);
+	rb = kzalloc(sizeof(struct xrep_bmap), 0);
 	if (!rb)
 		return ENOMEM;
 	rb->sc = sc;
@@ -622,7 +622,7 @@ xrep_bmap(
 out_bitmap:
 	free_slab(&rb->bmap_records);
 out_rb:
-	kmem_free(rb);
+	kfree(rb);
 	return error;
 }
 

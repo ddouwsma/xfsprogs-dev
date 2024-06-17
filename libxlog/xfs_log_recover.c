@@ -991,7 +991,7 @@ xlog_recover_new_tid(
 {
 	struct xlog_recover	*trans;
 
-	trans = kmem_zalloc(sizeof(struct xlog_recover), 0);
+	trans = kzalloc(sizeof(struct xlog_recover), 0);
 	trans->r_log_tid   = tid;
 	trans->r_lsn	   = lsn;
 	INIT_LIST_HEAD(&trans->r_itemq);
@@ -1006,7 +1006,7 @@ xlog_recover_add_item(
 {
 	struct xlog_recover_item *item;
 
-	item = kmem_zalloc(sizeof(struct xlog_recover_item), 0);
+	item = kzalloc(sizeof(struct xlog_recover_item), 0);
 	INIT_LIST_HEAD(&item->ri_list);
 	list_add_tail(&item->ri_list, head);
 }
@@ -1085,7 +1085,7 @@ xlog_recover_add_to_trans(
 		return 0;
 	}
 
-	ptr = kmem_alloc(len, 0);
+	ptr = kmalloc(len, 0);
 	memcpy(ptr, dp, len);
 	in_f = (struct xfs_inode_log_format *)ptr;
 
@@ -1107,13 +1107,12 @@ xlog_recover_add_to_trans(
 		"bad number of regions (%d) in inode log format",
 				  in_f->ilf_size);
 			ASSERT(0);
-			kmem_free(ptr);
+			kfree(ptr);
 			return XFS_ERROR(EIO);
 		}
 
 		item->ri_total = in_f->ilf_size;
-		item->ri_buf =
-			kmem_zalloc(item->ri_total * sizeof(xfs_log_iovec_t),
+		item->ri_buf = kzalloc(item->ri_total * sizeof(xfs_log_iovec_t),
 				    0);
 	}
 	ASSERT(item->ri_total > item->ri_cnt);
@@ -1141,13 +1140,13 @@ xlog_recover_free_trans(
 		/* Free the regions in the item. */
 		list_del(&item->ri_list);
 		for (i = 0; i < item->ri_cnt; i++)
-			kmem_free(item->ri_buf[i].i_addr);
+			kfree(item->ri_buf[i].i_addr);
 		/* Free the item itself */
-		kmem_free(item->ri_buf);
-		kmem_free(item);
+		kfree(item->ri_buf);
+		kfree(item);
 	}
 	/* Free the transaction recover structure */
-	kmem_free(trans);
+	kfree(trans);
 }
 
 /*
