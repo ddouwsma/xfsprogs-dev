@@ -919,8 +919,10 @@ mk_orphanage(xfs_mount_t *mp)
 	xname.len = strlen(ORPHANAGE);
 	xname.type = XFS_DIR3_FT_DIR;
 
-	if (libxfs_dir_lookup(NULL, pip, &xname, &ino, NULL) == 0)
-		return ino;
+	/* If the lookup of /lost+found succeeds, return the inumber. */
+	error = -libxfs_dir_lookup(NULL, pip, &xname, &ino, NULL);
+	if (error == 0)
+		goto out_pip;
 
 	/*
 	 * could not be found, create it
@@ -1012,6 +1014,7 @@ mk_orphanage(xfs_mount_t *mp)
 			ORPHANAGE, error);
 	}
 	libxfs_irele(ip);
+out_pip:
 	libxfs_irele(pip);
 
 	return(ino);
