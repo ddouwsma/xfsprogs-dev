@@ -252,7 +252,8 @@ writesymlink(
 	xfs_extlen_t		nb = XFS_B_TO_FSB(mp, len);
 	int			error;
 
-	error = -libxfs_symlink_write_target(tp, ip, buf, len, nb, nb);
+	error = -libxfs_symlink_write_target(tp, ip, ip->i_ino, buf, len, nb,
+			nb);
 	if (error) {
 		fprintf(stderr,
 	_("%s: error %d creating symlink to '%s'.\n"), progname, error, buf);
