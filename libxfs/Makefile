@@ -113,6 +113,7 @@ CFILES = buf_mem.c \
 	xfs_symlink_remote.c \
 	xfs_trans_inode.c \
 	xfs_trans_resv.c \
+	xfs_trans_space.c \
 	xfs_types.c
 
 #
