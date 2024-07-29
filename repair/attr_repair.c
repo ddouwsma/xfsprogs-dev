@@ -291,6 +291,13 @@ process_shortform_attr(
 			}
 		}
 
+		if (!libxfs_attr_check_namespace(currententry->flags)) {
+			do_warn(
+	_("multiple namespaces for shortform attribute %d in inode %" PRIu64 "\n"),
+				i, ino);
+			junkit = 1;
+		}
+
 		/* namecheck checks for null chars in attr names. */
 		if (!libxfs_attr_namecheck(currententry->flags,
 					   currententry->nameval,
@@ -637,6 +644,14 @@ process_leaf_attr_block(
 			do_warn(
 	_("bad attribute nameidx %d in attr block %u, inode %" PRIu64 "\n"),
 				be16_to_cpu(entry->nameidx), da_bno, ino);
+			clearit = 1;
+			break;
+		}
+
+		if (!libxfs_attr_check_namespace(entry->flags)) {
+			do_warn(
+	_("multiple namespaces for attribute entry %d in attr block %u, inode %" PRIu64 "\n"),
+				i, da_bno, ino);
 			clearit = 1;
 			break;
 		}
