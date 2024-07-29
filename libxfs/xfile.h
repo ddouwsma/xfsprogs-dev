@@ -30,5 +30,6 @@ ssize_t xfile_load(struct xfile *xf, void *buf, size_t count, loff_t pos);
 ssize_t xfile_store(struct xfile *xf, const void *buf, size_t count, loff_t pos);
 
 unsigned long long xfile_bytes(struct xfile *xf);
+void xfile_discard(struct xfile *xf, loff_t pos, unsigned long long count);
 
 #endif /* __LIBXFS_XFILE_H__ */
