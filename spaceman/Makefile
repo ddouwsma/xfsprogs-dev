@@ -6,12 +6,20 @@ TOPDIR = ..
 include $(TOPDIR)/include/builddefs
 
 LTCOMMAND = xfs_spaceman
-HFILES = init.h space.h
-CFILES = info.c init.c file.c health.c prealloc.c trim.c
+HFILES = \
+	init.h \
+	space.h
+CFILES = \
+	file.c \
+	health.c \
+	info.c \
+	init.c \
+	prealloc.c \
+	trim.c
 LSRCFILES = xfs_info.sh
 
-LLDLIBS = $(LIBXCMD) $(LIBFROG)
-LTDEPENDENCIES = $(LIBXCMD) $(LIBFROG)
+LLDLIBS = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG)
+LTDEPENDENCIES = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG)
 LLDFLAGS = -static
 
 ifeq ($(ENABLE_EDITLINE),yes)
