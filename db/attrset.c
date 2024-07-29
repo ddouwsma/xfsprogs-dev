@@ -111,7 +111,11 @@ attr_set_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_da_args	args = { };
+	struct xfs_da_args	args = {
+		.geo		= mp->m_attr_geo,
+		.whichfork	= XFS_ATTR_FORK,
+		.op_flags	= XFS_DA_OP_OKNOENT,
+	};
 	char			*sp;
 	char			*name_from_file = NULL;
 	char			*value_from_file = NULL;
@@ -253,6 +257,9 @@ attr_set_f(
 		goto out;
 	}
 
+	args.owner = iocur_top->ino;
+	libxfs_attr_sethash(&args);
+
 	if (libxfs_attr_set(&args, op, false)) {
 		dbprintf(_("failed to set attr %s on inode %llu\n"),
 			args.name, (unsigned long long)iocur_top->ino);
@@ -277,7 +284,11 @@ attr_remove_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_da_args	args = { };
+	struct xfs_da_args	args = {
+		.geo		= mp->m_attr_geo,
+		.whichfork	= XFS_ATTR_FORK,
+		.op_flags	= XFS_DA_OP_OKNOENT,
+	};
 	char			*name_from_file = NULL;
 	int			c;
 
@@ -364,6 +375,9 @@ attr_remove_f(
 			(unsigned long long)iocur_top->ino);
 		goto out;
 	}
+
+	args.owner = iocur_top->ino;
+	libxfs_attr_sethash(&args);
 
 	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE, false)) {
 		dbprintf(_("failed to remove attr %s from inode %llu\n"),
