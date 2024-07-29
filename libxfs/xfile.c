@@ -179,7 +179,7 @@ xfile_fcb_find(
 {
 	struct xfile_fcb	*fcb;
 	int			ret;
-	int			error;
+	int			error = 0;
 
 	/* No maximum range means that the caller gets a private memfd. */
 	if (maxbytes == 0) {
@@ -222,13 +222,13 @@ xfile_fcb_find(
 	/* Otherwise, open a new memfd and add it to our list. */
 	error = xfile_fcb_create(description, &fcb);
 	if (error)
-		return error;
+		goto out_unlock;
 
 	ret = ftruncate(fcb->fd, maxbytes);
 	if (ret) {
 		error = -errno;
 		xfile_fcb_irele(fcb, 0, maxbytes);
-		return error;
+		goto out_unlock;
 	}
 
 	list_add_tail(&fcb->fcb_list, &fcb_list);
