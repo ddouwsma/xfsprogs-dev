@@ -835,7 +835,7 @@ dirattr_hashname(
 		return libxfs_dir2_hashname(mp, &xname);
 	}
 
-	return libxfs_da_hashname(name, namelen);
+	return libxfs_attr_hashname(name, namelen);
 }
 
 static void
@@ -982,9 +982,9 @@ obfuscate_path_components(
 		if (!slash) {
 			/* last (or single) component */
 			namelen = strnlen((char *)comp, len);
-			hash = libxfs_da_hashname(comp, namelen);
+			hash = dirattr_hashname(true, comp, namelen);
 			obfuscate_name(hash, namelen, comp, false);
-			ASSERT(hash == libxfs_da_hashname(comp, namelen));
+			ASSERT(hash == dirattr_hashname(true, comp, namelen));
 			break;
 		}
 		namelen = slash - (char *)comp;
@@ -994,9 +994,9 @@ obfuscate_path_components(
 			len--;
 			continue;
 		}
-		hash = libxfs_da_hashname(comp, namelen);
+		hash = dirattr_hashname(true, comp, namelen);
 		obfuscate_name(hash, namelen, comp, false);
-		ASSERT(hash == libxfs_da_hashname(comp, namelen));
+		ASSERT(hash == dirattr_hashname(true, comp, namelen));
 		comp += namelen + 1;
 		len -= namelen + 1;
 	}

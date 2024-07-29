@@ -73,7 +73,7 @@ hash_f(
 		if (use_dir2_hash)
 			hashval = libxfs_dir2_hashname(mp, &xname);
 		else
-			hashval = libxfs_da_hashname(xname.name, xname.len);
+			hashval = libxfs_attr_hashname(xname.name, xname.len);
 		dbprintf("0x%x\n", hashval);
 	}
 
@@ -306,7 +306,7 @@ collide_xattrs(
 	unsigned long		i;
 	int			error = 0;
 
-	old_hash = libxfs_da_hashname((uint8_t *)name, namelen);
+	old_hash = libxfs_attr_hashname((uint8_t *)name, namelen);
 
 	if (fd >= 0) {
 		/*
@@ -331,8 +331,8 @@ collide_xattrs(
 		snprintf(xattrname, MAXNAMELEN + 5, "user.%s", name);
 		obfuscate_name(old_hash, namelen, (uint8_t *)xattrname + 5,
 				false);
-		ASSERT(old_hash == libxfs_da_hashname((uint8_t *)xattrname + 5,
-				namelen));
+		ASSERT(old_hash == libxfs_attr_hashname(
+					(uint8_t *)xattrname + 5, namelen));
 
 		if (fd >= 0) {
 			error = fsetxattr(fd, xattrname, "1", 1, 0);
