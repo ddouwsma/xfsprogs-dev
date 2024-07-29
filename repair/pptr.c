@@ -673,6 +673,44 @@ load_file_pptr_name(
 			name, file_pptr->namelen);
 }
 
+/* Add an on disk parent pointer to a file. */
+static int
+add_file_pptr(
+	struct xfs_inode		*ip,
+	const struct ag_pptr		*ag_pptr,
+	const unsigned char		*name)
+{
+	struct xfs_name			xname = {
+		.name			= name,
+		.len			= ag_pptr->namelen,
+	};
+	struct xfs_parent_rec		pptr_rec = { };
+	struct xfs_da_args		scratch;
+
+	xfs_parent_rec_init(&pptr_rec, ag_pptr->parent_ino,
+			ag_pptr->parent_gen);
+	return -libxfs_parent_set(ip, ip->i_ino, &xname, &pptr_rec, &scratch);
+}
+
+/* Remove an on disk parent pointer from a file. */
+static int
+remove_file_pptr(
+	struct xfs_inode		*ip,
+	const struct file_pptr		*file_pptr,
+	const unsigned char		*name)
+{
+	struct xfs_name			xname = {
+		.name			= name,
+		.len			= file_pptr->namelen,
+	};
+	struct xfs_parent_rec		pptr_rec = { };
+	struct xfs_da_args		scratch;
+
+	xfs_parent_rec_init(&pptr_rec, file_pptr->parent_ino,
+			file_pptr->parent_gen);
+	return -libxfs_parent_unset(ip, ip->i_ino, &xname, &pptr_rec, &scratch);
+}
+
 /* Remove all pptrs from @ip. */
 static void
 clear_all_pptrs(
@@ -729,7 +767,16 @@ add_missing_parent_ptr(
 				name);
 	}
 
-	/* XXX actually do the work */
+	error = add_file_pptr(ip, ag_pptr, name);
+	if (error)
+		do_error(
+ _("adding ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)ag_pptr->parent_ino,
+			ag_pptr->parent_gen,
+			ag_pptr->namelen,
+			name,
+			strerror(error));
 }
 
 /* Remove @file_pptr from @ip. */
@@ -771,7 +818,16 @@ remove_incorrect_parent_ptr(
 			file_pptr->namelen,
 			name);
 
-	/* XXX actually do the work */
+	error = remove_file_pptr(ip, file_pptr, name);
+	if (error)
+		do_error(
+ _("removing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)file_pptr->parent_ino,
+			file_pptr->parent_gen,
+			file_pptr->namelen,
+			name,
+			strerror(error));
 }
 
 /*
@@ -851,7 +907,33 @@ reset:
 			ag_pptr->namelen,
 			name1);
 
-	/* XXX do the work */
+	/* Remove the parent pointer that we don't want. */
+	error = remove_file_pptr(ip, file_pptr, name2);
+	if (error)
+		do_error(
+_("erasing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)file_pptr->parent_ino,
+			file_pptr->parent_gen,
+			file_pptr->namelen,
+			name2,
+			strerror(error));
+
+	/*
+	 * Add the parent pointer that we do want.  It's possible that this
+	 * parent pointer already exists but we haven't gotten that far in the
+	 * scan, so we'll keep going on EEXIST.
+	 */
+	error = add_file_pptr(ip, ag_pptr, name1);
+	if (error && error != EEXIST)
+		do_error(
+ _("updating ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)ag_pptr->parent_ino,
+			ag_pptr->parent_gen,
+			ag_pptr->namelen,
+			name1,
+			strerror(error));
 }
 
 static int
