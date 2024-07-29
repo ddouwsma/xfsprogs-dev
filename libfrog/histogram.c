@@ -110,10 +110,30 @@ hist_print(
 {
 	unsigned int			obs_w = strlen(hstr->observations);
 	unsigned int			sum_w = strlen(hstr->sum);
+	unsigned int			from_w = 7, to_w = 7;
 	unsigned int			i;
 
-	printf("%7s %7s %*s %*s %6s\n",
-			_("from"), _("to"),
+	for (i = 0; i < hs->nr_buckets; i++) {
+		char buf[256];
+
+		if (hs->buckets[i].nr_obs == 0)
+			continue;
+
+		snprintf(buf, sizeof(buf) - 1, "%lld", hs->buckets[i].low);
+		from_w = max(from_w, strlen(buf));
+
+		snprintf(buf, sizeof(buf) - 1, "%lld", hs->buckets[i].high);
+		to_w = max(to_w, strlen(buf));
+
+		snprintf(buf, sizeof(buf) - 1, "%lld", hs->buckets[i].nr_obs);
+		obs_w = max(obs_w, strlen(buf));
+
+		snprintf(buf, sizeof(buf) - 1, "%lld", hs->buckets[i].sum);
+		sum_w = max(sum_w, strlen(buf));
+	}
+
+	printf("%*s %*s %*s %*s %6s\n",
+			from_w, _("from"), to_w, _("to"),
 			obs_w, hstr->observations,
 			sum_w, hstr->sum,
 			_("pct"));
@@ -122,8 +142,9 @@ hist_print(
 		if (hs->buckets[i].nr_obs == 0)
 			continue;
 
-		printf("%7lld %7lld %*lld %*lld %6.2f\n",
-				hs->buckets[i].low, hs->buckets[i].high,
+		printf("%*lld %*lld %*lld %*lld %6.2f\n",
+				from_w, hs->buckets[i].low,
+				to_w, hs->buckets[i].high,
 				obs_w, hs->buckets[i].nr_obs,
 				sum_w, hs->buckets[i].sum,
 				hs->buckets[i].sum * 100.0 / hs->tot_sum);
