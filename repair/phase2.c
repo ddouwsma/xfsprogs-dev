@@ -182,6 +182,34 @@ set_nrext64(
 	return true;
 }
 
+static bool
+set_exchrange(
+	struct xfs_mount	*mp,
+	struct xfs_sb		*new_sb)
+{
+	if (xfs_has_exchange_range(mp)) {
+		printf(_("Filesystem already supports exchange-range.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_crc(mp)) {
+		printf(
+	_("File exchange-range feature only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_reflink(mp)) {
+		printf(
+	_("File exchange-range feature cannot be added without reflink.\n"));
+		exit(0);
+	}
+
+	printf(_("Adding file exchange-range support to filesystem.\n"));
+	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_INCOMPAT_EXCHRANGE;
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	return true;
+}
+
 struct check_state {
 	struct xfs_sb		sb;
 	uint64_t		features;
@@ -290,6 +318,8 @@ upgrade_filesystem(
 		dirty |= set_bigtime(mp, &new_sb);
 	if (add_nrext64)
 		dirty |= set_nrext64(mp, &new_sb);
+	if (add_exchrange)
+		dirty |= set_exchrange(mp, &new_sb);
 	if (!dirty)
 		return;
 

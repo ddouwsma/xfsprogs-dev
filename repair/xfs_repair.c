@@ -69,6 +69,7 @@ enum c_opt_nums {
 	CONVERT_INOBTCOUNT,
 	CONVERT_BIGTIME,
 	CONVERT_NREXT64,
+	CONVERT_EXCHRANGE,
 	C_MAX_OPTS,
 };
 
@@ -77,6 +78,7 @@ static char *c_opts[] = {
 	[CONVERT_INOBTCOUNT]	= "inobtcount",
 	[CONVERT_BIGTIME]	= "bigtime",
 	[CONVERT_NREXT64]	= "nrext64",
+	[CONVERT_EXCHRANGE]	= "exchange",
 	[C_MAX_OPTS]		= NULL,
 };
 
@@ -359,6 +361,15 @@ process_args(int argc, char **argv)
 						do_abort(
 		_("-c nrext64 only supports upgrades\n"));
 					add_nrext64 = true;
+					break;
+				case CONVERT_EXCHRANGE:
+					if (!val)
+						do_abort(
+		_("-c exchange requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c exchange only supports upgrades\n"));
+					add_exchrange = true;
 					break;
 				default:
 					unknown('c', val);
