@@ -1018,7 +1018,7 @@ main(int argc, char **argv)
 	xfs_mount_t	*temp_mp;
 	xfs_mount_t	*mp;
 	struct xfs_buf	*sbp;
-	xfs_mount_t	xfs_m;
+	struct xfs_mount xfs_m = { };
 	struct xlog	log = {0};
 	char		*msgbuf;
 	struct xfs_sb	psb;
