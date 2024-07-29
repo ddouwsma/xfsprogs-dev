@@ -109,7 +109,7 @@ hist_free(
  * in the long tail of small extents, e.g. 98% of the free space extents are
  * larger than 31 blocks.
  */
-static struct histogram_cdf *
+struct histogram_cdf *
 hist_cdf(
 	const struct histogram	*hs)
 {
@@ -151,7 +151,7 @@ hist_cdf(
 }
 
 /* Free all data associated with a histogram cdf. */
-static void
+void
 histcdf_free(
 	struct histogram_cdf	*cdf)
 {

@@ -68,6 +68,9 @@ static inline unsigned int hist_buckets(const struct histogram *hs)
 	return hs->nr_buckets;
 }
 
+struct histogram_cdf *hist_cdf(const struct histogram *hs);
+void histcdf_free(struct histogram_cdf *cdf);
+
 void hist_import(struct histogram *dest, const struct histogram *src);
 void hist_move(struct histogram *dest, struct histogram *src);
 
