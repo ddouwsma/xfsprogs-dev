@@ -33,6 +33,8 @@ static int	attr_remote_data_count(void *obj, int startoff);
 static int	attr3_remote_hdr_count(void *obj, int startoff);
 static int	attr3_remote_data_count(void *obj, int startoff);
 
+static int	attr_leaf_value_pptr_count(void *obj, int startoff);
+
 const field_t	attr_hfld[] = {
 	{ "", FLDT_ATTR, OI(0), C1, 0, TYP_NONE },
 	{ NULL }
@@ -118,6 +120,8 @@ const field_t	attr_leaf_name_flds[] = {
 	  attr_leaf_name_local_count, FLD_COUNT, TYP_NONE },
 	{ "name", FLDT_CHARNS, OI(LNOFF(nameval)),
 	  attr_leaf_name_local_name_count, FLD_COUNT, TYP_NONE },
+	{ "parent_dir", FLDT_PARENT_REC, attr_leaf_name_local_value_offset,
+	  attr_leaf_value_pptr_count, FLD_COUNT | FLD_OFFSET, TYP_NONE },
 	{ "value", FLDT_CHARNS, attr_leaf_name_local_value_offset,
 	  attr_leaf_name_local_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ "valueblk", FLDT_UINT32X, OI(LVOFF(valueblk)),
@@ -306,6 +310,8 @@ __attr_leaf_name_local_value_count(
 	struct xfs_attr_leaf_name_local	*l;
 
 	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_PARENT)
 		return 0;
 
 	l = xfs_attr3_leaf_name_local(leaf, i);
@@ -512,6 +518,28 @@ attr3_remote_hdr_count(
 
 	ASSERT(startoff == 0);
 	return be32_to_cpu(node->rm_magic) == XFS_ATTR3_RMT_MAGIC;
+}
+
+static int
+__leaf_pptr_count(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_PARENT)
+		return 0;
+
+	return 1;
+}
+
+static int
+attr_leaf_value_pptr_count(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff, __leaf_pptr_count);
 }
 
 int
