@@ -639,4 +639,6 @@ int xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
  */
 #define lower_32_bits(n) ((uint32_t)((n) & 0xffffffff))
 
+#define cond_resched()	((void)0)
+
 #endif	/* __LIBXFS_INTERNAL_XFS_H__ */
