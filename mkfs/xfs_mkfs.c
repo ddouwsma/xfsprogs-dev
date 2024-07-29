@@ -90,6 +90,7 @@ enum {
 	I_PROJID32BIT,
 	I_SPINODES,
 	I_NREXT64,
+	I_EXCHANGE,
 	I_MAX_OPTS,
 };
 
@@ -469,6 +470,7 @@ static struct opt_params iopts = {
 		[I_PROJID32BIT] = "projid32bit",
 		[I_SPINODES] = "sparse",
 		[I_NREXT64] = "nrext64",
+		[I_EXCHANGE] = "exchange",
 		[I_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -523,7 +525,13 @@ static struct opt_params iopts = {
 		  .minval = 0,
 		  .maxval = 1,
 		  .defaultval = 1,
-		}
+		},
+		{ .index = I_EXCHANGE,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
 	},
 };
 
@@ -889,6 +897,7 @@ struct sb_feat_args {
 	bool	nodalign;
 	bool	nortalign;
 	bool	nrext64;
+	bool	exchrange;		/* XFS_SB_FEAT_INCOMPAT_EXCHRANGE */
 };
 
 struct cli_params {
@@ -1024,7 +1033,8 @@ usage( void )
 			    sectsize=num,concurrency=num]\n\
 /* force overwrite */	[-f]\n\
 /* inode size */	[-i perblock=n|size=num,maxpct=n,attr=0|1|2,\n\
-			    projid32bit=0|1,sparse=0|1,nrext64=0|1]\n\
+			    projid32bit=0|1,sparse=0|1,nrext64=0|1,\n\
+			    exchange=0|1]\n\
 /* no discard */	[-K]\n\
 /* log subvol */	[-l agnum=n,internal,size=num,logdev=xxx,version=n\n\
 			    sunit=value|su=num,sectsize=num,lazy-count=0|1,\n\
@@ -1722,6 +1732,9 @@ inode_opts_parser(
 	case I_NREXT64:
 		cli->sb_feat.nrext64 = getnum(value, opts, subopt);
 		break;
+	case I_EXCHANGE:
+		cli->sb_feat.exchrange = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2365,6 +2378,13 @@ _("64 bit extent count not supported without CRC support\n"));
 			usage();
 		}
 		cli->sb_feat.nrext64 = false;
+
+		if (cli->sb_feat.exchrange && cli_opt_set(&iopts, I_EXCHANGE)) {
+			fprintf(stderr,
+_("exchange-range not supported without CRC support\n"));
+			usage();
+		}
+		cli->sb_feat.exchrange = false;
 	}
 
 	if (!cli->sb_feat.finobt) {
@@ -3498,6 +3518,8 @@ sb_set_features(
 
 	if (fp->nrext64)
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NREXT64;
+	if (fp->exchrange)
+		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_EXCHRANGE;
 }
 
 /*

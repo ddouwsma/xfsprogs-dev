@@ -670,6 +670,13 @@ If the value is omitted, 1 is assumed.
 This feature will be enabled when possible.
 This feature is only available for filesystems formatted with -m crc=1.
 .TP
+.BI exchange[= value]
+When enabled, application programs can exchange file contents atomically
+via the XFS_IOC_EXCHANGE_RANGE ioctl.
+Online repair uses this functionality to rebuild extended attributes,
+directories, symbolic links, and realtime metadata files.
+This feature is disabled by default.
+This feature is only available for filesystems formatted with -m crc=1.
 .RE
 .PP
 .PD 0
