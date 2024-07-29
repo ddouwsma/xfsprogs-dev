@@ -449,18 +449,18 @@ listdir(
 		.geo		= dp->i_mount->m_dir_geo,
 	};
 	int			error;
-	bool			isblock;
 
-	if (dp->i_df.if_format == XFS_DINODE_FMT_LOCAL)
+	switch (libxfs_dir2_format(&args, &error)) {
+	case XFS_DIR2_FMT_SF:
 		return list_sfdir(&args);
-
-	error = -libxfs_dir2_isblock(&args, &isblock);
-	if (error)
-		return error;
-
-	if (isblock)
+	case XFS_DIR2_FMT_BLOCK:
 		return list_blockdir(&args);
-	return list_leafdir(&args);
+	case XFS_DIR2_FMT_LEAF:
+	case XFS_DIR2_FMT_NODE:
+		return list_leafdir(&args);
+	default:
+		return error;
+	}
 }
 
 /* List the inode number of the currently selected inode. */

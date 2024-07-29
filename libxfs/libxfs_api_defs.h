@@ -122,9 +122,8 @@
 #define xfs_dir2_data_use_free		libxfs_dir2_data_use_free
 #define xfs_dir2_free_hdr_from_disk	libxfs_dir2_free_hdr_from_disk
 #define xfs_dir2_hashname		libxfs_dir2_hashname
-#define xfs_dir2_isblock		libxfs_dir2_isblock
-#define xfs_dir2_isleaf			libxfs_dir2_isleaf
 #define xfs_dir2_leaf_hdr_from_disk	libxfs_dir2_leaf_hdr_from_disk
+#define xfs_dir2_format			libxfs_dir2_format
 #define xfs_dir2_namecheck		libxfs_dir2_namecheck
 #define xfs_dir2_sf_entsize		libxfs_dir2_sf_entsize
 #define xfs_dir2_sf_get_ftype		libxfs_dir2_sf_get_ftype
