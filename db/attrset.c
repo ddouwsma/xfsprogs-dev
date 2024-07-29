@@ -69,7 +69,7 @@ attr_set_f(
 {
 	struct xfs_da_args	args = { };
 	char			*sp;
-	enum xfs_attr_update	op = XFS_ATTRUPDATE_UPSERTR;
+	enum xfs_attr_update	op = XFS_ATTRUPDATE_UPSERT;
 	int			c;
 
 	if (cur_typ == NULL) {
@@ -247,7 +247,7 @@ attr_remove_f(
 		goto out;
 	}
 
-	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_UPSERTR)) {
+	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE)) {
 		dbprintf(_("failed to remove attr %s from inode %llu\n"),
 			(unsigned char *)args.name,
 			(unsigned long long)iocur_top->ino);
