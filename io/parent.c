@@ -17,6 +17,9 @@ static char *mntpt;
 
 struct pptr_args {
 	char		*pathbuf;
+	char		*filter_name;
+	uint64_t	filter_ino;
+	bool		shortformat;
 };
 
 static int
@@ -25,9 +28,24 @@ pptr_print(
 	void			*arg)
 {
 	const struct xfs_fid	*fid = &rec->p_handle.ha_fid;
+	struct pptr_args	*args = arg;
 
 	if (rec->p_flags & PARENTREC_FILE_IS_ROOT) {
 		printf(_("Root directory.\n"));
+		return 0;
+	}
+
+	if (args->filter_ino && fid->fid_ino != args->filter_ino)
+		return 0;
+	if (args->filter_name && strcmp(args->filter_name, rec->p_name))
+		return 0;
+
+	if (args->shortformat) {
+		printf("%llu:%u:%zu:%s\n",
+				(unsigned long long)fid->fid_ino,
+				(unsigned int)fid->fid_gen,
+				strlen(rec->p_name),
+				rec->p_name);
 		return 0;
 	}
 
@@ -36,6 +54,21 @@ pptr_print(
 	printf(_("p_namelen = %zu\n"), strlen(rec->p_name));
 	printf(_("p_name    = \"%s\"\n\n"), rec->p_name);
 
+	return 0;
+}
+
+static int
+filter_path_components(
+	const char		*name,
+	uint64_t		ino,
+	void			*arg)
+{
+	struct pptr_args	*args = arg;
+
+	if (args->filter_ino && ino == args->filter_ino)
+		return ECANCELED;
+	if (args->filter_name && !strcmp(args->filter_name, name))
+		return ECANCELED;
 	return 0;
 }
 
@@ -50,6 +83,12 @@ paths_print(
 	size_t			len = MAXPATHLEN;
 	int			mntpt_len = strlen(mntpt);
 	int			ret;
+
+	if (args->filter_ino || args->filter_name) {
+		ret = path_walk_components(path, filter_path_components, args);
+		if (ret != ECANCELED)
+			return 0;
+	}
 
 	/* Trim trailing slashes from the mountpoint */
 	while (mntpt_len > 0 && mntpt[mntpt_len - 1] == '/')
@@ -103,7 +142,7 @@ parent_f(
 	}
 	mntpt = fs->fs_dir;
 
-	while ((c = getopt(argc, argv, "b:pz")) != EOF) {
+	while ((c = getopt(argc, argv, "b:i:n:psz")) != EOF) {
 		switch (c) {
 		case 'b':
 			errno = 0;
@@ -114,8 +153,23 @@ parent_f(
 				return 1;
 			}
 			break;
+		case 'i':
+			args.filter_ino = strtoull(optarg, &p, 0);
+			if (*p != '\0' || args.filter_ino == 0) {
+				fprintf(stderr, _("Bad inode number '%s'.\n"),
+						optarg);
+				exitcode = 1;
+				return 1;
+			}
+			break;
+		case 'n':
+			args.filter_name = optarg;
+			break;
 		case 'p':
 			listpath_flag = 1;
+			break;
+		case 's':
+			args.shortformat = true;
 			break;
 		case 'z':
 			single_path = true;
@@ -203,7 +257,10 @@ printf(_(
 " list the current file's parents and their filenames\n"
 "\n"
 " -b -- use this many bytes to hold parent pointer records\n"
+" -i -- Only show parent pointer records containing the given inode\n"
+" -n -- Only show parent pointer records containing the given filename\n"
 " -p -- list the current file's paths up to the root\n"
+" -s -- Print records in short format: ino/gen/namelen/filename\n"
 " -z -- print only the first path from the root\n"
 "\n"
 "If ino and gen are supplied, use them instead.\n"
@@ -217,7 +274,7 @@ parent_init(void)
 	parent_cmd.cfunc = parent_f;
 	parent_cmd.argmin = 0;
 	parent_cmd.argmax = -1;
-	parent_cmd.args = _("[-pz] [-b bufsize] [ino gen]");
+	parent_cmd.args = _("[-psz] [-b bufsize] [-i ino] [-n name] [ino gen]");
 	parent_cmd.flags = CMD_NOMAP_OK;
 	parent_cmd.oneline = _("print parent inodes");
 	parent_cmd.help = parent_help;
