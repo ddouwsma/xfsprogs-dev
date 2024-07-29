@@ -33,6 +33,14 @@ struct histogram {
 	unsigned int		nr_buckets;
 };
 
+struct histogram_cdf {
+	/* histogram from which this cdf was computed */
+	const struct histogram	*histogram;
+
+	/* distribution information */
+	struct histbucket	*buckets;
+};
+
 int hist_add_bucket(struct histogram *hs, long long bucket_low);
 void hist_add(struct histogram *hs, long long value);
 void hist_init(struct histogram *hs);

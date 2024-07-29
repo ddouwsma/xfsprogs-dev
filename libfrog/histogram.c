@@ -102,16 +102,80 @@ hist_free(
 	memset(hs, 0, sizeof(struct histogram));
 }
 
+/*
+ * Compute the CDF of the histogram in decreasing order of value.
+ *
+ * For a free space histogram, callers can determine how much free space is not
+ * in the long tail of small extents, e.g. 98% of the free space extents are
+ * larger than 31 blocks.
+ */
+static struct histogram_cdf *
+hist_cdf(
+	const struct histogram	*hs)
+{
+	struct histogram_cdf	*cdf;
+	int			i = hs->nr_buckets - 1;
+
+	ASSERT(hs->nr_buckets < INT_MAX);
+
+	cdf = malloc(sizeof(struct histogram_cdf));
+	if (!cdf)
+		return NULL;
+	cdf->histogram = hs;
+
+	if (hs->nr_buckets == 0) {
+		cdf->buckets = NULL;
+		return cdf;
+	}
+
+	cdf->buckets = calloc(hs->nr_buckets, sizeof(struct histbucket));
+	if (!cdf->buckets) {
+		free(cdf);
+		return NULL;
+	}
+
+	cdf->buckets[i].nr_obs = hs->buckets[i].nr_obs;
+	cdf->buckets[i].sum = hs->buckets[i].sum;
+	i--;
+
+	while (i >= 0) {
+		cdf->buckets[i].nr_obs = hs->buckets[i].nr_obs +
+					cdf->buckets[i + 1].nr_obs;
+
+		cdf->buckets[i].sum =    hs->buckets[i].sum +
+					cdf->buckets[i + 1].sum;
+		i--;
+	}
+
+	return cdf;
+}
+
+/* Free all data associated with a histogram cdf. */
+static void
+histcdf_free(
+	struct histogram_cdf	*cdf)
+{
+	free(cdf->buckets);
+	free(cdf);
+}
+
 /* Dump a histogram to stdout. */
 void
 hist_print(
 	const struct histogram		*hs,
 	const struct histogram_strings	*hstr)
 {
+	struct histogram_cdf		*cdf;
 	unsigned int			obs_w = strlen(hstr->observations);
 	unsigned int			sum_w = strlen(hstr->sum);
 	unsigned int			from_w = 7, to_w = 7;
 	unsigned int			i;
+
+	cdf = hist_cdf(hs);
+	if (!cdf) {
+		perror(_("histogram cdf"));
+		return;
+	}
 
 	for (i = 0; i < hs->nr_buckets; i++) {
 		char buf[256];
@@ -132,23 +196,27 @@ hist_print(
 		sum_w = max(sum_w, strlen(buf));
 	}
 
-	printf("%*s %*s %*s %*s %6s\n",
+	printf("%*s %*s %*s %*s %6s %6s %6s\n",
 			from_w, _("from"), to_w, _("to"),
 			obs_w, hstr->observations,
 			sum_w, hstr->sum,
-			_("pct"));
+			_("pct"), _("blkcdf"), _("extcdf"));
 
 	for (i = 0; i < hs->nr_buckets; i++) {
 		if (hs->buckets[i].nr_obs == 0)
 			continue;
 
-		printf("%*lld %*lld %*lld %*lld %6.2f\n",
+		printf("%*lld %*lld %*lld %*lld %6.2f %6.2f %6.2f\n",
 				from_w, hs->buckets[i].low,
 				to_w, hs->buckets[i].high,
 				obs_w, hs->buckets[i].nr_obs,
 				sum_w, hs->buckets[i].sum,
-				hs->buckets[i].sum * 100.0 / hs->tot_sum);
+				hs->buckets[i].sum * 100.0 / hs->tot_sum,
+				cdf->buckets[i].sum * 100.0 / hs->tot_sum,
+				cdf->buckets[i].nr_obs * 100.0 / hs->tot_obs);
 	}
+
+	histcdf_free(cdf);
 }
 
 /* Summarize the contents of the histogram. */
