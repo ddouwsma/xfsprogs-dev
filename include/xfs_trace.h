@@ -68,6 +68,7 @@
 #define trace_xfs_log_recover_item_add(a,b,c,d)	((void) 0)
 
 #define trace_xfs_da_btree_corrupt(a,b)		((void) 0)
+#define trace_xfs_delalloc_enospc(...)		((void) 0)
 #define trace_xfs_btree_corrupt(a,b)		((void) 0)
 #define trace_xfs_btree_updkeys(a,b,c)		((void) 0)
 #define trace_xfs_btree_overlapped_query_range(a,b,c)	((void) 0)
