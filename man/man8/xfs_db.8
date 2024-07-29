@@ -184,10 +184,14 @@ Displays the length, free block count, per-AG reservation size, and per-AG
 reservation usage for a given AG.
 If no argument is given, display information for all AGs.
 .TP
-.BI "attr_remove [\-r|\-u|\-s] [\-n] " name
+.BI "attr_remove [\-p|\-r|\-u|\-s] [\-n] [\-N " namefile "|" name "] "
 Remove the specified extended attribute from the current file.
 .RS 1.0i
 .TP 0.4i
+.B \-p
+Sets the attribute in the parent namespace.
+Only one namespace option can be specified.
+.TP
 .B \-r
 Sets the attribute in the root namespace.
 Only one namespace option can be specified.
@@ -199,15 +203,22 @@ Only one namespace option can be specified.
 .B \-s
 Sets the attribute in the secure namespace.
 Only one namespace option can be specified.
+.TP
+.B \-N
+Read the name from this file.
 .TP
 .B \-n
 Do not enable 'noattr2' mode on V4 filesystems.
 .RE
 .TP
-.BI "attr_set [\-r|\-u|\-s] [\-n] [\-R|\-C] [\-v " namelen "] " name
+.BI "attr_set [\-p\-r|\-u|\-s] [\-n] [\-R|\-C] [\-v " valuelen "|\-V " valuefile "] [\-N " namefile "|" name "] "
 Sets an extended attribute on the current file with the given name.
 .RS 1.0i
 .TP 0.4i
+.B \-p
+Sets the attribute in the parent namespace.
+Only one namespace option can be specified.
+.TP
 .B \-r
 Sets the attribute in the root namespace.
 Only one namespace option can be specified.
@@ -219,6 +230,9 @@ Only one namespace option can be specified.
 .B \-s
 Sets the attribute in the secure namespace.
 Only one namespace option can be specified.
+.TP
+.B \-N
+Read the name from this file.
 .TP
 .B \-n
 Do not enable 'noattr2' mode on V4 filesystems.
@@ -230,6 +244,9 @@ The command will fail if the attribute does not already exist.
 .B \-C
 Create the attribute.
 The command will fail if the attribute already exists.
+.TP
+.B \-V
+Read the value from this file.
 .TP
 .B \-v
 Set the attribute value to a string of this length containing the letter 'v'.
