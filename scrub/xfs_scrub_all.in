@@ -181,6 +181,10 @@ def fibonacci(max_ret):
 		y = z
 		z = x + y
 
+def was_unit_masked(ex):
+	'''Decide if this dbus exception occurred because we tried to start a masked unit.'''
+	return ex.get_dbus_name() == "org.freedesktop.systemd1.UnitMasked"
+
 class scrub_service(scrub_control):
 	'''Control object for xfs_scrub systemd service.'''
 	def __init__(self, mnt, scrub_media):
@@ -219,6 +223,12 @@ class scrub_service(scrub_control):
 				if debug:
 					print(e)
 				fatal_ex = e
+
+				# If the unit is masked, there's no point in
+				# retrying any operations on it.
+				if was_unit_masked(e):
+					break
+
 				time.sleep(i)
 				self.bind()
 		raise fatal_ex
@@ -270,6 +280,13 @@ class scrub_service(scrub_control):
 		try:
 			self.__dbusrun(lambda: self.unit.Start('replace'))
 			return self.wait()
+		except dbus.exceptions.DBusException as e:
+			# If the unit was masked, the sysadmin doesn't want us
+			# running it.  Pretend that we finished it.
+			if was_unit_masked(e):
+				return 32
+			print(e, file = sys.stderr)
+			return -1
 		except Exception as e:
 			print(e, file = sys.stderr)
 			return -1
@@ -317,6 +334,10 @@ def run_scrub(mnt, cond, running_devs, mntdevs, killfuncs):
 		# are running as a systemd service.
 		if 'SERVICE_MODE' in os.environ:
 			ret = run_service(mnt, scrub_media, killfuncs)
+			if ret == 32:
+				print("Scrubbing %s disabled by administrator, (err=%d)" % (mnt, ret))
+				sys.stdout.flush()
+				return
 			if ret == 0 or ret == 1:
 				print("Scrubbing %s done, (err=%d)" % (mnt, ret))
 				sys.stdout.flush()
