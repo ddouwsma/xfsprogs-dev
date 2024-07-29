@@ -45,7 +45,7 @@ rootfs_type() {
 . /usr/share/initramfs-tools/hook-functions
 
 if [ "$(rootfs_type)" = "xfs" ]; then
-	copy_exec /sbin/xfs_repair
+	copy_exec /usr/sbin/xfs_repair
 	copy_exec /usr/sbin/xfs_db
 	copy_exec /usr/sbin/xfs_metadump
 fi

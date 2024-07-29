@@ -105,9 +105,8 @@ binary-arch: checkroot built
 	$(pkgme)  $(MAKE) dist
 	install -D -m 0755 debian/local/initramfs.hook debian/xfsprogs/usr/share/initramfs-tools/hooks/xfs
 	rmdir debian/xfslibs-dev/usr/share/doc/xfsprogs
-	rm -f debian/xfslibs-dev/lib/$(DEB_HOST_MULTIARCH)/libhandle.la
-	rm -f debian/xfslibs-dev/lib/$(DEB_HOST_MULTIARCH)/libhandle.a
-	rm -fr debian/xfslibs-dev/usr/lib
+	rm -f debian/xfslibs-dev/usr/lib/$(DEB_HOST_MULTIARCH)/libhandle.la
+	rm -f debian/xfslibs-dev/usr/lib/$(DEB_HOST_MULTIARCH)/libhandle.a
 	dh_installdocs -XCHANGES
 	dh_installchangelogs
 	dh_strip
