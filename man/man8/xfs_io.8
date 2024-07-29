@@ -713,6 +713,46 @@ Swaps extent forks between files. The current open file is the target. The donor
 file is specified by path. Note that file data is not copied (file content moves
 with the fork(s)).
 .TP
+.BI "exchangerange [OPTIONS]" donor_file "
+Exchanges contents between files.
+The current open file is the target.
+The donor file is specified by path.
+Note that file data is not copied (file content moves with the fork(s)).
+Options include:
+.RS 1.0i
+.PD 0
+.TP 0.4i
+.TP
+.B \-C
+Print timing information in a condensed format.
+.TP
+.BI \-d " dest_offset"
+Swap extents with open file beginning at
+.IR dest_offset .
+.TP
+.B \-f
+Flush changed file data and file metadata to disk.
+.TP
+.BI \-l " length"
+Swap up to
+.I length
+bytes of data.
+.TP
+.B \-n
+Perform all the parameter validation checks but don't change anything.
+.TP
+.BI \-s " src_offset"
+Swap extents with donor file beginning at
+.IR src_offset .
+.TP
+.B \-t
+Print timing information.
+.TP
+.B \-w
+Only exchange written ranges in the supplied file.
+.RE
+.PD
+.TP
 .BI "set_encpolicy [ \-c " mode " ] [ \-n " mode " ] [ \-f " flags " ] [ \-s " log2_dusize " ] [ \-v " version " ] [ " keyspec " ]"
 On filesystems that support encryption, assign an encryption policy to the
 current file.
