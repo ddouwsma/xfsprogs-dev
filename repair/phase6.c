@@ -3445,5 +3445,7 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 		}
 	}
 
+	/* Check and repair directory parent pointers, if enabled. */
+	check_parent_ptrs(mp);
 	parent_ptr_free(mp);
 }
