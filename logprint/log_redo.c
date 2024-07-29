@@ -847,3 +847,131 @@ xlog_recover_print_attrd(
 		f->alfd_size,
 		(unsigned long long)f->alfd_alf_id);
 }
+
+/* Atomic Extent Swapping Items */
+
+static int
+xfs_xmi_copy_format(
+	struct xfs_xmi_log_format *xmi,
+	uint			  len,
+	struct xfs_xmi_log_format *dst_fmt,
+	int			  continued)
+{
+	if (len == sizeof(struct xfs_xmi_log_format) || continued) {
+		memcpy(dst_fmt, xmi, len);
+		return 0;
+	}
+	fprintf(stderr, _("%s: bad size of XMI format: %u; expected %zu\n"),
+		progname, len, sizeof(struct xfs_xmi_log_format));
+	return 1;
+}
+
+int
+xlog_print_trans_xmi(
+	char			**ptr,
+	uint			src_len,
+	int			continued)
+{
+	struct xfs_xmi_log_format *src_f, *f = NULL;
+	int			error = 0;
+
+	src_f = malloc(src_len);
+	if (src_f == NULL) {
+		fprintf(stderr, _("%s: %s: malloc failed\n"),
+			progname, __func__);
+		exit(1);
+	}
+	memcpy(src_f, *ptr, src_len);
+	*ptr += src_len;
+
+	/* convert to native format */
+	if (continued && src_len < sizeof(struct xfs_xmi_log_format)) {
+		printf(_("XMI: Not enough data to decode further\n"));
+		error = 1;
+		goto error;
+	}
+
+	f = malloc(sizeof(struct xfs_xmi_log_format));
+	if (f == NULL) {
+		fprintf(stderr, _("%s: %s: malloc failed\n"),
+			progname, __func__);
+		exit(1);
+	}
+	if (xfs_xmi_copy_format(src_f, src_len, f, continued)) {
+		error = 1;
+		goto error;
+	}
+
+	printf(_("XMI:  #regs: %d	num_extents: 1  id: 0x%llx\n"),
+		f->xmi_size, (unsigned long long)f->xmi_id);
+
+	if (continued) {
+		printf(_("XMI extent data skipped (CONTINUE set, no space)\n"));
+		goto error;
+	}
+
+	printf("(ino1: 0x%llx, igen1: 0x%x, ino2: 0x%llx, igen2: 0x%x, off1: %lld, off2: %lld, len: %lld, flags: 0x%llx)\n",
+		(unsigned long long)f->xmi_inode1,
+		(unsigned int)f->xmi_igen1,
+		(unsigned long long)f->xmi_inode2,
+		(unsigned int)f->xmi_igen2,
+		(unsigned long long)f->xmi_startoff1,
+		(unsigned long long)f->xmi_startoff2,
+		(unsigned long long)f->xmi_blockcount,
+		(unsigned long long)f->xmi_flags);
+error:
+	free(src_f);
+	free(f);
+	return error;
+}
+
+void
+xlog_recover_print_xmi(
+	struct xlog_recover_item	*item)
+{
+	char				*src_f;
+	uint				src_len;
+
+	src_f = item->ri_buf[0].i_addr;
+	src_len = item->ri_buf[0].i_len;
+
+	xlog_print_trans_xmi(&src_f, src_len, 0);
+}
+
+int
+xlog_print_trans_xmd(
+	char				**ptr,
+	uint				len)
+{
+	struct xfs_xmd_log_format	*f;
+	struct xfs_xmd_log_format	lbuf;
+
+	/* size without extents at end */
+	uint core_size = sizeof(struct xfs_xmd_log_format);
+
+	memcpy(&lbuf, *ptr, min(core_size, len));
+	f = &lbuf;
+	*ptr += len;
+	if (len >= core_size) {
+		printf(_("XMD:  #regs: %d	                 id: 0x%llx\n"),
+			f->xmd_size,
+			(unsigned long long)f->xmd_xmi_id);
+
+		/* don't print extents as they are not used */
+
+		return 0;
+	} else {
+		printf(_("XMD: Not enough data to decode further\n"));
+		return 1;
+	}
+}
+
+void
+xlog_recover_print_xmd(
+	struct xlog_recover_item	*item)
+{
+	char				*f;
+
+	f = item->ri_buf[0].i_addr;
+	xlog_print_trans_xmd(&f, sizeof(struct xfs_xmd_log_format));
+}
