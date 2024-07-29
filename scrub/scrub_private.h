@@ -13,6 +13,7 @@ void xfrog_scrubv_from_item(struct xfrog_scrubv *scrubv,
 void xfrog_scrubv_add_item(struct xfrog_scrubv *scrubv,
 		const struct scrub_item *sri, unsigned int scrub_type,
 		bool want_repair);
+void xfrog_scrubv_add_barrier(struct xfrog_scrubv *scrubv);
 
 struct scrubv_descr {
 	struct xfrog_scrubv	*scrubv;
@@ -116,6 +117,7 @@ scrub_item_schedule_retry(struct scrub_item *sri, unsigned int scrub_type)
 
 bool scrub_item_call_kernel_again(struct scrub_item *sri, uint8_t work_mask,
 		const struct scrub_item *old);
-bool scrub_item_schedule_work(struct scrub_item *sri, uint8_t state_flags);
+bool scrub_item_schedule_work(struct scrub_item *sri, uint8_t state_flags,
+		const unsigned int *schedule_deps);
 
 #endif /* XFS_SCRUB_SCRUB_PRIVATE_H_ */
