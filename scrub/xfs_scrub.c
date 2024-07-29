@@ -115,6 +115,7 @@
  * XFS_SCRUB_THREADS		-- start exactly this number of threads
  * XFS_SCRUB_DISK_ERROR_INTERVAL-- simulate a disk error every this many bytes
  * XFS_SCRUB_DISK_VERIFY_SKIP	-- pretend disk verify read calls succeeded
+ * XFS_SCRUB_FORCE_SINGLE	-- fall back to ioctl-per-item scrubbing
  *
  * Available even in non-debug mode:
  * SERVICE_MODE			-- compress all error codes to 1 for LSB
