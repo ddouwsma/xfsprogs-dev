@@ -1000,6 +1000,20 @@ fsr_setup_attr_fork(
 		return 0;
 
 	/*
+	 * If the filesystem has the ability to perform atomic file mapping
+	 * exchanges, the file extent swap implementation uses a higher level
+	 * algorithm that calls into the bmap code instead of playing games
+	 * with swapping the extent forks.
+	 *
+	 * This new functionality does not require specific values of
+	 * bs_forkoff, unlike the old fork swap code.  Leave the extended
+	 * attributes alone if we know we're not using the old fork swap
+	 * strategy.  This eliminates a major source of runtime errors in fsr.
+	 */
+	if (fsgeom.flags & XFS_FSOP_GEOM_FLAGS_EXCHANGE_RANGE)
+		return 0;
+
+	/*
 	 * use the old method if we have attr1 or the kernel does not yet
 	 * support passing the fork offset in the bulkstat data.
 	 */
