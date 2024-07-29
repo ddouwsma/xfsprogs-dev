@@ -45,6 +45,7 @@ HFILES = \
 	xfs_da_btree.h \
 	xfs_dir2.h \
 	xfs_errortag.h \
+	xfs_exchmaps.h \
 	xfs_ialloc.h \
 	xfs_ialloc_btree.h \
 	xfs_inode_buf.h \
@@ -94,6 +95,7 @@ CFILES = buf_mem.c \
 	xfs_dir2_node.c \
 	xfs_dir2_sf.c \
 	xfs_dquot_buf.c \
+	xfs_exchmaps.c \
 	xfs_ialloc.c \
 	xfs_iext_tree.c \
 	xfs_inode_buf.c \
