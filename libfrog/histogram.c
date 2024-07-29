@@ -230,3 +230,41 @@ hist_summarize(
 	printf("%s %g\n", hstr->averages,
 			(double)hs->tot_sum / (double)hs->tot_obs);
 }
+
+/* Copy the contents of src to dest. */
+void
+hist_import(
+	struct histogram	*dest,
+	const struct histogram	*src)
+{
+	unsigned int		i;
+
+	ASSERT(dest->nr_buckets == src->nr_buckets);
+
+	dest->tot_sum += src->tot_sum;
+	dest->tot_obs += src->tot_obs;
+
+	for (i = 0; i < dest->nr_buckets; i++) {
+		ASSERT(dest->buckets[i].low == src->buckets[i].low);
+		ASSERT(dest->buckets[i].high == src->buckets[i].high);
+
+		dest->buckets[i].nr_obs += src->buckets[i].nr_obs;
+		dest->buckets[i].sum += src->buckets[i].sum;
+	}
+}
+
+/*
+ * Move the contents of src to dest and reinitialize src.  dst must not
+ * contain any observations or buckets.
+ */
+void
+hist_move(
+	struct histogram	*dest,
+	struct histogram	*src)
+{
+	ASSERT(dest->nr_buckets == 0);
+	ASSERT(dest->tot_obs == 0);
+
+	memcpy(dest, src, sizeof(struct histogram));
+	hist_init(src);
+}
