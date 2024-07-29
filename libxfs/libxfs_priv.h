@@ -210,7 +210,7 @@ static inline bool WARN_ON(bool expr) {
 #define WARN_ON_ONCE(e)			WARN_ON(e)
 #define percpu_counter_read(x)		(*x)
 #define percpu_counter_read_positive(x)	((*x) > 0 ? (*x) : 0)
-#define percpu_counter_sum(x)		(*x)
+#define percpu_counter_sum_positive(x)	((*x) > 0 ? (*x) : 0)
 
 /*
  * get_random_u32 is used for di_gen inode allocation, it must be zero for
