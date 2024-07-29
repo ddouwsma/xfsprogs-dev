@@ -46,6 +46,7 @@
 #define xfs_attr_is_leaf		libxfs_attr_is_leaf
 #define xfs_attr_leaf_newentsize	libxfs_attr_leaf_newentsize
 #define xfs_attr_namecheck		libxfs_attr_namecheck
+#define xfs_attr_removename		libxfs_attr_removename
 #define xfs_attr_set			libxfs_attr_set
 #define xfs_attr_sethash		libxfs_attr_sethash
 #define xfs_attr_sf_firstentry		libxfs_attr_sf_firstentry
