@@ -192,7 +192,7 @@ xfs_initialize_perag_data(
 		pag = xfs_perag_get(mp, index);
 		error = xfs_alloc_read_agf(pag, NULL, 0, NULL);
 		if (!error)
-			error = xfs_ialloc_read_agi(pag, NULL, NULL);
+			error = xfs_ialloc_read_agi(pag, NULL, 0, NULL);
 		if (error) {
 			xfs_perag_put(pag);
 			return error;
@@ -929,7 +929,7 @@ xfs_ag_shrink_space(
 	int			error, err2;
 
 	ASSERT(pag->pag_agno == mp->m_sb.sb_agcount - 1);
-	error = xfs_ialloc_read_agi(pag, *tpp, &agibp);
+	error = xfs_ialloc_read_agi(pag, *tpp, 0, &agibp);
 	if (error)
 		return error;
 
@@ -1060,7 +1060,7 @@ xfs_ag_extend_space(
 
 	ASSERT(pag->pag_agno == pag->pag_mount->m_sb.sb_agcount - 1);
 
-	error = xfs_ialloc_read_agi(pag, tp, &bp);
+	error = xfs_ialloc_read_agi(pag, tp, 0, &bp);
 	if (error)
 		return error;
 
@@ -1117,7 +1117,7 @@ xfs_ag_get_geometry(
 	int			error;
 
 	/* Lock the AG headers. */
-	error = xfs_ialloc_read_agi(pag, NULL, &agi_bp);
+	error = xfs_ialloc_read_agi(pag, NULL, 0, &agi_bp);
 	if (error)
 		return error;
 	error = xfs_alloc_read_agf(pag, NULL, 0, &agf_bp);

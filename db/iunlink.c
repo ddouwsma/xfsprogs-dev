@@ -117,7 +117,7 @@ dump_unlinked(
 	xfs_agnumber_t		agno = pag->pag_agno;
 	int			error;
 
-	error = -libxfs_ialloc_read_agi(pag, NULL, &agi_bp);
+	error = -libxfs_ialloc_read_agi(pag, NULL, 0, &agi_bp);
 	if (error) {
 		dbprintf(_("AGI %u: %s\n"), agno, strerror(errno));
 		return;
@@ -295,7 +295,7 @@ iunlink(
 	pag = libxfs_perag_get(mp, XFS_INO_TO_AGNO(mp, ip->i_ino));
 
 	/* Get the agi buffer first.  It ensures lock ordering on the list. */
-	error = -libxfs_read_agi(pag, tp, &agibp);
+	error = -libxfs_read_agi(pag, tp, 0, &agibp);
 	if (error)
 		goto out;
 
