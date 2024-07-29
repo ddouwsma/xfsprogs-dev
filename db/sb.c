@@ -708,6 +708,8 @@ version_string(
 		strcat(s, ",NREXT64");
 	if (xfs_has_exchange_range(mp))
 		strcat(s, ",EXCHANGE");
+	if (xfs_has_parent(mp))
+		strcat(s, ",PARENT");
 	return s;
 }
 
