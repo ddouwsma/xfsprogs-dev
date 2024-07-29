@@ -1036,7 +1036,8 @@ process_symlink_extlist(
 	int			max_blocks;
 
 	if (be64_to_cpu(dino->di_size) <= XFS_DFORK_DSIZE(dino, mp)) {
-		if (dino->di_format == XFS_DINODE_FMT_LOCAL)
+		if (dino->di_format == XFS_DINODE_FMT_LOCAL ||
+		    dino->di_format == XFS_DINODE_FMT_EXTENTS)
 			return 0;
 		do_warn(
 _("mismatch between format (%d) and size (%" PRId64 ") in symlink ino %" PRIu64 "\n"),
@@ -1368,7 +1369,7 @@ process_symlink(
 	 * get symlink contents into data area
 	 */
 	symlink = &data[0];
-	if (be64_to_cpu(dino->di_size) <= XFS_DFORK_DSIZE(dino, mp))  {
+	if (dino->di_format == XFS_DINODE_FMT_LOCAL) {
 		/*
 		 * local symlink, just copy the symlink out of the
 		 * inode into the data area
