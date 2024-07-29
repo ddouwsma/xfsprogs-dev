@@ -79,7 +79,10 @@ extern struct kmem_cache *xfs_trans_cache;
 #define crc32c(c,p,l)	crc32c_le((c),(unsigned char const *)(p),(l))
 
 /* fake up kernel's iomap, (not) used in xfs_bmap.[ch] */
-struct iomap;
+struct iomap {
+	unsigned long long	offset;	/* do not use */
+	unsigned long long	length;	/* do not use */
+};
 
 #define cancel_delayed_work_sync(work) do { } while(0)
 
