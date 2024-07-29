@@ -214,7 +214,7 @@ attr3_remote_data_count(
 
 	if (hdr->rm_magic != cpu_to_be32(XFS_ATTR3_RMT_MAGIC))
 		return 0;
-	buf_space = XFS_ATTR3_RMT_BUF_SPACE(mp, mp->m_sb.sb_blocksize);
+	buf_space = xfs_attr3_rmt_buf_space(mp);
 	if (be32_to_cpu(hdr->rm_bytes) > buf_space)
 		return buf_space;
 	return be32_to_cpu(hdr->rm_bytes);

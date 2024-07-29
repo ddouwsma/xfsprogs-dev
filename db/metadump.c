@@ -1369,7 +1369,7 @@ add_remote_vals(
 		attr_data.remote_vals[attr_data.remote_val_count] = blockidx;
 		attr_data.remote_val_count++;
 		blockidx++;
-		length -= XFS_ATTR3_RMT_BUF_SPACE(mp, mp->m_sb.sb_blocksize);
+		length -= xfs_attr3_rmt_buf_space(mp);
 	}
 
 	if (attr_data.remote_val_count >= MAX_REMOTE_VALS) {
@@ -1405,8 +1405,8 @@ process_attr_block(
 			    attr_data.remote_vals[i] == offset)
 				/* Macros to handle both attr and attr3 */
 				memset(block +
-					(bs - XFS_ATTR3_RMT_BUF_SPACE(mp, bs)),
-				      'v', XFS_ATTR3_RMT_BUF_SPACE(mp, bs));
+					(bs - xfs_attr3_rmt_buf_space(mp)),
+				      'v', xfs_attr3_rmt_buf_space(mp));
 		}
 		return;
 	}
@@ -1418,7 +1418,7 @@ process_attr_block(
 	if (nentries == 0 ||
 	    nentries * sizeof(xfs_attr_leaf_entry_t) +
 			xfs_attr3_leaf_hdr_size(leaf) >
-				XFS_ATTR3_RMT_BUF_SPACE(mp, bs)) {
+				xfs_attr3_rmt_buf_space(mp)) {
 		if (metadump.show_warnings)
 			print_warning("invalid attr count in inode %llu",
 					(long long)metadump.cur_ino);
