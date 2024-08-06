@@ -89,26 +89,30 @@ nlink_grow_16_to_32(ino_tree_node_t *irec)
 
 void add_inode_ref(struct ino_tree_node *irec, int ino_offset)
 {
+	union ino_nlink		*c;
+
 	ASSERT(irec->ino_un.ex_data != NULL);
 
 	pthread_mutex_lock(&irec->lock);
+	c = &irec->ino_un.ex_data->counted_nlinks;
 	switch (irec->nlink_size) {
 	case sizeof(uint8_t):
-		if (irec->ino_un.ex_data->counted_nlinks.un8[ino_offset] < 0xff) {
-			irec->ino_un.ex_data->counted_nlinks.un8[ino_offset]++;
+		if (c->un8[ino_offset] < 0xff) {
+			c->un8[ino_offset]++;
 			break;
 		}
 		nlink_grow_8_to_16(irec);
 		/*FALLTHRU*/
 	case sizeof(uint16_t):
-		if (irec->ino_un.ex_data->counted_nlinks.un16[ino_offset] < 0xffff) {
-			irec->ino_un.ex_data->counted_nlinks.un16[ino_offset]++;
+		if (c->un16[ino_offset] < 0xffff) {
+			c->un16[ino_offset]++;
 			break;
 		}
 		nlink_grow_16_to_32(irec);
 		/*FALLTHRU*/
 	case sizeof(uint32_t):
-		irec->ino_un.ex_data->counted_nlinks.un32[ino_offset]++;
+		if (c->un32[ino_offset] != XFS_NLINK_PINNED)
+			c->un32[ino_offset]++;
 		break;
 	default:
 		ASSERT(0);
