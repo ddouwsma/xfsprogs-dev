@@ -24,11 +24,11 @@ static void		attrset_help(void);
 
 static const cmdinfo_t	attr_set_cmd =
 	{ "attr_set", "aset", attr_set_f, 1, -1, 0,
-	  N_("[-r|-s|-u] [-n] [-R|-C] [-v n] name"),
+	  N_("[-r|-s|-u|-p] [-n] [-R|-C] [-v n] name"),
 	  N_("set the named attribute on the current inode"), attrset_help };
 static const cmdinfo_t	attr_remove_cmd =
 	{ "attr_remove", "aremove", attr_remove_f, 1, -1, 0,
-	  N_("[-r|-s|-u] [-n] name"),
+	  N_("[-r|-s|-u|-p] [-n] name"),
 	  N_("remove the named attribute from the current inode"), attrset_help };
 
 static void
@@ -44,6 +44,7 @@ attrset_help(void)
 "  -r -- 'root'\n"
 "  -u -- 'user'		(default)\n"
 "  -s -- 'secure'\n"
+"  -p -- 'parent'\n"
 "\n"
 " For attr_set, these options further define the type of set operation:\n"
 "  -C -- 'create'    - create attribute, fail if it already exists\n"
@@ -62,6 +63,49 @@ attrset_init(void)
 	add_command(&attr_remove_cmd);
 }
 
+static unsigned char *
+get_buf_from_file(
+	const char	*fname,
+	size_t		bufsize,
+	int		*namelen)
+{
+	FILE		*fp;
+	unsigned char	*buf;
+	size_t		sz;
+
+	buf = malloc(bufsize + 1);
+	if (!buf) {
+		perror("malloc");
+		return NULL;
+	}
+
+	fp = fopen(fname, "r");
+	if (!fp) {
+		perror(fname);
+		goto out_free;
+	}
+
+	sz = fread(buf, sizeof(char), bufsize, fp);
+	if (sz == 0) {
+		printf("%s: Could not read anything from file\n", fname);
+		goto out_fp;
+	}
+
+	fclose(fp);
+
+	*namelen = sz;
+	return buf;
+out_fp:
+	fclose(fp);
+out_free:
+	free(buf);
+	return NULL;
+}
+
+#define LIBXFS_ATTR_NS		(LIBXFS_ATTR_SECURE | \
+				 LIBXFS_ATTR_ROOT | \
+				 LIBXFS_ATTR_PARENT)
+
 static int
 attr_set_f(
 	int			argc,
@@ -69,6 +113,8 @@ attr_set_f(
 {
 	struct xfs_da_args	args = { };
 	char			*sp;
+	char			*name_from_file = NULL;
+	char			*value_from_file = NULL;
 	enum xfs_attr_update	op = XFS_ATTRUPDATE_UPSERT;
 	int			c;
 
@@ -81,20 +127,23 @@ attr_set_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "rusCRnv:")) != EOF) {
+	while ((c = getopt(argc, argv, "ruspCRnN:v:V:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_ROOT;
-			args.attr_filter &= ~LIBXFS_ATTR_SECURE;
 			break;
 		case 'u':
-			args.attr_filter &= ~(LIBXFS_ATTR_ROOT |
-					      LIBXFS_ATTR_SECURE);
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			break;
 		case 's':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_SECURE;
-			args.attr_filter &= ~LIBXFS_ATTR_ROOT;
+			break;
+		case 'p':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= XFS_ATTR_PARENT;
 			break;
 
 		/* modifiers */
@@ -103,6 +152,10 @@ attr_set_f(
 			break;
 		case 'R':
 			op = XFS_ATTRUPDATE_REPLACE;
+			break;
+
+		case 'N':
+			name_from_file = optarg;
 			break;
 
 		case 'n':
@@ -114,6 +167,11 @@ attr_set_f(
 
 		/* value length */
 		case 'v':
+			if (value_from_file) {
+				dbprintf(_("already set value file\n"));
+				return 0;
+			}
+
 			args.valuelen = strtol(optarg, &sp, 0);
 			if (*sp != '\0' ||
 			    args.valuelen < 0 || args.valuelen > 64 * 1024) {
@@ -122,30 +180,64 @@ attr_set_f(
 			}
 			break;
 
+		case 'V':
+			if (args.valuelen != 0) {
+				dbprintf(_("already set valuelen\n"));
+				return 0;
+			}
+
+			value_from_file = optarg;
+			break;
+
 		default:
 			dbprintf(_("bad option for attr_set command\n"));
 			return 0;
 		}
 	}
 
-	if (optind != argc - 1) {
-		dbprintf(_("too few options for attr_set (no name given)\n"));
-		return 0;
+	if (name_from_file) {
+		int namelen;
+
+		if (optind != argc) {
+			dbprintf(_("too many options for attr_set (no name needed)\n"));
+			return 0;
+		}
+
+		args.name = get_buf_from_file(name_from_file, MAXNAMELEN,
+				&namelen);
+		if (!args.name)
+			return 0;
+
+		args.namelen = namelen;
+	} else {
+		if (optind != argc - 1) {
+			dbprintf(_("too few options for attr_set (no name given)\n"));
+			return 0;
+		}
+
+		args.name = (const unsigned char *)argv[optind];
+		if (!args.name) {
+			dbprintf(_("invalid name\n"));
+			return 0;
+		}
+
+		args.namelen = strlen(argv[optind]);
+		if (args.namelen >= MAXNAMELEN) {
+			dbprintf(_("name too long\n"));
+			goto out;
+		}
 	}
 
-	args.name = (const unsigned char *)argv[optind];
-	if (!args.name) {
-		dbprintf(_("invalid name\n"));
-		return 0;
-	}
+	if (value_from_file) {
+		int valuelen;
 
-	args.namelen = strlen(argv[optind]);
-	if (args.namelen >= MAXNAMELEN) {
-		dbprintf(_("name too long\n"));
-		return 0;
-	}
+		args.value = get_buf_from_file(value_from_file,
+				XFS_XATTR_SIZE_MAX, &valuelen);
+		if (!args.value)
+			goto out;
 
-	if (args.valuelen) {
+		args.valuelen = valuelen;
+	} else if (args.valuelen) {
 		args.value = memalign(getpagesize(), args.valuelen);
 		if (!args.value) {
 			dbprintf(_("cannot allocate buffer (%d)\n"),
@@ -175,6 +267,8 @@ out:
 		libxfs_irele(args.dp);
 	if (args.value)
 		free(args.value);
+	if (name_from_file)
+		free((void *)args.name);
 	return 0;
 }
 
@@ -184,6 +278,7 @@ attr_remove_f(
 	char			**argv)
 {
 	struct xfs_da_args	args = { };
+	char			*name_from_file = NULL;
 	int			c;
 
 	if (cur_typ == NULL) {
@@ -195,20 +290,27 @@ attr_remove_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "rusn")) != EOF) {
+	while ((c = getopt(argc, argv, "ruspnN:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_ROOT;
-			args.attr_filter &= ~LIBXFS_ATTR_SECURE;
 			break;
 		case 'u':
-			args.attr_filter &= ~(LIBXFS_ATTR_ROOT |
-					      LIBXFS_ATTR_SECURE);
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			break;
 		case 's':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_SECURE;
-			args.attr_filter &= ~LIBXFS_ATTR_ROOT;
+			break;
+		case 'p':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= XFS_ATTR_PARENT;
+			break;
+
+		case 'N':
+			name_from_file = optarg;
 			break;
 
 		case 'n':
@@ -224,21 +326,37 @@ attr_remove_f(
 		}
 	}
 
-	if (optind != argc - 1) {
-		dbprintf(_("too few options for attr_remove (no name given)\n"));
-		return 0;
-	}
+	if (name_from_file) {
+		int namelen;
 
-	args.name = (const unsigned char *)argv[optind];
-	if (!args.name) {
-		dbprintf(_("invalid name\n"));
-		return 0;
-	}
+		if (optind != argc) {
+			dbprintf(_("too many options for attr_set (no name needed)\n"));
+			return 0;
+		}
 
-	args.namelen = strlen(argv[optind]);
-	if (args.namelen >= MAXNAMELEN) {
-		dbprintf(_("name too long\n"));
-		return 0;
+		args.name = get_buf_from_file(name_from_file, MAXNAMELEN,
+				&namelen);
+		if (!args.name)
+			return 0;
+
+		args.namelen = namelen;
+	} else {
+		if (optind != argc - 1) {
+			dbprintf(_("too few options for attr_remove (no name given)\n"));
+			return 0;
+		}
+
+		args.name = (const unsigned char *)argv[optind];
+		if (!args.name) {
+			dbprintf(_("invalid name\n"));
+			return 0;
+		}
+
+		args.namelen = strlen(argv[optind]);
+		if (args.namelen >= MAXNAMELEN) {
+			dbprintf(_("name too long\n"));
+			return 0;
+		}
 	}
 
 	if (libxfs_iget(mp, NULL, iocur_top->ino, 0, &args.dp)) {
@@ -260,5 +378,7 @@ attr_remove_f(
 out:
 	if (args.dp)
 		libxfs_irele(args.dp);
+	if (name_from_file)
+		free((void *)args.name);
 	return 0;
 }

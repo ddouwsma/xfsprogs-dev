@@ -596,6 +596,696 @@ static struct cmdinfo ls_cmd = {
 	.help		= ls_help,
 };
 
+static void
+pptr_emit(
+	struct xfs_inode	*ip,
+	unsigned int		attr_flags,
+	const uint8_t		*name,
+	unsigned int		namelen,
+	const void		*value,
+	unsigned int		valuelen)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	xfs_ino_t		parent_ino;
+	uint32_t		parent_gen;
+	int			error;
+
+	if (!(attr_flags & XFS_ATTR_PARENT))
+		return;
+
+	error = -libxfs_parent_from_attr(mp, attr_flags, name, namelen, value,
+			valuelen, &parent_ino, &parent_gen);
+	if (error)
+		return;
+
+	dbprintf("%18llu:0x%08x %3d %.*s\n", parent_ino, parent_gen, namelen,
+			namelen, name);
+}
+
+static int
+list_sf_pptrs(
+	struct xfs_inode		*ip)
+{
+	struct xfs_attr_sf_hdr		*hdr = ip->i_af.if_data;
+	struct xfs_attr_sf_entry	*sfe;
+	unsigned int			i;
+
+	sfe = libxfs_attr_sf_firstentry(hdr);
+	for (i = 0; i < hdr->count; i++) {
+		pptr_emit(ip, sfe->flags, sfe->nameval, sfe->namelen,
+				sfe->nameval + sfe->valuelen, sfe->valuelen);
+
+		sfe = xfs_attr_sf_nextentry(sfe);
+	}
+
+	return 0;
+}
+
+static void
+list_leaf_pptr_entries(
+	struct xfs_inode		*ip,
+	struct xfs_buf			*bp)
+{
+	struct xfs_attr3_icleaf_hdr	ichdr;
+	struct xfs_mount		*mp = ip->i_mount;
+	struct xfs_attr_leafblock	*leaf = bp->b_addr;
+	struct xfs_attr_leaf_entry	*entry;
+	unsigned int			i;
+
+	libxfs_attr3_leaf_hdr_from_disk(mp->m_attr_geo, &ichdr, leaf);
+	entry = xfs_attr3_leaf_entryp(leaf);
+
+	for (i = 0; i < ichdr.count; entry++, i++) {
+		struct xfs_attr_leaf_name_local	*name_loc;
+
+		/*
+		 * Parent pointers cannot be remote values; don't bother
+		 * decoding this xattr name.
+		 */
+		if (!(entry->flags & XFS_ATTR_LOCAL))
+			continue;
+
+		name_loc = xfs_attr3_leaf_name_local(leaf, i);
+		pptr_emit(ip, entry->flags, name_loc->nameval,
+				name_loc->namelen,
+				name_loc->nameval + name_loc->namelen,
+				be16_to_cpu(name_loc->valuelen));
+	}
+}
+
+static int
+list_leaf_pptrs(
+	struct xfs_inode		*ip)
+{
+	struct xfs_buf			*leaf_bp;
+	int				error;
+
+	error = -libxfs_attr3_leaf_read(NULL, ip, ip->i_ino, 0, &leaf_bp);
+	if (error)
+		return error;
+
+	list_leaf_pptr_entries(ip, leaf_bp);
+	libxfs_trans_brelse(NULL, leaf_bp);
+	return 0;
+}
+
+static int
+find_leftmost_attr_leaf(
+	struct xfs_inode		*ip,
+	struct xfs_buf			**leaf_bpp)
+{
+	struct xfs_da3_icnode_hdr	nodehdr;
+	struct xfs_mount		*mp = ip->i_mount;
+	struct xfs_da_intnode		*node;
+	struct xfs_da_node_entry	*btree;
+	struct xfs_buf			*bp;
+	xfs_dablk_t			blkno = 0;
+	unsigned int			expected_level = 0;
+	int				error;
+
+	for (;;) {
+		uint16_t		magic;
+
+		error = -libxfs_da3_node_read(NULL, ip, blkno, &bp,
+				XFS_ATTR_FORK);
+		if (error)
+			return error;
+
+		node = bp->b_addr;
+		magic = be16_to_cpu(node->hdr.info.magic);
+		if (magic == XFS_ATTR_LEAF_MAGIC ||
+		    magic == XFS_ATTR3_LEAF_MAGIC)
+			break;
+
+		error = EFSCORRUPTED;
+		if (magic != XFS_DA_NODE_MAGIC &&
+		    magic != XFS_DA3_NODE_MAGIC)
+			goto out_buf;
+
+		libxfs_da3_node_hdr_from_disk(mp, &nodehdr, node);
+
+		if (nodehdr.count == 0 || nodehdr.level >= XFS_DA_NODE_MAXDEPTH)
+			goto out_buf;
+
+		/* Check the level from the root node. */
+		if (blkno == 0)
+			expected_level = nodehdr.level - 1;
+		else if (expected_level != nodehdr.level)
+			goto out_buf;
+		else
+			expected_level--;
+
+		/* Find the next level towards the leaves of the dabtree. */
+		btree = nodehdr.btree;
+		blkno = be32_to_cpu(btree->before);
+		libxfs_trans_brelse(NULL, bp);
+	}
+
+	error = EFSCORRUPTED;
+	if (expected_level != 0)
+		goto out_buf;
+
+	*leaf_bpp = bp;
+	return 0;
+
+out_buf:
+	libxfs_trans_brelse(NULL, bp);
+	return error;
+}
+
+static int
+list_node_pptrs(
+	struct xfs_inode		*ip)
+{
+	struct xfs_attr3_icleaf_hdr	leafhdr;
+	struct xfs_mount		*mp = ip->i_mount;
+	struct xfs_attr_leafblock	*leaf;
+	struct xfs_buf			*leaf_bp;
+	int				error;
+
+	error = find_leftmost_attr_leaf(ip, &leaf_bp);
+	if (error)
+		return error;
+
+	for (;;) {
+		list_leaf_pptr_entries(ip, leaf_bp);
+
+		/* Find the right sibling of this leaf block. */
+		leaf = leaf_bp->b_addr;
+		libxfs_attr3_leaf_hdr_from_disk(mp->m_attr_geo, &leafhdr, leaf);
+		if (leafhdr.forw == 0)
+			goto out_leaf;
+
+		libxfs_trans_brelse(NULL, leaf_bp);
+
+		error = -libxfs_attr3_leaf_read(NULL, ip, ip->i_ino,
+				leafhdr.forw, &leaf_bp);
+		if (error)
+			return error;
+	}
+
+out_leaf:
+	libxfs_trans_brelse(NULL, leaf_bp);
+	return error;
+}
+
+static int
+list_pptrs(
+	struct xfs_inode	*ip)
+{
+	int			error;
+
+	if (!libxfs_inode_hasattr(ip))
+		return 0;
+
+	if (ip->i_af.if_format == XFS_DINODE_FMT_LOCAL)
+		return list_sf_pptrs(ip);
+
+	/* attr functions require that the attr fork is loaded */
+	error = -libxfs_iread_extents(NULL, ip, XFS_ATTR_FORK);
+	if (error)
+		return error;
+
+	if (libxfs_attr_is_leaf(ip))
+		return list_leaf_pptrs(ip);
+
+	return list_node_pptrs(ip);
+}
+
+/* If the io cursor points to a file, list its parents. */
+static int
+parent_cur(
+	char			*tag)
+{
+	struct xfs_inode	*ip;
+	int			error = 0;
+
+	if (!xfs_has_parent(mp))
+		return 0;
+
+	if (iocur_top->typ != &typtab[TYP_INODE])
+		return ENOTDIR;
+
+	error = -libxfs_iget(mp, NULL, iocur_top->ino, 0, &ip);
+	if (error)
+		return error;
+
+	/* List the parents of a file. */
+	if (tag)
+		dbprintf(_("%s:\n"), tag);
+
+	error = list_pptrs(ip);
+	if (error)
+		goto rele;
+
+rele:
+	libxfs_irele(ip);
+	return error;
+}
+
+static void
+parent_help(void)
+{
+	dbprintf(_(
+"\n"
+" List the parents of the currently selected file.\n"
+"\n"
+" Parent pointers will be listed in the format:\n"
+" inode_number:inode_gen	ondisk_namehash:namehash	name_length	name\n"
+	));
+}
+
+static int
+parent_f(
+	int			argc,
+	char			**argv)
+{
+	int			c;
+	int			error = 0;
+
+	while ((c = getopt(argc, argv, "")) != -1) {
+		switch (c) {
+		default:
+			ls_help();
+			return 0;
+		}
+	}
+
+	if (optind == argc) {
+		error = parent_cur(NULL);
+		if (error) {
+			dbprintf("%s\n", strerror(error));
+			exitcode = 1;
+		}
+
+		return 0;
+	}
+
+	for (c = optind; c < argc; c++) {
+		push_cur();
+
+		error = path_walk(argv[c]);
+		if (error)
+			goto err_cur;
+
+		error = parent_cur(argv[c]);
+		if (error)
+			goto err_cur;
+
+		pop_cur();
+	}
+
+	return 0;
+err_cur:
+	pop_cur();
+	if (error) {
+		dbprintf("%s: %s\n", argv[c], strerror(error));
+		exitcode = 1;
+	}
+	return 0;
+}
+
+static struct cmdinfo parent_cmd = {
+	.name		= "parent",
+	.altname	= "pptr",
+	.cfunc		= parent_f,
+	.argmin		= 0,
+	.argmax		= -1,
+	.canpush	= 0,
+	.args		= "[paths...]",
+	.help		= parent_help,
+};
+
+static void
+link_help(void)
+{
+	dbprintf(_(
+"\n"
+" Create a directory entry in the current directory that points to the\n"
+" specified file.\n"
+"\n"
+" Options:\n"
+"   -i   -- Point to this specific inode number.\n"
+"   -p   -- Point to the inode given by this path.\n"
+"   -t   -- Set the file type to this value.\n"
+"   name -- Create this directory entry with this name.\n"
+	));
+}
+
+static int
+create_child(
+	struct xfs_mount	*mp,
+	xfs_ino_t		parent_ino,
+	const char		*name,
+	unsigned int		ftype,
+	xfs_ino_t		child_ino)
+{
+	struct xfs_name		xname = {
+		.name		= (const unsigned char *)name,
+		.len		= strlen(name),
+		.type		= ftype,
+	};
+	struct xfs_parent_args	*ppargs = NULL;
+	struct xfs_trans	*tp;
+	struct xfs_inode	*dp, *ip;
+	unsigned int		resblks;
+	bool			isdir;
+	int			error;
+
+	error = -libxfs_iget(mp, NULL, parent_ino, 0, &dp);
+	if (error)
+		return error;
+
+	if (!S_ISDIR(VFS_I(dp)->i_mode)) {
+		error = -ENOTDIR;
+		goto out_dp;
+	}
+
+	error = -libxfs_iget(mp, NULL, child_ino, 0, &ip);
+	if (error)
+		goto out_dp;
+	isdir = S_ISDIR(VFS_I(ip)->i_mode);
+
+	if (xname.type == XFS_DIR3_FT_UNKNOWN)
+		xname.type = libxfs_mode_to_ftype(VFS_I(ip)->i_mode);
+
+	error = -libxfs_parent_start(mp, &ppargs);
+	if (error)
+		goto out_ip;
+
+	resblks = libxfs_link_space_res(mp, MAXNAMELEN);
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_link, resblks, 0, 0,
+			&tp);
+	if (error)
+		goto out_parent;
+
+	libxfs_trans_ijoin(tp, dp, 0);
+	libxfs_trans_ijoin(tp, ip, 0);
+
+	error = -libxfs_dir_createname(tp, dp, &xname, ip->i_ino, resblks);
+	if (error)
+		goto out_trans;
+
+	/* bump dp's link to ip */
+	libxfs_bumplink(tp, ip);
+
+	/* bump ip's dotdot link to dp */
+	if (isdir)
+		libxfs_bumplink(tp, dp);
+
+	/* Replace the dotdot entry in the child directory. */
+	if (isdir) {
+		error = -libxfs_dir_replace(tp, ip, &xfs_name_dotdot,
+				dp->i_ino, resblks);
+		if (error)
+			goto out_trans;
+	}
+
+	if (ppargs) {
+		error = -libxfs_parent_addname(tp, ppargs, dp, &xname, ip);
+		if (error)
+			goto out_trans;
+	}
+
+	error = -libxfs_trans_commit(tp);
+	goto out_parent;
+
+out_trans:
+	libxfs_trans_cancel(tp);
+out_parent:
+	libxfs_parent_finish(mp, ppargs);
+out_ip:
+	libxfs_irele(ip);
+out_dp:
+	libxfs_irele(dp);
+	return error;
+}
+
+static const char *ftype_map[] = {
+	[XFS_DIR3_FT_REG_FILE]	= "reg",
+	[XFS_DIR3_FT_DIR]	= "dir",
+	[XFS_DIR3_FT_CHRDEV]	= "cdev",
+	[XFS_DIR3_FT_BLKDEV]	= "bdev",
+	[XFS_DIR3_FT_FIFO]	= "fifo",
+	[XFS_DIR3_FT_SOCK]	= "sock",
+	[XFS_DIR3_FT_SYMLINK]	= "symlink",
+	[XFS_DIR3_FT_WHT]	= "whiteout",
+};
+
+static int
+link_f(
+	int			argc,
+	char			**argv)
+{
+	xfs_ino_t		child_ino = NULLFSINO;
+	int			ftype = XFS_DIR3_FT_UNKNOWN;
+	unsigned int		i;
+	int			c;
+	int			error = 0;
+
+	while ((c = getopt(argc, argv, "i:p:t:")) != -1) {
+		switch (c) {
+		case 'i':
+			errno = 0;
+			child_ino = strtoull(optarg, NULL, 0);
+			if (errno == ERANGE) {
+				printf("%s: unknown inode number\n", optarg);
+				exitcode = 1;
+				return 0;
+			}
+			break;
+		case 'p':
+			push_cur();
+			error = path_walk(optarg);
+			if (error) {
+				printf("%s: %s\n", optarg, strerror(error));
+				exitcode = 1;
+				return 0;
+			} else if (iocur_top->typ != &typtab[TYP_INODE]) {
+				printf("%s: does not point to an inode\n",
+						optarg);
+				exitcode = 1;
+				return 0;
+			} else {
+				child_ino = iocur_top->ino;
+			}
+			pop_cur();
+			break;
+		case 't':
+			for (i = 0; i < ARRAY_SIZE(ftype_map); i++) {
+				if (ftype_map[i] &&
+				    !strcmp(ftype_map[i], optarg)) {
+					ftype = i;
+					break;
+				}
+			}
+			if (i == ARRAY_SIZE(ftype_map)) {
+				printf("%s: unknown file type\n", optarg);
+				exitcode = 1;
+				return 0;
+			}
+			break;
+		default:
+			link_help();
+			return 0;
+		}
+	}
+
+	if (child_ino == NULLFSINO) {
+		printf("link: need to specify child via -i or -p\n");
+		exitcode = 1;
+		return 0;
+	}
+
+	if (iocur_top->typ != &typtab[TYP_INODE]) {
+		printf("io cursor does not point to an inode.\n");
+		exitcode = 1;
+		return 0;
+	}
+
+	if (optind + 1 != argc) {
+		printf("link: need directory entry name");
+		exitcode = 1;
+		return 0;
+	}
+
+	error = create_child(mp, iocur_top->ino, argv[optind], ftype,
+			child_ino);
+	if (error) {
+		printf("link failed: %s\n", strerror(error));
+		exitcode = 1;
+		return 0;
+	}
+
+	return 0;
+}
+
+static struct cmdinfo link_cmd = {
+	.name		= "link",
+	.cfunc		= link_f,
+	.argmin		= 0,
+	.argmax		= -1,
+	.canpush	= 0,
+	.args		= "[-i ino] [-p path] [-t ftype] name",
+	.help		= link_help,
+};
+
+static void
+unlink_help(void)
+{
+	dbprintf(_(
+"\n"
+" Remove a directory entry from the current directory.\n"
+"\n"
+" Options:\n"
+"   name -- Remove the directory entry with this name.\n"
+	));
+}
+
+static void
+droplink(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip)
+{
+	struct inode		*inode = VFS_I(ip);
+
+	libxfs_trans_ichgtime(tp, ip, XFS_ICHGTIME_CHG);
+
+	if (inode->i_nlink != XFS_NLINK_PINNED)
+		drop_nlink(VFS_I(ip));
+
+	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+}
+
+static int
+remove_child(
+	struct xfs_mount	*mp,
+	xfs_ino_t		parent_ino,
+	const char		*name)
+{
+	struct xfs_name		xname = {
+		.name		= (const unsigned char *)name,
+		.len		= strlen(name),
+	};
+	struct xfs_parent_args	*ppargs;
+	struct xfs_trans	*tp;
+	struct xfs_inode	*dp, *ip;
+	xfs_ino_t		child_ino;
+	unsigned int		resblks;
+	int			error;
+
+	error = -libxfs_iget(mp, NULL, parent_ino, 0, &dp);
+	if (error)
+		return error;
+
+	if (!S_ISDIR(VFS_I(dp)->i_mode)) {
+		error = -ENOTDIR;
+		goto out_dp;
+	}
+
+	error = -libxfs_dir_lookup(NULL, dp, &xname, &child_ino, NULL);
+	if (error)
+		goto out_dp;
+
+	error = -libxfs_iget(mp, NULL, child_ino, 0, &ip);
+	if (error)
+		goto out_dp;
+
+	error = -libxfs_parent_start(mp, &ppargs);
+	if (error)
+		goto out_ip;
+
+	resblks = libxfs_remove_space_res(mp, MAXNAMELEN);
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_remove, resblks, 0, 0,
+			&tp);
+	if (error)
+		goto out_parent;
+
+	libxfs_trans_ijoin(tp, dp, 0);
+	libxfs_trans_ijoin(tp, ip, 0);
+
+	if (S_ISDIR(VFS_I(ip)->i_mode)) {
+		/* drop ip's dotdot link to dp */
+		droplink(tp, dp);
+	} else {
+		libxfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
+	}
+
+	/* drop dp's link to ip */
+	droplink(tp, ip);
+
+	error = -libxfs_dir_removename(tp, dp, &xname, ip->i_ino, resblks);
+	if (error)
+		goto out_trans;
+
+	if (ppargs) {
+		error = -libxfs_parent_removename(tp, ppargs, dp, &xname, ip);
+		if (error)
+			goto out_trans;
+	}
+
+	error = -libxfs_trans_commit(tp);
+	goto out_parent;
+
+out_trans:
+	libxfs_trans_cancel(tp);
+out_parent:
+	libxfs_parent_finish(mp, ppargs);
+out_ip:
+	libxfs_irele(ip);
+out_dp:
+	libxfs_irele(dp);
+	return error;
+}
+
+static int
+unlink_f(
+	int			argc,
+	char			**argv)
+{
+	int			c;
+	int			error = 0;
+
+	while ((c = getopt(argc, argv, "")) != -1) {
+		switch (c) {
+		default:
+			unlink_help();
+			return 0;
+		}
+	}
+
+	if (iocur_top->typ != &typtab[TYP_INODE]) {
+		printf("io cursor does not point to an inode.\n");
+		exitcode = 1;
+		return 0;
+	}
+
+	if (optind + 1 != argc) {
+		printf("unlink: need directory entry name");
+		exitcode = 1;
+		return 0;
+	}
+
+	error = remove_child(mp, iocur_top->ino, argv[optind]);
+	if (error) {
+		printf("unlink failed: %s\n", strerror(error));
+		exitcode = 1;
+		return 0;
+	}
+
+	return 0;
+}
+
+static struct cmdinfo unlink_cmd = {
+	.name		= "unlink",
+	.cfunc		= unlink_f,
+	.argmin		= 0,
+	.argmax		= -1,
+	.canpush	= 0,
+	.args		= "name",
+	.help		= unlink_help,
+};
+
 void
 namei_init(void)
 {
@@ -604,4 +1294,15 @@ namei_init(void)
 
 	ls_cmd.oneline = _("list directory contents");
 	add_command(&ls_cmd);
+
+	parent_cmd.oneline = _("list parent pointers");
+	add_command(&parent_cmd);
+
+	if (expert_mode) {
+		link_cmd.oneline = _("create directory link");
+		add_command(&link_cmd);
+
+		unlink_cmd.oneline = _("remove directory link");
+		add_command(&unlink_cmd);
+	}
 }

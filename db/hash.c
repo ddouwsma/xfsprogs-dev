@@ -36,11 +36,17 @@ hash_help(void)
 " 'hash' prints out the calculated hash value for a string using the\n"
 "directory/attribute code hash function.\n"
 "\n"
-" Usage:  \"hash <string>\"\n"
+" Usage:  \"hash [-d|-p parent_ino] <string>\"\n"
 "\n"
 ));
 
 }
+
+enum hash_what {
+	ATTR,
+	DIRECTORY,
+	PPTR,
+};
 
 /* ARGSUSED */
 static int
@@ -48,14 +54,24 @@ hash_f(
 	int		argc,
 	char		**argv)
 {
+	xfs_ino_t	p_ino = 0;
 	xfs_dahash_t	hashval;
-	bool		use_dir2_hash = false;
+	enum hash_what	what = ATTR;
 	int		c;
 
-	while ((c = getopt(argc, argv, "d")) != EOF) {
+	while ((c = getopt(argc, argv, "dp:")) != EOF) {
 		switch (c) {
 		case 'd':
-			use_dir2_hash = true;
+			what = DIRECTORY;
+			break;
+		case 'p':
+			errno = 0;
+			p_ino = strtoull(optarg, NULL, 0);
+			if (errno) {
+				perror(optarg);
+				return 1;
+			}
+			what = PPTR;
 			break;
 		default:
 			exitcode = 1;
@@ -70,10 +86,18 @@ hash_f(
 			.len	= strlen(argv[c]),
 		};
 
-		if (use_dir2_hash)
+		switch (what) {
+		case DIRECTORY:
 			hashval = libxfs_dir2_hashname(mp, &xname);
-		else
-			hashval = libxfs_da_hashname(xname.name, xname.len);
+			break;
+		case PPTR:
+			hashval = libxfs_parent_hashval(mp, xname.name,
+					xname.len, p_ino);
+			break;
+		case ATTR:
+			hashval = libxfs_attr_hashname(xname.name, xname.len);
+			break;
+		}
 		dbprintf("0x%x\n", hashval);
 	}
 
@@ -306,7 +330,7 @@ collide_xattrs(
 	unsigned long		i;
 	int			error = 0;
 
-	old_hash = libxfs_da_hashname((uint8_t *)name, namelen);
+	old_hash = libxfs_attr_hashname((uint8_t *)name, namelen);
 
 	if (fd >= 0) {
 		/*
@@ -331,8 +355,8 @@ collide_xattrs(
 		snprintf(xattrname, MAXNAMELEN + 5, "user.%s", name);
 		obfuscate_name(old_hash, namelen, (uint8_t *)xattrname + 5,
 				false);
-		ASSERT(old_hash == libxfs_da_hashname((uint8_t *)xattrname + 5,
-				namelen));
+		ASSERT(old_hash == libxfs_attr_hashname(
+					(uint8_t *)xattrname + 5, namelen));
 
 		if (fd >= 0) {
 			error = fsetxattr(fd, xattrname, "1", 1, 0);

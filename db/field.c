@@ -24,6 +24,14 @@
 #include "dir2sf.h"
 #include "symlink.h"
 
+#define	PPOFF(f)	bitize(offsetof(struct xfs_parent_rec, f))
+const field_t		parent_flds[] = {
+	{ "inumber", FLDT_INO, OI(PPOFF(p_ino)), C1, 0, TYP_INODE },
+	{ "gen", FLDT_UINT32D, OI(PPOFF(p_gen)), C1, 0, TYP_NONE },
+	{ NULL }
+};
+#undef PPOFF
+
 const ftattr_t	ftattrtab[] = {
 	{ FLDT_AGBLOCK, "agblock", fp_num, "%u", SI(bitsz(xfs_agblock_t)),
 	  FTARG_DONULL, fa_agblock, NULL },
@@ -384,6 +392,8 @@ const ftattr_t	ftattrtab[] = {
 	{ FLDT_UINT8X, "uint8x", fp_num, "%#x", SI(bitsz(uint8_t)), 0, NULL,
 	  NULL },
 	{ FLDT_UUID, "uuid", fp_uuid, NULL, SI(bitsz(uuid_t)), 0, NULL, NULL },
+	{ FLDT_PARENT_REC, "parent", NULL, (char *)parent_flds,
+	  SI(bitsz(struct xfs_parent_rec)), 0, NULL, parent_flds },
 	{ FLDT_ZZZ, NULL }
 };
 

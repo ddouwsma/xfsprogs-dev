@@ -114,6 +114,7 @@ enum {
 	N_SIZE = 0,
 	N_VERSION,
 	N_FTYPE,
+	N_PARENT,
 	N_MAX_OPTS,
 };
 
@@ -656,6 +657,7 @@ static struct opt_params nopts = {
 		[N_SIZE] = "size",
 		[N_VERSION] = "version",
 		[N_FTYPE] = "ftype",
+		[N_PARENT] = "parent",
 		[N_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -679,6 +681,14 @@ static struct opt_params nopts = {
 		  .maxval = 1,
 		  .defaultval = 1,
 		},
+		{ .index = N_PARENT,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+
+
 	},
 };
 
@@ -1040,7 +1050,7 @@ usage( void )
 			    sunit=value|su=num,sectsize=num,lazy-count=0|1,\n\
 			    concurrency=num]\n\
 /* label */		[-L label (maximum 12 characters)]\n\
-/* naming */		[-n size=num,version=2|ci,ftype=0|1]\n\
+/* naming */		[-n size=num,version=2|ci,ftype=0|1,parent=0|1]]\n\
 /* no-op info only */	[-N]\n\
 /* prototype file */	[-p fname]\n\
 /* quiet */		[-q]\n\
@@ -1878,6 +1888,9 @@ naming_opts_parser(
 	case N_FTYPE:
 		cli->sb_feat.dirftype = getnum(value, opts, subopt);
 		break;
+	case N_PARENT:
+		cli->sb_feat.parent_pointers = getnum(value, &nopts, N_PARENT);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2385,6 +2398,14 @@ _("exchange-range not supported without CRC support\n"));
 			usage();
 		}
 		cli->sb_feat.exchrange = false;
+
+		if (cli->sb_feat.parent_pointers &&
+		    cli_opt_set(&nopts, N_PARENT)) {
+			fprintf(stderr,
+_("parent pointers not supported without CRC support\n"));
+			usage();
+		}
+		cli->sb_feat.parent_pointers = false;
 	}
 
 	if (!cli->sb_feat.finobt) {
@@ -2417,6 +2438,17 @@ _("rmapbt not supported with realtime devices\n"));
 		fprintf(stderr,
 _("cowextsize not supported without reflink support\n"));
 		usage();
+	}
+
+	/*
+	 * Turn on exchange-range if parent pointers are enabled and the caller
+	 * did not provide an explicit exchange-range parameter so that users
+	 * can take advantage of online repair.  It's not required for correct
+	 * operation, but it costs us nothing to enable it.
+	 */
+	if (cli->sb_feat.parent_pointers && !cli->sb_feat.exchrange &&
+	    !cli_opt_set(&iopts, I_EXCHANGE)) {
+		cli->sb_feat.exchrange = true;
 	}
 
 	/*
@@ -3458,8 +3490,6 @@ sb_set_features(
 		sbp->sb_features2 |= XFS_SB_VERSION2_LAZYSBCOUNTBIT;
 	if (fp->projid32bit)
 		sbp->sb_features2 |= XFS_SB_VERSION2_PROJID32BIT;
-	if (fp->parent_pointers)
-		sbp->sb_features2 |= XFS_SB_VERSION2_PARENTBIT;
 	if (fp->crcs_enabled)
 		sbp->sb_features2 |= XFS_SB_VERSION2_CRCBIT;
 	if (fp->attr_version == 2)
@@ -3520,6 +3550,15 @@ sb_set_features(
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NREXT64;
 	if (fp->exchrange)
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_EXCHRANGE;
+	if (fp->parent_pointers) {
+		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_PARENT;
+		/*
+		 * Set ATTRBIT even if mkfs doesn't write out a single parent
+		 * pointer so that the kernel doesn't have to do that for us
+		 * with a synchronous write to the primary super at runtime.
+		 */
+		sbp->sb_versionnum |= XFS_SB_VERSION_ATTRBIT;
+	}
 }
 
 /*
