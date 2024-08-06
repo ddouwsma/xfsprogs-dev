@@ -18,6 +18,7 @@
 #include "descr.h"
 #include "unicrash.h"
 #include "progress.h"
+#include "libfrog/histogram.h"
 
 /*
  * XFS Online Metadata Scrub (and Repair)
@@ -621,11 +622,13 @@ report_outcome(
  */
 enum o_opt_nums {
 	IWARN = 0,
+	FSTRIM_PCT,
 	O_MAX_OPTS,
 };
 
 static char *o_opts[] = {
 	[IWARN]			= "iwarn",
+	[FSTRIM_PCT]		= "fstrim_pct",
 	[O_MAX_OPTS]		= NULL,
 };
 
@@ -634,8 +637,11 @@ parse_o_opts(
 	struct scrub_ctx	*ctx,
 	char			*p)
 {
+	double			dval;
+
 	while (*p != '\0')  {
 		char		*val;
+		char		*endp;
 
 		switch (getsubopt(&p, o_opts, &val))  {
 		case IWARN:
@@ -645,6 +651,35 @@ parse_o_opts(
 				usage();
 			}
 			info_is_warning = true;
+			break;
+		case FSTRIM_PCT:
+			if (!val) {
+				fprintf(stderr,
+ _("-o fstrim_pct requires a parameter\n"));
+				usage();
+			}
+
+			errno = 0;
+			dval = strtod(val, &endp);
+
+			if (*endp) {
+				fprintf(stderr,
+ _("-o fstrim_pct must be a floating point number\n"));
+				usage();
+			}
+			if (errno) {
+				fprintf(stderr,
+ _("-o fstrim_pct: %s\n"),
+						strerror(errno));
+				usage();
+			}
+			if (dval <= 0 || dval > 100) {
+				fprintf(stderr,
+ _("-o fstrim_pct must be larger than 0 and less than 100\n"));
+				usage();
+			}
+
+			ctx->fstrim_block_pct = dval / 100.0;
 			break;
 		default:
 			usage();
@@ -658,7 +693,9 @@ main(
 	int			argc,
 	char			**argv)
 {
-	struct scrub_ctx	ctx = {0};
+	struct scrub_ctx	ctx = {
+		.fstrim_block_pct = FSTRIM_BLOCK_PCT_DEFAULT,
+	};
 	struct phase_rusage	all_pi;
 	char			*mtab = NULL;
 	FILE			*progress_fp = NULL;
@@ -668,6 +705,8 @@ main(
 	int			fd;
 	int			ret = SCRUB_RET_SUCCESS;
 	int			error;
+
+	hist_init(&ctx.datadev_hist);
 
 	fprintf(stdout, "EXPERIMENTAL xfs_scrub program in use! Use at your own risk!\n");
 	fflush(stdout);
@@ -878,10 +917,12 @@ out:
 	if (ctx.runtime_errors)
 		ret |= SCRUB_RET_OPERROR;
 	phase_end(&all_pi, 0);
-	if (progress_fp)
+	if (progress_fp && fileno(progress_fp) != 1)
 		fclose(progress_fp);
 out_unicrash:
 	unicrash_unload();
+
+	hist_free(&ctx.datadev_hist);
 
 	/*
 	 * If we're being run as a service, the return code must fit the LSB

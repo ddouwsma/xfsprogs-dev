@@ -7,6 +7,7 @@
 #define XFS_SCRUB_XFS_SCRUB_H_
 
 #include "libfrog/fsgeom.h"
+#include "libfrog/histogram.h"
 
 extern char *progname;
 
@@ -86,7 +87,22 @@ struct scrub_ctx {
 	unsigned long long	preens;
 	bool			scrub_setup_succeeded;
 	bool			preen_triggers[XFS_SCRUB_TYPE_NR];
+
+	/* Free space histograms, in fsb */
+	struct histogram	datadev_hist;
+
+	/*
+	 * Pick the largest value for fstrim minlen such that we trim at least
+	 * this much space per volume.
+	 */
+	double			fstrim_block_pct;
 };
+
+/*
+ * Trim only enough free space extents (in order of decreasing length) to
+ * ensure that this percentage of the free space is trimmed.
+ */
+#define FSTRIM_BLOCK_PCT_DEFAULT	(99.0 / 100.0)
 
 /* Phase helper functions */
 void xfs_shutdown_fs(struct scrub_ctx *ctx);
