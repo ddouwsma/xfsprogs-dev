@@ -30,6 +30,9 @@ enum xfrog_scrub_group;
 /* This scrub type needs to be checked. */
 #define SCRUB_ITEM_NEEDSCHECK	(1 << 5)
 
+/* Scrub barrier. */
+#define SCRUB_ITEM_BARRIER	(1 << 6)
+
 /* All of the state flags that we need to prioritize repair work. */
 #define SCRUB_ITEM_REPAIR_ANY	(SCRUB_ITEM_CORRUPT | \
 				 SCRUB_ITEM_PREEN | \
@@ -126,6 +129,20 @@ scrub_item_check(struct scrub_ctx *ctx, struct scrub_item *sri)
 	return scrub_item_check_file(ctx, sri, -1);
 }
 
+/* Count the number of metadata objects still needing a scrub. */
+static inline unsigned int
+scrub_item_count_needscheck(
+	const struct scrub_item		*sri)
+{
+	unsigned int			ret = 0;
+	unsigned int			i;
+
+	foreach_scrub_type(i)
+		if (sri->sri_state[i] & SCRUB_ITEM_NEEDSCHECK)
+			ret++;
+	return ret;
+}
+
 void scrub_report_preen_triggers(struct scrub_ctx *ctx);
 
 bool can_scrub_fs_metadata(struct scrub_ctx *ctx);
@@ -137,6 +154,8 @@ bool can_scrub_symlink(struct scrub_ctx *ctx);
 bool can_scrub_parent(struct scrub_ctx *ctx);
 bool can_repair(struct scrub_ctx *ctx);
 bool can_force_rebuild(struct scrub_ctx *ctx);
+
+void check_scrubv(struct scrub_ctx *ctx);
 
 int scrub_file(struct scrub_ctx *ctx, int fd, const struct xfs_bulkstat *bstat,
 		unsigned int type, struct scrub_item *sri);

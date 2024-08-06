@@ -8,45 +8,59 @@
 
 /* Shared code between scrub.c and repair.c. */
 
-int format_scrub_descr(struct scrub_ctx *ctx, char *buf, size_t buflen,
+void xfrog_scrubv_from_item(struct xfrog_scrubv *scrubv,
+		const struct scrub_item *sri);
+void xfrog_scrubv_add_item(struct xfrog_scrubv *scrubv,
+		const struct scrub_item *sri, unsigned int scrub_type,
+		bool want_repair);
+void xfrog_scrubv_add_barrier(struct xfrog_scrubv *scrubv);
+
+struct scrubv_descr {
+	struct xfrog_scrubv	*scrubv;
+	int			idx;
+};
+
+#define SCRUBV_DESCR(sv)	{ .scrubv = (sv), .idx = -1 }
+
+int format_scrubv_descr(struct scrub_ctx *ctx, char *buf, size_t buflen,
 		void *where);
 
 /* Predicates for scrub flag state. */
 
-static inline bool is_corrupt(struct xfs_scrub_metadata *sm)
+static inline bool is_corrupt(const struct xfs_scrub_vec *sv)
 {
-	return sm->sm_flags & XFS_SCRUB_OFLAG_CORRUPT;
+	return sv->sv_flags & XFS_SCRUB_OFLAG_CORRUPT;
 }
 
-static inline bool is_unoptimized(struct xfs_scrub_metadata *sm)
+static inline bool is_unoptimized(const struct xfs_scrub_vec *sv)
 {
-	return sm->sm_flags & XFS_SCRUB_OFLAG_PREEN;
+	return sv->sv_flags & XFS_SCRUB_OFLAG_PREEN;
 }
 
-static inline bool xref_failed(struct xfs_scrub_metadata *sm)
+static inline bool xref_failed(const struct xfs_scrub_vec *sv)
 {
-	return sm->sm_flags & XFS_SCRUB_OFLAG_XFAIL;
+	return sv->sv_flags & XFS_SCRUB_OFLAG_XFAIL;
 }
 
-static inline bool xref_disagrees(struct xfs_scrub_metadata *sm)
+static inline bool xref_disagrees(const struct xfs_scrub_vec *sv)
 {
-	return sm->sm_flags & XFS_SCRUB_OFLAG_XCORRUPT;
+	return sv->sv_flags & XFS_SCRUB_OFLAG_XCORRUPT;
 }
 
-static inline bool is_incomplete(struct xfs_scrub_metadata *sm)
+static inline bool is_incomplete(const struct xfs_scrub_vec *sv)
 {
-	return sm->sm_flags & XFS_SCRUB_OFLAG_INCOMPLETE;
+	return sv->sv_flags & XFS_SCRUB_OFLAG_INCOMPLETE;
 }
 
-static inline bool is_suspicious(struct xfs_scrub_metadata *sm)
+static inline bool is_suspicious(const struct xfs_scrub_vec *sv)
 {
-	return sm->sm_flags & XFS_SCRUB_OFLAG_WARNING;
+	return sv->sv_flags & XFS_SCRUB_OFLAG_WARNING;
 }
 
 /* Should we fix it? */
-static inline bool needs_repair(struct xfs_scrub_metadata *sm)
+static inline bool needs_repair(const struct xfs_scrub_vec *sv)
 {
-	return is_corrupt(sm) || xref_disagrees(sm);
+	return is_corrupt(sv) || xref_disagrees(sv);
 }
 
 /*
@@ -54,13 +68,13 @@ static inline bool needs_repair(struct xfs_scrub_metadata *sm)
  * scan/repair; or if there were cross-referencing problems but the object was
  * not obviously corrupt.
  */
-static inline bool want_retry(struct xfs_scrub_metadata *sm)
+static inline bool want_retry(const struct xfs_scrub_vec *sv)
 {
-	return is_incomplete(sm) || (xref_disagrees(sm) && !is_corrupt(sm));
+	return is_incomplete(sv) || (xref_disagrees(sv) && !is_corrupt(sv));
 }
 
 void scrub_warn_incomplete_scrub(struct scrub_ctx *ctx, struct descr *dsc,
-		struct xfs_scrub_metadata *meta);
+		const struct xfs_scrub_vec *meta);
 
 /* Scrub item functions */
 
@@ -101,8 +115,9 @@ scrub_item_schedule_retry(struct scrub_item *sri, unsigned int scrub_type)
 	return true;
 }
 
-bool scrub_item_call_kernel_again(struct scrub_item *sri,
-		unsigned int scrub_type, uint8_t work_mask,
+bool scrub_item_call_kernel_again(struct scrub_item *sri, uint8_t work_mask,
 		const struct scrub_item *old);
+bool scrub_item_schedule_work(struct scrub_item *sri, uint8_t state_flags,
+		const unsigned int *schedule_deps);
 
 #endif /* XFS_SCRUB_SCRUB_PRIVATE_H_ */

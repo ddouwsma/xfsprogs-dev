@@ -78,61 +78,31 @@ repair_want_service_downgrade(
 	return false;
 }
 
-/* Repair some metadata. */
-static int
-xfs_repair_metadata(
-	struct scrub_ctx		*ctx,
-	struct xfs_fd			*xfdp,
-	unsigned int			scrub_type,
-	struct scrub_item		*sri,
-	unsigned int			repair_flags)
+static inline void
+restore_oldvec(
+	struct xfs_scrub_vec	*oldvec,
+	const struct scrub_item	*sri,
+	unsigned int		scrub_type)
 {
-	struct xfs_scrub_metadata	meta = { 0 };
-	struct xfs_scrub_metadata	oldm;
-	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
-	bool				repair_only;
-	int				error;
+	oldvec->sv_type = scrub_type;
+	oldvec->sv_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
+}
 
-	/*
-	 * If the caller boosted the priority of this scrub type on behalf of a
-	 * higher level repair by setting IFLAG_REPAIR, turn off REPAIR_ONLY.
-	 */
-	repair_only = (repair_flags & XRM_REPAIR_ONLY) &&
-			scrub_item_type_boosted(sri, scrub_type);
+static int
+repair_epilogue(
+	struct scrub_ctx		*ctx,
+	struct descr			*dsc,
+	struct scrub_item		*sri,
+	unsigned int			repair_flags,
+	const struct xfs_scrub_vec	*meta)
+{
+	struct xfs_scrub_vec		oldv;
+	struct xfs_scrub_vec		*oldm = &oldv;
+	unsigned int			scrub_type = meta->sv_type;
+	int				error = -meta->sv_ret;
 
-	assert(scrub_type < XFS_SCRUB_TYPE_NR);
-	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
-	meta.sm_type = scrub_type;
-	meta.sm_flags = XFS_SCRUB_IFLAG_REPAIR;
-	if (use_force_rebuild)
-		meta.sm_flags |= XFS_SCRUB_IFLAG_FORCE_REBUILD;
-	switch (xfrog_scrubbers[scrub_type].group) {
-	case XFROG_SCRUB_GROUP_AGHEADER:
-	case XFROG_SCRUB_GROUP_PERAG:
-		meta.sm_agno = sri->sri_agno;
-		break;
-	case XFROG_SCRUB_GROUP_INODE:
-		meta.sm_ino = sri->sri_ino;
-		meta.sm_gen = sri->sri_gen;
-		break;
-	default:
-		break;
-	}
+	restore_oldvec(oldm, sri, meta->sv_type);
 
-	if (!is_corrupt(&meta) && repair_only)
-		return 0;
-
-	memcpy(&oldm, &meta, sizeof(oldm));
-	oldm.sm_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
-	descr_set(&dsc, &oldm);
-
-	if (needs_repair(&oldm))
-		str_info(ctx, descr_render(&dsc), _("Attempting repair."));
-	else if (debug || verbose)
-		str_info(ctx, descr_render(&dsc),
-				_("Attempting optimization."));
-
-	error = -xfrog_scrub_metadata(xfdp, &meta);
 	switch (error) {
 	case 0:
 		/* No operational errors encountered. */
@@ -141,12 +111,12 @@ xfs_repair_metadata(
 	case EBUSY:
 		/* Filesystem is busy, try again later. */
 		if (debug || verbose)
-			str_info(ctx, descr_render(&dsc),
+			str_info(ctx, descr_render(dsc),
 _("Filesystem is busy, deferring repair."));
 		return 0;
 	case ESHUTDOWN:
 		/* Filesystem is already shut down, abort. */
-		str_error(ctx, descr_render(&dsc),
+		str_error(ctx, descr_render(dsc),
 _("Filesystem is shut down, aborting."));
 		return ECANCELED;
 	case ENOTTY:
@@ -157,7 +127,7 @@ _("Filesystem is shut down, aborting."));
 		 * how to perform the repair, don't requeue the request.  Mark
 		 * it done and move on.
 		 */
-		if (is_unoptimized(&oldm) ||
+		if (is_unoptimized(oldm) ||
 		    debug_tweak_on("XFS_SCRUB_FORCE_REPAIR")) {
 			scrub_item_clean_state(sri, scrub_type);
 			return 0;
@@ -175,14 +145,14 @@ _("Filesystem is shut down, aborting."));
 		fallthrough;
 	case EINVAL:
 		/* Kernel doesn't know how to repair this? */
-		str_corrupt(ctx, descr_render(&dsc),
+		str_corrupt(ctx, descr_render(dsc),
 _("Don't know how to fix; offline repair required."));
 		scrub_item_clean_state(sri, scrub_type);
 		return 0;
 	case EROFS:
 		/* Read-only filesystem, can't fix. */
-		if (verbose || debug || needs_repair(&oldm))
-			str_error(ctx, descr_render(&dsc),
+		if (verbose || debug || needs_repair(oldm))
+			str_error(ctx, descr_render(dsc),
 _("Read-only filesystem; cannot make changes."));
 		return ECANCELED;
 	case ENOENT:
@@ -192,7 +162,7 @@ _("Read-only filesystem; cannot make changes."));
 	case ENOMEM:
 	case ENOSPC:
 		/* Don't care if preen fails due to low resources. */
-		if (is_unoptimized(&oldm) && !needs_repair(&oldm)) {
+		if (is_unoptimized(oldm) && !needs_repair(oldm)) {
 			scrub_item_clean_state(sri, scrub_type);
 			return 0;
 		}
@@ -207,7 +177,7 @@ _("Read-only filesystem; cannot make changes."));
 		 */
 		if (!(repair_flags & XRM_FINAL_WARNING))
 			return 0;
-		str_liberror(ctx, error, descr_render(&dsc));
+		str_liberror(ctx, error, descr_render(dsc));
 		scrub_item_clean_state(sri, scrub_type);
 		return 0;
 	}
@@ -218,12 +188,12 @@ _("Read-only filesystem; cannot make changes."));
 	 * the repair again, just in case the fs was busy.  Only retry so many
 	 * times.
 	 */
-	if (want_retry(&meta) && scrub_item_schedule_retry(sri, scrub_type))
+	if (want_retry(meta) && scrub_item_schedule_retry(sri, scrub_type))
 		return 0;
 
 	if (repair_flags & XRM_FINAL_WARNING)
-		scrub_warn_incomplete_scrub(ctx, &dsc, &meta);
-	if (needs_repair(&meta) || is_incomplete(&meta)) {
+		scrub_warn_incomplete_scrub(ctx, dsc, meta);
+	if (needs_repair(meta) || is_incomplete(meta)) {
 		/*
 		 * Still broken; if we've been told not to complain then we
 		 * just requeue this and try again later.  Otherwise we
@@ -231,9 +201,9 @@ _("Read-only filesystem; cannot make changes."));
 		 */
 		if (!(repair_flags & XRM_FINAL_WARNING))
 			return 0;
-		str_corrupt(ctx, descr_render(&dsc),
+		str_corrupt(ctx, descr_render(dsc),
 _("Repair unsuccessful; offline repair required."));
-	} else if (xref_failed(&meta)) {
+	} else if (xref_failed(meta)) {
 		/*
 		 * This metadata object itself looks ok, but we still noticed
 		 * inconsistencies when comparing it with the other filesystem
@@ -242,35 +212,189 @@ _("Repair unsuccessful; offline repair required."));
 		 * reverify the cross-referencing as repairs progress.
 		 */
 		if (repair_flags & XRM_FINAL_WARNING) {
-			str_info(ctx, descr_render(&dsc),
+			str_info(ctx, descr_render(dsc),
  _("Seems correct but cross-referencing failed; offline repair recommended."));
 		} else {
 			if (verbose)
-				str_info(ctx, descr_render(&dsc),
+				str_info(ctx, descr_render(dsc),
  _("Seems correct but cross-referencing failed; will keep checking."));
 			return 0;
 		}
-	} else if (meta.sm_flags & XFS_SCRUB_OFLAG_NO_REPAIR_NEEDED) {
+	} else if (meta->sv_flags & XFS_SCRUB_OFLAG_NO_REPAIR_NEEDED) {
 		if (verbose)
-			str_info(ctx, descr_render(&dsc),
+			str_info(ctx, descr_render(dsc),
 					_("No modification needed."));
 	} else {
 		/* Clean operation, no corruption detected. */
-		if (is_corrupt(&oldm))
-			record_repair(ctx, descr_render(&dsc),
+		if (is_corrupt(oldm))
+			record_repair(ctx, descr_render(dsc),
  _("Repairs successful."));
-		else if (xref_disagrees(&oldm))
-			record_repair(ctx, descr_render(&dsc),
+		else if (xref_disagrees(oldm))
+			record_repair(ctx, descr_render(dsc),
  _("Repairs successful after discrepancy in cross-referencing."));
-		else if (xref_failed(&oldm))
-			record_repair(ctx, descr_render(&dsc),
+		else if (xref_failed(oldm))
+			record_repair(ctx, descr_render(dsc),
  _("Repairs successful after cross-referencing failure."));
 		else
-			record_preen(ctx, descr_render(&dsc),
+			record_preen(ctx, descr_render(dsc),
  _("Optimization successful."));
 	}
 
 	scrub_item_clean_state(sri, scrub_type);
+	return 0;
+}
+
+/* Decide if the dependent scrub types of the given scrub type are ok. */
+static bool
+repair_item_dependencies_ok(
+	const struct scrub_item	*sri,
+	unsigned int		scrub_type)
+{
+	unsigned int		dep_mask = repair_deps[scrub_type];
+	unsigned int		b;
+
+	for (b = 0; dep_mask && b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
+		if (!(dep_mask & 1))
+			continue;
+		/*
+		 * If this lower level object also needs repair, we can't fix
+		 * the higher level item.
+		 */
+		if (sri->sri_state[b] & SCRUB_ITEM_NEEDSREPAIR)
+			return false;
+	}
+
+	return true;
+}
+
+/* Decide if we want to repair a particular type of metadata. */
+static bool
+can_repair_now(
+	const struct scrub_item	*sri,
+	unsigned int		scrub_type,
+	__u32			repair_mask,
+	unsigned int		repair_flags)
+{
+	struct xfs_scrub_vec	oldvec;
+	bool			repair_only;
+
+	/* Do we even need to repair this thing? */
+	if (!(sri->sri_state[scrub_type] & repair_mask))
+		return false;
+
+	restore_oldvec(&oldvec, sri, scrub_type);
+
+	/*
+	 * If the caller boosted the priority of this scrub type on behalf of a
+	 * higher level repair by setting IFLAG_REPAIR, ignore REPAIR_ONLY.
+	 */
+	repair_only = (repair_flags & XRM_REPAIR_ONLY) &&
+		      !(sri->sri_state[scrub_type] & SCRUB_ITEM_BOOST_REPAIR);
+	if (!is_corrupt(&oldvec) && repair_only)
+		return false;
+
+	/*
+	 * Don't try to repair higher level items if their lower-level
+	 * dependencies haven't been verified, unless this is our last chance
+	 * to fix things without complaint.
+	 */
+	if (!(repair_flags & XRM_FINAL_WARNING) &&
+	    !repair_item_dependencies_ok(sri, scrub_type))
+		return false;
+
+	return true;
+}
+
+/*
+ * Repair some metadata.
+ *
+ * Returns 0 for success (or repair item deferral), or ECANCELED to abort the
+ * program.
+ */
+static int
+repair_call_kernel(
+	struct scrub_ctx		*ctx,
+	struct xfs_fd			*xfdp,
+	struct scrub_item		*sri,
+	__u32				repair_mask,
+	unsigned int			repair_flags)
+{
+	DEFINE_DESCR(dsc, ctx, format_scrubv_descr);
+	struct xfrog_scrubv		scrubv = { };
+	struct scrubv_descr		vdesc = SCRUBV_DESCR(&scrubv);
+	struct xfs_scrub_vec		*v;
+	unsigned int			scrub_type;
+	bool				need_barrier = false;
+	int				error;
+
+	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
+
+	xfrog_scrubv_from_item(&scrubv, sri);
+	descr_set(&dsc, &vdesc);
+
+	foreach_scrub_type(scrub_type) {
+		if (scrub_excessive_errors(ctx))
+			return ECANCELED;
+
+		if (!can_repair_now(sri, scrub_type, repair_mask,
+					repair_flags))
+			continue;
+
+		if (need_barrier) {
+			xfrog_scrubv_add_barrier(&scrubv);
+			need_barrier = false;
+		}
+
+		xfrog_scrubv_add_item(&scrubv, sri, scrub_type, true);
+
+		if (sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSREPAIR)
+			str_info(ctx, descr_render(&dsc),
+					_("Attempting repair."));
+		else if (debug || verbose)
+			str_info(ctx, descr_render(&dsc),
+					_("Attempting optimization."));
+
+		dbg_printf("repair %s flags %xh tries %u\n", descr_render(&dsc),
+				sri->sri_state[scrub_type],
+				sri->sri_tries[scrub_type]);
+
+		/*
+		 * One of the other scrub types depends on this one.  Set us up
+		 * to add a repair barrier if we decide to schedule a repair
+		 * after this one.  If the UNFIXED flag is set, that means this
+		 * is our last chance to fix things, so we skip the barriers
+		 * just let everything run.
+		 */
+		if (!(repair_flags & XRM_FINAL_WARNING) &&
+		    (sri->sri_state[scrub_type] & SCRUB_ITEM_BARRIER))
+			need_barrier = true;
+	}
+
+	error = -xfrog_scrubv_metadata(xfdp, &scrubv);
+	if (error)
+		return error;
+
+	foreach_xfrog_scrubv_vec(&scrubv, vdesc.idx, v) {
+		/* Deal with barriers separately. */
+		if (v->sv_type == XFS_SCRUB_TYPE_BARRIER) {
+			/* -ECANCELED means the kernel stopped here. */
+			if (v->sv_ret == -ECANCELED)
+				return 0;
+			if (v->sv_ret)
+				return -v->sv_ret;
+			continue;
+		}
+
+		error = repair_epilogue(ctx, &dsc, sri, repair_flags, v);
+		if (error)
+			return error;
+
+		/* Maybe update progress if we fixed the problem. */
+		if (!(repair_flags & XRM_NOPROGRESS) &&
+		    !(sri->sri_state[v->sv_type] & SCRUB_ITEM_REPAIR_ANY))
+			progress_add(1);
+	}
+
 	return 0;
 }
 
@@ -349,7 +473,8 @@ repair_item_boost_priorities(
  * bits are left untouched to force a rescan in phase 4.
  */
 #define MUSTFIX_STATES	(SCRUB_ITEM_CORRUPT | \
-			 SCRUB_ITEM_BOOST_REPAIR)
+			 SCRUB_ITEM_BOOST_REPAIR | \
+			 SCRUB_ITEM_BARRIER)
 /*
  * Figure out which AG metadata must be fixed before we can move on
  * to the inode scan.
@@ -610,29 +735,6 @@ action_list_process(
 	return ret;
 }
 
-/* Decide if the dependent scrub types of the given scrub type are ok. */
-static bool
-repair_item_dependencies_ok(
-	const struct scrub_item	*sri,
-	unsigned int		scrub_type)
-{
-	unsigned int		dep_mask = repair_deps[scrub_type];
-	unsigned int		b;
-
-	for (b = 0; dep_mask && b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
-		if (!(dep_mask & 1))
-			continue;
-		/*
-		 * If this lower level object also needs repair, we can't fix
-		 * the higher level item.
-		 */
-		if (sri->sri_state[b] & SCRUB_ITEM_NEEDSREPAIR)
-			return false;
-	}
-
-	return true;
-}
-
 /*
  * For a given filesystem object, perform all repairs of a given class
  * (corrupt, xcorrupt, xfail, preen) if the repair item says it's needed.
@@ -648,12 +750,13 @@ repair_item_class(
 	struct xfs_fd			xfd;
 	struct scrub_item		old_sri;
 	struct xfs_fd			*xfdp = &ctx->mnt;
-	unsigned int			scrub_type;
 	int				error = 0;
 
 	if (ctx->mode == SCRUB_MODE_DRY_RUN)
 		return 0;
 	if (ctx->mode == SCRUB_MODE_PREEN && !(repair_mask & SCRUB_ITEM_PREEN))
+		return 0;
+	if (!scrub_item_schedule_work(sri, repair_mask, repair_deps))
 		return 0;
 
 	/*
@@ -667,39 +770,14 @@ repair_item_class(
 		xfdp = &xfd;
 	}
 
-	foreach_scrub_type(scrub_type) {
-		if (scrub_excessive_errors(ctx))
-			return ECANCELED;
+	do {
+		memcpy(&old_sri, sri, sizeof(struct scrub_item));
+		error = repair_call_kernel(ctx, xfdp, sri, repair_mask, flags);
+		if (error)
+			return error;
+	} while (scrub_item_call_kernel_again(sri, repair_mask, &old_sri));
 
-		if (!(sri->sri_state[scrub_type] & repair_mask))
-			continue;
-
-		/*
-		 * Don't try to repair higher level items if their lower-level
-		 * dependencies haven't been verified, unless this is our last
-		 * chance to fix things without complaint.
-		 */
-		if (!(flags & XRM_FINAL_WARNING) &&
-		    !repair_item_dependencies_ok(sri, scrub_type))
-			continue;
-
-		sri->sri_tries[scrub_type] = SCRUB_ITEM_MAX_RETRIES;
-		do {
-			memcpy(&old_sri, sri, sizeof(old_sri));
-			error = xfs_repair_metadata(ctx, xfdp, scrub_type, sri,
-					flags);
-			if (error)
-				return error;
-		} while (scrub_item_call_kernel_again(sri, scrub_type,
-					repair_mask, &old_sri));
-
-		/* Maybe update progress if we fixed the problem. */
-		if (!(flags & XRM_NOPROGRESS) &&
-		    !(sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY))
-			progress_add(1);
-	}
-
-	return error;
+	return 0;
 }
 
 /*
@@ -782,6 +860,7 @@ repair_item_to_action_item(
 	struct action_item	**aitemp)
 {
 	struct action_item	*aitem;
+	unsigned int		scrub_type;
 
 	if (repair_item_count_needsrepair(sri) == 0)
 		return 0;
@@ -796,6 +875,20 @@ repair_item_to_action_item(
 
 	INIT_LIST_HEAD(&aitem->list);
 	memcpy(&aitem->sri, sri, sizeof(struct scrub_item));
+
+	/*
+	 * If the scrub item indicates that there is unchecked metadata, assume
+	 * that the scrub type checker depends on something that couldn't be
+	 * fixed.  Mark that type as corrupt so that phase 4 will try it again.
+	 */
+	foreach_scrub_type(scrub_type) {
+		__u8		*state = aitem->sri.sri_state;
+
+		if (state[scrub_type] & SCRUB_ITEM_NEEDSCHECK) {
+			state[scrub_type] &= ~SCRUB_ITEM_NEEDSCHECK;
+			state[scrub_type] |= SCRUB_ITEM_CORRUPT;
+		}
+	}
 
 	*aitemp = aitem;
 	return 0;
