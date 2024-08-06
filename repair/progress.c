@@ -394,7 +394,7 @@ timestamp(
 	time_t			now;
 	struct tm		*tmp;
 
-	if (verbose > 1 && mp && mp->m_ddev_targp)
+	if (verbose > 1 && mp && mp->m_ddev_targp && mp->m_ddev_targp->bcache)
 		cache_report(stderr, "libxfs_bcache", mp->m_ddev_targp->bcache);
 
 	now = time(NULL);

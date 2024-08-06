@@ -390,22 +390,11 @@ _("bad state %d, inode %" PRIu64 " bmap block 0x%" PRIx64 "\n"),
 			break;
 		}
 		pthread_mutex_unlock(&ag_locks[agno].lock);
-	} else  {
-		/*
-		 * attribute fork for realtime files is in the regular
-		 * filesystem
-		 */
-		if (type != XR_INO_RTDATA || whichfork != XFS_DATA_FORK)  {
-			if (search_dup_extent(XFS_FSB_TO_AGNO(mp, bno),
-					XFS_FSB_TO_AGBNO(mp, bno),
-					XFS_FSB_TO_AGBNO(mp, bno) + 1))
-				return(1);
-		} else  {
-			xfs_rtxnum_t	ext = xfs_rtb_to_rtx(mp, bno);
-
-			if (search_rt_dup_extent(mp, ext))
-				return 1;
-		}
+	} else {
+		if (search_dup_extent(XFS_FSB_TO_AGNO(mp, bno),
+				XFS_FSB_TO_AGBNO(mp, bno),
+				XFS_FSB_TO_AGBNO(mp, bno) + 1))
+			return 1;
 	}
 	(*tot)++;
 	numrecs = be16_to_cpu(block->bb_numrecs);
