@@ -49,7 +49,44 @@ static inline bool needs_repair(struct xfs_scrub_metadata *sm)
 	return is_corrupt(sm) || xref_disagrees(sm);
 }
 
+/*
+ * We want to retry an operation if the kernel says it couldn't complete the
+ * scan/repair; or if there were cross-referencing problems but the object was
+ * not obviously corrupt.
+ */
+static inline bool want_retry(struct xfs_scrub_metadata *sm)
+{
+	return is_incomplete(sm) || (xref_disagrees(sm) && !is_corrupt(sm));
+}
+
 void scrub_warn_incomplete_scrub(struct scrub_ctx *ctx, struct descr *dsc,
 		struct xfs_scrub_metadata *meta);
+
+/* Scrub item functions */
+
+static inline void
+scrub_item_save_state(
+	struct scrub_item		*sri,
+	unsigned  int			scrub_type,
+	unsigned  int			scrub_flags)
+{
+	sri->sri_state[scrub_type] = scrub_flags & SCRUB_ITEM_REPAIR_ANY;
+}
+
+static inline void
+scrub_item_clean_state(
+	struct scrub_item		*sri,
+	unsigned  int			scrub_type)
+{
+	sri->sri_state[scrub_type] = 0;
+}
+
+static inline bool
+scrub_item_type_boosted(
+	struct scrub_item		*sri,
+	unsigned  int			scrub_type)
+{
+	return sri->sri_state[scrub_type] & SCRUB_ITEM_BOOST_REPAIR;
+}
 
 #endif /* XFS_SCRUB_SCRUB_PRIVATE_H_ */

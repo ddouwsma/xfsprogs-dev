@@ -40,7 +40,7 @@ repair_ag(
 
 	/* Repair anything broken until we fail to make progress. */
 	do {
-		ret = action_list_process(ctx, -1, alist, flags);
+		ret = action_list_process(ctx, alist, flags);
 		if (ret) {
 			*aborted = true;
 			return;
@@ -55,7 +55,7 @@ repair_ag(
 
 	/* Try once more, but this time complain if we can't fix things. */
 	flags |= XRM_FINAL_WARNING;
-	ret = action_list_process(ctx, -1, alist, flags);
+	ret = action_list_process(ctx, alist, flags);
 	if (ret)
 		*aborted = true;
 }
@@ -129,7 +129,7 @@ phase4_func(
 	struct scrub_ctx	*ctx)
 {
 	struct xfs_fsop_geom	fsgeom;
-	struct action_list	alist;
+	struct scrub_item	sri;
 	int			ret;
 
 	if (!have_action_items(ctx))
@@ -142,8 +142,8 @@ phase4_func(
 	 * chance that repairs of primary metadata fail due to secondary
 	 * metadata.  If repairs fails, we'll come back during phase 7.
 	 */
-	action_list_init(&alist);
-	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_FSCOUNTERS, 0, &alist);
+	scrub_item_init_fs(&sri);
+	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_FSCOUNTERS, &sri);
 	if (ret)
 		return ret;
 
@@ -158,18 +158,15 @@ phase4_func(
 		return ret;
 
 	if (fsgeom.sick & XFS_FSOP_GEOM_SICK_QUOTACHECK) {
-		ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_QUOTACHECK, 0,
-				&alist);
+		ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_QUOTACHECK, &sri);
 		if (ret)
 			return ret;
 	}
 
 	/* Repair counters before starting on the rest. */
-	ret = action_list_process(ctx, -1, &alist,
-			XRM_REPAIR_ONLY | XRM_NOPROGRESS);
+	ret = repair_item_corruption(ctx, &sri);
 	if (ret)
 		return ret;
-	action_list_discard(&alist);
 
 	ret = repair_everything(ctx);
 	if (ret)

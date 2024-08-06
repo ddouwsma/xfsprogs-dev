@@ -99,7 +99,7 @@ phase7_func(
 	struct scrub_ctx	*ctx)
 {
 	struct summary_counts	totalcount = {0};
-	struct action_list	alist;
+	struct scrub_item	sri;
 	struct ptvar		*ptvar;
 	unsigned long long	used_data;
 	unsigned long long	used_rt;
@@ -117,12 +117,11 @@ phase7_func(
 	int			error;
 
 	/* Check and fix the summary metadata. */
-	action_list_init(&alist);
-	error = scrub_summary_metadata(ctx, &alist);
+	scrub_item_init_fs(&sri);
+	error = scrub_summary_metadata(ctx, &sri);
 	if (error)
 		return error;
-	error = action_list_process(ctx, -1, &alist,
-			XRM_FINAL_WARNING | XRM_NOPROGRESS);
+	error = repair_item_completely(ctx, &sri);
 	if (error)
 		return error;
 
