@@ -24,6 +24,8 @@ HFILES = \
 	err_protos.h \
 	globals.h \
 	incore.h \
+	listxattr.h \
+	pptr.h \
 	prefetch.h \
 	progress.h \
 	protos.h \
@@ -34,6 +36,7 @@ HFILES = \
 	rt.h \
 	scan.h \
 	slab.h \
+	strblobs.h \
 	threads.h \
 	versions.h
 
@@ -56,6 +59,7 @@ CFILES = \
 	incore_ext.c \
 	incore_ino.c \
 	init.c \
+	listxattr.c \
 	phase1.c \
 	phase2.c \
 	phase3.c \
@@ -63,6 +67,7 @@ CFILES = \
 	phase5.c \
 	phase6.c \
 	phase7.c \
+	pptr.c \
 	prefetch.c \
 	progress.c \
 	quotacheck.c \
@@ -73,6 +78,7 @@ CFILES = \
 	sb.c \
 	scan.c \
 	slab.c \
+	strblobs.c \
 	threads.c \
 	versions.c \
 	xfs_repair.c

@@ -111,12 +111,17 @@ attr_set_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_da_args	args = { };
+	struct xfs_da_args	args = {
+		.geo		= mp->m_attr_geo,
+		.whichfork	= XFS_ATTR_FORK,
+		.op_flags	= XFS_DA_OP_OKNOENT,
+	};
 	char			*sp;
 	char			*name_from_file = NULL;
 	char			*value_from_file = NULL;
 	enum xfs_attr_update	op = XFS_ATTRUPDATE_UPSERT;
 	int			c;
+	int			error;
 
 	if (cur_typ == NULL) {
 		dbprintf(_("no current type\n"));
@@ -253,9 +258,14 @@ attr_set_f(
 		goto out;
 	}
 
-	if (libxfs_attr_set(&args, op, false)) {
-		dbprintf(_("failed to set attr %s on inode %llu\n"),
-			args.name, (unsigned long long)iocur_top->ino);
+	args.owner = iocur_top->ino;
+	libxfs_attr_sethash(&args);
+
+	error = -libxfs_attr_set(&args, op, false);
+	if (error) {
+		dbprintf(_("failed to set attr %s on inode %llu: %s\n"),
+			args.name, (unsigned long long)iocur_top->ino,
+			strerror(error));
 		goto out;
 	}
 
@@ -277,9 +287,14 @@ attr_remove_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_da_args	args = { };
+	struct xfs_da_args	args = {
+		.geo		= mp->m_attr_geo,
+		.whichfork	= XFS_ATTR_FORK,
+		.op_flags	= XFS_DA_OP_OKNOENT,
+	};
 	char			*name_from_file = NULL;
 	int			c;
+	int			error;
 
 	if (cur_typ == NULL) {
 		dbprintf(_("no current type\n"));
@@ -365,10 +380,15 @@ attr_remove_f(
 		goto out;
 	}
 
-	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE, false)) {
-		dbprintf(_("failed to remove attr %s from inode %llu\n"),
+	args.owner = iocur_top->ino;
+	libxfs_attr_sethash(&args);
+
+	error = -libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE, false);
+	if (error) {
+		dbprintf(_("failed to remove attr %s from inode %llu: %s\n"),
 			(unsigned char *)args.name,
-			(unsigned long long)iocur_top->ino);
+			(unsigned long long)iocur_top->ino,
+			strerror(error));
 		goto out;
 	}
 
