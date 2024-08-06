@@ -69,6 +69,7 @@ attr_set_f(
 {
 	struct xfs_da_args	args = { };
 	char			*sp;
+	enum xfs_attr_update	op = XFS_ATTRUPDATE_UPSERT;
 	int			c;
 
 	if (cur_typ == NULL) {
@@ -98,12 +99,10 @@ attr_set_f(
 
 		/* modifiers */
 		case 'C':
-			args.attr_flags |= XATTR_CREATE;
-			args.attr_flags &= ~XATTR_REPLACE;
+			op = XFS_ATTRUPDATE_CREATE;
 			break;
 		case 'R':
-			args.attr_flags |= XATTR_REPLACE;
-			args.attr_flags &= ~XATTR_CREATE;
+			op = XFS_ATTRUPDATE_REPLACE;
 			break;
 
 		case 'n':
@@ -162,7 +161,7 @@ attr_set_f(
 		goto out;
 	}
 
-	if (libxfs_attr_set(&args)) {
+	if (libxfs_attr_set(&args, op, false)) {
 		dbprintf(_("failed to set attr %s on inode %llu\n"),
 			args.name, (unsigned long long)iocur_top->ino);
 		goto out;
@@ -248,7 +247,7 @@ attr_remove_f(
 		goto out;
 	}
 
-	if (libxfs_attr_set(&args)) {
+	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE, false)) {
 		dbprintf(_("failed to remove attr %s from inode %llu\n"),
 			(unsigned char *)args.name,
 			(unsigned long long)iocur_top->ino);

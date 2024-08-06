@@ -927,7 +927,7 @@ mk_orphanage(xfs_mount_t *mp)
 	/*
 	 * could not be found, create it
 	 */
-	nres = XFS_MKDIR_SPACE_RES(mp, xname.len);
+	nres = libxfs_mkdir_space_res(mp, xname.len);
 	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_mkdir, nres, 0, 0, &tp);
 	if (i)
 		res_failed(i);
@@ -1283,7 +1283,7 @@ longform_dir2_rebuild(
 	    libxfs_dir_ino_validate(mp, pip.i_ino))
 		pip.i_ino = mp->m_sb.sb_rootino;
 
-	nres = XFS_REMOVE_SPACE_RES(mp);
+	nres = libxfs_remove_space_res(mp, 0);
 	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_remove, nres, 0, 0, &tp);
 	if (error)
 		res_failed(error);
@@ -1343,7 +1343,7 @@ longform_dir2_rebuild(
 						p->name.name[1] == '.'))))
 			continue;
 
-		nres = XFS_CREATE_SPACE_RES(mp, p->name.len);
+		nres = libxfs_create_space_res(mp, p->name.len);
 		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_create,
 					    nres, 0, 0, &tp);
 		if (error)
@@ -1389,7 +1389,7 @@ dir2_kill_block(
 	int		nres;
 	xfs_trans_t	*tp;
 
-	nres = XFS_REMOVE_SPACE_RES(mp);
+	nres = libxfs_remove_space_res(mp, 0);
 	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_remove, nres, 0, 0, &tp);
 	if (error)
 		res_failed(error);
@@ -2269,12 +2269,12 @@ longform_dir2_entry_check(
 	xfs_dablk_t		da_bno;
 	freetab_t		*freetab;
 	int			i;
-	bool			isblock;
-	bool			isleaf;
+	enum xfs_dir2_fmt	fmt;
 	xfs_fileoff_t		next_da_bno;
 	int			seeval;
 	int			fixit = 0;
 	struct xfs_da_args	args;
+	int			error;
 
 	*need_dot = 1;
 	freetab = malloc(FREETAB_SIZE(ip->i_disk_size / mp->m_dir_geo->blksize));
@@ -2294,8 +2294,7 @@ longform_dir2_entry_check(
 	/* is this a block, leaf, or node directory? */
 	args.dp = ip;
 	args.geo = mp->m_dir_geo;
-	libxfs_dir2_isblock(&args, &isblock);
-	libxfs_dir2_isleaf(&args, &isleaf);
+	fmt = libxfs_dir2_format(&args, &error);
 
 	/* check directory "data" blocks (ie. name/inode pairs) */
 	for (da_bno = 0, next_da_bno = 0;
@@ -2318,7 +2317,7 @@ longform_dir2_entry_check(
 			break;
 		}
 
-		if (isblock)
+		if (fmt == XFS_DIR2_FMT_BLOCK)
 			ops = &xfs_dir3_block_buf_ops;
 		else
 			ops = &xfs_dir3_data_buf_ops;
@@ -2335,7 +2334,7 @@ longform_dir2_entry_check(
 			 * block form and we fail, there isn't anything else to
 			 * read, and nothing we can do but trash it.
 			 */
-			if (isblock) {
+			if (fmt == XFS_DIR2_FMT_BLOCK) {
 				fixit++;
 				goto out_fix;
 			}
@@ -2349,7 +2348,7 @@ longform_dir2_entry_check(
 			error = check_dir3_header(mp, bp, ino);
 			if (error) {
 				fixit++;
-				if (isblock)
+				if (fmt == XFS_DIR2_FMT_BLOCK)
 					goto out_fix;
 
 				libxfs_buf_relse(bp);
@@ -2360,8 +2359,8 @@ longform_dir2_entry_check(
 
 		longform_dir2_entry_check_data(mp, ip, num_illegal, need_dot,
 				irec, ino_offset, bp, hashtab,
-				&freetab, da_bno, isblock);
-		if (isblock)
+				&freetab, da_bno, fmt == XFS_DIR2_FMT_BLOCK);
+		if (fmt == XFS_DIR2_FMT_BLOCK)
 			break;
 
 		libxfs_buf_relse(bp);
@@ -2371,7 +2370,7 @@ longform_dir2_entry_check(
 
 	if (!dotdot_update) {
 		/* check btree and freespace */
-		if (isblock) {
+		if (fmt == XFS_DIR2_FMT_BLOCK) {
 			struct xfs_dir2_data_hdr *block;
 			xfs_dir2_block_tail_t	*btp;
 			xfs_dir2_leaf_entry_t	*blp;
@@ -2384,7 +2383,7 @@ longform_dir2_entry_check(
 						be32_to_cpu(btp->stale));
 			if (dir_hash_check(hashtab, ip, seeval))
 				fixit |= 1;
-		} else if (isleaf) {
+		} else if (fmt == XFS_DIR2_FMT_LEAF) {
 			fixit |= longform_dir2_check_leaf(mp, ip, hashtab,
 								freetab);
 		} else {
@@ -2908,7 +2907,7 @@ process_dir_inode(
 			 * inode but it's easier than wedging a
 			 * new define in ourselves.
 			 */
-			nres = no_modify ? 0 : XFS_REMOVE_SPACE_RES(mp);
+			nres = no_modify ? 0 : libxfs_remove_space_res(mp, 0);
 			error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_remove,
 						    nres, 0, 0, &tp);
 			if (error)
@@ -2955,7 +2954,7 @@ _("error %d fixing shortform directory %llu\n"),
 
 		do_warn(_("recreating root directory .. entry\n"));
 
-		nres = XFS_MKDIR_SPACE_RES(mp, 2);
+		nres = libxfs_mkdir_space_res(mp, 2);
 		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_mkdir,
 					    nres, 0, 0, &tp);
 		if (error)
@@ -3010,7 +3009,7 @@ _("error %d fixing shortform directory %llu\n"),
 			do_warn(
 	_("creating missing \".\" entry in dir ino %" PRIu64 "\n"), ino);
 
-			nres = XFS_MKDIR_SPACE_RES(mp, 1);
+			nres = libxfs_mkdir_space_res(mp, 1);
 			error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_mkdir,
 						    nres, 0, 0, &tp);
 			if (error)

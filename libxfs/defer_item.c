@@ -25,6 +25,8 @@
 #include "xfs_attr.h"
 #include "libxfs.h"
 #include "defer_item.h"
+#include "xfs_ag.h"
+#include "xfs_exchmaps.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -668,6 +670,34 @@ xfs_attr_cancel_item(
 	xfs_attr_free_item(attr);
 }
 
+void
+xfs_attr_defer_add(
+	struct xfs_da_args	*args,
+	enum xfs_attr_defer_op	op)
+{
+	struct xfs_attr_intent	*new;
+
+	new = kmem_cache_zalloc(xfs_attr_intent_cache, GFP_NOFS | __GFP_NOFAIL);
+	new->xattri_da_args = args;
+
+	switch (op) {
+	case XFS_ATTR_DEFER_SET:
+		new->xattri_op_flags = XFS_ATTRI_OP_FLAGS_SET;
+		new->xattri_dela_state = xfs_attr_init_add_state(args);
+		break;
+	case XFS_ATTR_DEFER_REPLACE:
+		new->xattri_op_flags = XFS_ATTRI_OP_FLAGS_REPLACE;
+		new->xattri_dela_state = xfs_attr_init_replace_state(args);
+		break;
+	case XFS_ATTR_DEFER_REMOVE:
+		new->xattri_op_flags = XFS_ATTRI_OP_FLAGS_REMOVE;
+		new->xattri_dela_state = xfs_attr_init_remove_state(args);
+		break;
+	}
+
+	xfs_defer_add(args->trans, &new->xattri_list, &xfs_attr_defer_type);
+}
+
 const struct xfs_defer_op_type xfs_attr_defer_type = {
 	.name		= "attr",
 	.max_items	= 1,
@@ -676,4 +706,90 @@ const struct xfs_defer_op_type xfs_attr_defer_type = {
 	.create_done	= xfs_attr_create_done,
 	.finish_item	= xfs_attr_finish_item,
 	.cancel_item	= xfs_attr_cancel_item,
+};
+
+/* File Mapping Exchanges */
+
+STATIC struct xfs_log_item *
+xfs_exchmaps_create_intent(
+	struct xfs_trans		*tp,
+	struct list_head		*items,
+	unsigned int			count,
+	bool				sort)
+{
+	return NULL;
+}
+STATIC struct xfs_log_item *
+xfs_exchmaps_create_done(
+	struct xfs_trans		*tp,
+	struct xfs_log_item		*intent,
+	unsigned int			count)
+{
+	return NULL;
+}
+
+/* Add this deferred XMI to the transaction. */
+void
+xfs_exchmaps_defer_add(
+	struct xfs_trans		*tp,
+	struct xfs_exchmaps_intent	*xmi)
+{
+	trace_xfs_exchmaps_defer(tp->t_mountp, xmi);
+
+	xfs_defer_add(tp, &xmi->xmi_list, &xfs_exchmaps_defer_type);
+}
+
+static inline struct xfs_exchmaps_intent *xmi_entry(const struct list_head *e)
+{
+	return list_entry(e, struct xfs_exchmaps_intent, xmi_list);
+}
+
+/* Process a deferred swapext update. */
+STATIC int
+xfs_exchmaps_finish_item(
+	struct xfs_trans		*tp,
+	struct xfs_log_item		*done,
+	struct list_head		*item,
+	struct xfs_btree_cur		**state)
+{
+	struct xfs_exchmaps_intent	*xmi = xmi_entry(item);
+	int				error;
+
+	/*
+	 * Exchange one more extent between the two files.  If there's still
+	 * more work to do, we want to requeue ourselves after all other
+	 * pending deferred operations have finished.  This includes all of the
+	 * dfops that we queued directly as well as any new ones created in the
+	 * process of finishing the others.
+	 */
+	error = xfs_exchmaps_finish_one(tp, xmi);
+	if (error != -EAGAIN)
+		kmem_cache_free(xfs_exchmaps_intent_cache, xmi);
+	return error;
+}
+
+/* Abort all pending XMIs. */
+STATIC void
+xfs_exchmaps_abort_intent(
+	struct xfs_log_item		*intent)
+{
+}
+
+/* Cancel a deferred swapext update. */
+STATIC void
+xfs_exchmaps_cancel_item(
+	struct list_head		*item)
+{
+	struct xfs_exchmaps_intent	*xmi = xmi_entry(item);
+
+	kmem_cache_free(xfs_exchmaps_intent_cache, xmi);
+}
+
+const struct xfs_defer_op_type xfs_exchmaps_defer_type = {
+	.name		= "exchmaps",
+	.create_intent	= xfs_exchmaps_create_intent,
+	.abort_intent	= xfs_exchmaps_abort_intent,
+	.create_done	= xfs_exchmaps_create_done,
+	.finish_item	= xfs_exchmaps_finish_item,
+	.cancel_item	= xfs_exchmaps_cancel_item,
 };

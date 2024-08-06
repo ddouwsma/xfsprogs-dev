@@ -90,6 +90,7 @@ struct iomap;
 #include "libxfs/xfile.h"
 #include "libxfs/buf_mem.h"
 #include "xfs_btree_mem.h"
+#include "xfs_parent.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))

@@ -68,6 +68,7 @@
 #define trace_xfs_log_recover_item_add(a,b,c,d)	((void) 0)
 
 #define trace_xfs_da_btree_corrupt(a,b)		((void) 0)
+#define trace_xfs_delalloc_enospc(...)		((void) 0)
 #define trace_xfs_btree_corrupt(a,b)		((void) 0)
 #define trace_xfs_btree_updkeys(a,b,c)		((void) 0)
 #define trace_xfs_btree_overlapped_query_range(a,b,c)	((void) 0)
@@ -329,6 +330,9 @@
 #define trace_xfs_refcount_cow_decrease(...)	((void) 0)
 #define trace_xfs_refcount_recover_extent(...)	((void) 0)
 
+#define trace_xfs_reflink_set_inode_flag(...)	((void) 0)
+#define trace_xfs_reflink_unset_inode_flag(...)	((void) 0)
+
 #define trace_xfs_rmap_find_left_neighbor_candidate(...)	((void) 0)
 #define trace_xfs_rmap_find_left_neighbor_query(...)	((void) 0)
 #define trace_xfs_rmap_find_left_neighbor_result(...)	((void) 0)
@@ -341,6 +345,17 @@
 #define trace_xfs_rmap_map_done(...)		((void) 0)
 #define trace_xfs_rmap_map_error(...)		((void) 0)
 #define trace_xfs_rmap_delete_error(...)	((void) 0)
+
+#define trace_xfs_exchmaps_defer(...)		((void) 0)
+#define trace_xfs_exchmaps_delta_nextents(...)	((void) 0)
+#define trace_xfs_exchmaps_delta_nextents_step(...) ((void) 0)
+#define trace_xfs_exchmaps_mapping1_skip(...)	((void) 0)
+#define trace_xfs_exchmaps_mapping1(...)	((void) 0)
+#define trace_xfs_exchmaps_mapping2(...)	((void) 0)
+#define trace_xfs_exchmaps_final_estimate(...)	((void) 0)
+#define trace_xfs_exchmaps_initial_estimate(...) ((void) 0)
+#define trace_xfs_exchmaps_overhead(...)	((void) 0)
+#define trace_xfs_exchmaps_update_inode_size(...) ((void) 0)
 
 #define trace_xfs_fs_mark_healthy(a,b)		((void) 0)
 

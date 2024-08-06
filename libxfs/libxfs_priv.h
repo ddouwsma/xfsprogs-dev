@@ -79,7 +79,10 @@ extern struct kmem_cache *xfs_trans_cache;
 #define crc32c(c,p,l)	crc32c_le((c),(unsigned char const *)(p),(l))
 
 /* fake up kernel's iomap, (not) used in xfs_bmap.[ch] */
-struct iomap;
+struct iomap {
+	unsigned long long	offset;	/* do not use */
+	unsigned long long	length;	/* do not use */
+};
 
 #define cancel_delayed_work_sync(work) do { } while(0)
 
@@ -141,7 +144,7 @@ enum ce { CE_DEBUG, CE_CONT, CE_NOTE, CE_WARN, CE_ALERT, CE_PANIC };
 
 
 #define xfs_force_shutdown(d,n)		((void) 0)
-#define xfs_mod_delalloc(a,b) 		((void) 0)
+#define xfs_mod_delalloc(a,b,c)		((void) 0)
 
 /* stop unused var warnings by assigning mp to itself */
 
@@ -170,6 +173,9 @@ enum ce { CE_DEBUG, CE_CONT, CE_NOTE, CE_WARN, CE_ALERT, CE_PANIC };
 
 #define XFS_ERRLEVEL_LOW		1
 #define XFS_ILOCK_EXCL			0
+#define XFS_ILOCK_SHARED		0
+#define XFS_ILOCK_RTBITMAP		0
+#define XFS_ILOCK_RTSUM			0
 #define XFS_STATS_INC(mp, count)	do { (mp) = (mp); } while (0)
 #define XFS_STATS_DEC(mp, count, x)	do { (mp) = (mp); } while (0)
 #define XFS_STATS_ADD(mp, count, x)	do { (mp) = (mp); } while (0)
@@ -204,7 +210,7 @@ static inline bool WARN_ON(bool expr) {
 #define WARN_ON_ONCE(e)			WARN_ON(e)
 #define percpu_counter_read(x)		(*x)
 #define percpu_counter_read_positive(x)	((*x) > 0 ? (*x) : 0)
-#define percpu_counter_sum(x)		(*x)
+#define percpu_counter_sum_positive(x)	((*x) > 0 ? (*x) : 0)
 
 /*
  * get_random_u32 is used for di_gen inode allocation, it must be zero for
@@ -218,6 +224,35 @@ static inline bool WARN_ON(bool expr) {
 #define inode_set_iversion_queried(inode, version) do { \
 	(inode)->i_version = (version);	\
 } while (0)
+
+#define __must_check	__attribute__((__warn_unused_result__))
+
+/*
+ * Allows for effectively applying __must_check to a macro so we can have
+ * both the type-agnostic benefits of the macros while also being able to
+ * enforce that the return value is, in fact, checked.
+ */
+static inline bool __must_check __must_check_overflow(bool overflow)
+{
+	return unlikely(overflow);
+}
+
+/*
+ * For simplicity and code hygiene, the fallback code below insists on
+ * a, b and *d having the same type (similar to the min() and max()
+ * macros), whereas gcc's type-generic overflow checkers accept
+ * different types. Hence we don't just make check_add_overflow an
+ * alias for __builtin_add_overflow, but add type checks similar to
+ * below.
+ */
+#define check_add_overflow(a, b, d) __must_check_overflow(({	\
+	typeof(a) __a = (a);			\
+	typeof(b) __b = (b);			\
+	typeof(d) __d = (d);			\
+	(void) (&__a == &__b);			\
+	(void) (&__a == __d);			\
+	__builtin_add_overflow(__a, __b, __d);	\
+}))
 
 #define min_t(type,x,y) \
 	({ type __x = (x); type __y = (y); __x < __y ? __x: __y; })
@@ -411,6 +446,8 @@ xfs_buf_readahead(
 })
 #define xfs_lock_two_inodes(ip0,mode0,ip1,mode1)	((void) 0)
 #define xfs_assert_ilocked(ip, flags)			((void) 0)
+#define xfs_lock_inodes(i_tab, nr, mode)		((void) 0)
+#define xfs_sort_inodes(i_tab, nr)			((void) 0)
 
 /* space allocation */
 #define XFS_EXTENT_BUSY_DISCARDED	0x01	/* undergoing a discard op. */
@@ -458,6 +495,7 @@ static inline int retzero(void) { return 0; }
 
 #define xfs_icreate_log(tp, agno, agbno, cnt, isize, len, gen) ((void) 0)
 #define xfs_sb_validate_fsb_count(sbp, nblks)		(0)
+#define xlog_calc_iovec_len(len)		roundup(len, sizeof(uint32_t))
 
 /*
  * Prototypes for kernel static functions that are aren't in their
@@ -507,10 +545,14 @@ struct xfs_buf *xfs_trans_buf_item_match(struct xfs_trans *,
 			struct xfs_buftarg *, struct xfs_buf_map *, int);
 
 /* local source files */
-#define xfs_mod_fdblocks(mp, delta, rsvd) \
-	libxfs_mod_incore_sb(mp, XFS_TRANS_SB_FDBLOCKS, delta, rsvd)
-#define xfs_mod_frextents(mp, delta) \
+#define xfs_add_fdblocks(mp, delta) \
+	libxfs_mod_incore_sb(mp, XFS_TRANS_SB_FDBLOCKS, delta, false)
+#define xfs_dec_fdblocks(mp, delta, rsvd) \
+	libxfs_mod_incore_sb(mp, XFS_TRANS_SB_FDBLOCKS, -(int64_t)(delta), rsvd)
+#define xfs_add_frextents(mp, delta) \
 	libxfs_mod_incore_sb(mp, XFS_TRANS_SB_FREXTENTS, delta, 0)
+#define xfs_dec_frextents(mp, delta) \
+	libxfs_mod_incore_sb(mp, XFS_TRANS_SB_FREXTENTS, -(int64_t)(delta), 0)
 int  libxfs_mod_incore_sb(struct xfs_mount *, int, int64_t, int);
 /* percpu counters in mp are #defined to the superblock sb_ counters */
 #define xfs_reinit_percpu_counters(mp)
@@ -541,6 +583,7 @@ void xfs_log_item_init(struct xfs_mount *mp, struct xfs_log_item *lip, int type,
 #define xfs_log_in_recovery(mp)		(false)
 
 /* xfs_icache.c */
+#define xfs_inode_clear_cowblocks_tag(ip)	do { } while (0)
 #define xfs_inode_set_cowblocks_tag(ip)	do { } while (0)
 #define xfs_inode_set_eofblocks_tag(ip)	do { } while (0)
 
@@ -577,5 +620,25 @@ int xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 
 /* xfs_inode.h */
 #define xfs_iflags_set(ip, flags)	do { } while (0)
+
+/* linux/wordpart.h */
+
+/**
+ * upper_32_bits - return bits 32-63 of a number
+ * @n: the number we're accessing
+ *
+ * A basic shift-right of a 64- or 32-bit quantity.  Use this to suppress
+ * the "right shift count >= width of type" warning when that quantity is
+ * 32-bits.
+ */
+#define upper_32_bits(n) ((uint32_t)(((n) >> 16) >> 16))
+
+/**
+ * lower_32_bits - return bits 0-31 of a number
+ * @n: the number we're accessing
+ */
+#define lower_32_bits(n) ((uint32_t)((n) & 0xffffffff))
+
+#define cond_resched()	((void)0)
 
 #endif	/* __LIBXFS_INTERNAL_XFS_H__ */
