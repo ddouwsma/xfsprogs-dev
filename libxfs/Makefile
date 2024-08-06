@@ -28,6 +28,7 @@ HFILES = \
 	linux-err.h \
 	topology.h \
 	buf_mem.h \
+	xfblob.h \
 	xfile.h \
 	xfs_ag_resv.h \
 	xfs_alloc.h \
@@ -73,6 +74,7 @@ CFILES = buf_mem.c \
 	topology.c \
 	trans.c \
 	util.c \
+	xfblob.c \
 	xfile.c \
 	xfs_ag.c \
 	xfs_ag_resv.c \
