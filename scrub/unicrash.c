@@ -4,6 +4,8 @@
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
 #include "xfs.h"
+#include "xfs_arch.h"
+#include "list.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -56,21 +58,28 @@
  * In other words, skel = remove_invisible(nfd(remap_confusables(nfd(name)))).
  */
 
+typedef uint16_t __bitwise	badname_t;
+
 struct name_entry {
 	struct name_entry	*next;
 
 	/* NFKC normalized name */
 	UChar			*normstr;
-	size_t			normstrlen;
 
 	/* Unicode skeletonized name */
 	UChar			*skelstr;
-	size_t			skelstrlen;
+
+	/* Lengths for normstr and skelstr */
+	int32_t			normstrlen;
+	int32_t			skelstrlen;
 
 	xfs_ino_t		ino;
 
+	/* Everything that we don't like about this name. */
+	badname_t		badflags;
+
 	/* Raw dirent name */
-	size_t			namelen;
+	uint16_t		namelen;
 	char			name[0];
 };
 #define NAME_ENTRY_SZ(nl)	(sizeof(struct name_entry) + 1 + \
@@ -79,7 +88,8 @@ struct name_entry {
 struct unicrash {
 	struct scrub_ctx	*ctx;
 	USpoofChecker		*spoof;
-	const UNormalizer2	*normalizer;
+	const UNormalizer2	*nfkc;
+	const UNormalizer2	*nfc;
 	bool			compare_ino;
 	bool			is_only_root_writeable;
 	size_t			nr_buckets;
@@ -90,26 +100,35 @@ struct unicrash {
 
 /* Things to complain about in Unicode naming. */
 
+/* Everything is ok */
+#define UNICRASH_OK		((__force badname_t)0)
+
 /*
  * Multiple names resolve to the same normalized string and therefore render
  * identically.
  */
-#define UNICRASH_NOT_UNIQUE	(1 << 0)
+#define UNICRASH_NOT_UNIQUE	((__force badname_t)(1U << 0))
 
 /* Name contains directional overrides. */
-#define UNICRASH_BIDI_OVERRIDE	(1 << 1)
+#define UNICRASH_BIDI_OVERRIDE	((__force badname_t)(1U << 1))
 
 /* Name mixes left-to-right and right-to-left characters. */
-#define UNICRASH_BIDI_MIXED	(1 << 2)
+#define UNICRASH_BIDI_MIXED	((__force badname_t)(1U << 2))
 
 /* Control characters in name. */
-#define UNICRASH_CONTROL_CHAR	(1 << 3)
+#define UNICRASH_CONTROL_CHAR	((__force badname_t)(1U << 3))
 
 /* Invisible characters.  Only a problem if we have collisions. */
-#define UNICRASH_ZERO_WIDTH	(1 << 4)
+#define UNICRASH_INVISIBLE	((__force badname_t)(1U << 4))
 
 /* Multiple names resolve to the same skeleton string. */
-#define UNICRASH_CONFUSABLE	(1 << 5)
+#define UNICRASH_CONFUSABLE	((__force badname_t)(1U << 5))
+
+/* Possible phony file extension. */
+#define UNICRASH_PHONY_EXTENSION ((__force badname_t)(1U << 6))
+
+/* FULL STOP (aka period), 0x2E */
+#define UCHAR_PERIOD		((UChar32)'.')
 
 /*
  * We only care about validating utf8 collisions if the underlying
@@ -146,6 +165,248 @@ is_utf8_locale(void)
 }
 
 /*
+ * Remove control/formatting characters from this string and return its new
+ * length.  UChar32 is required for U16_NEXT, despite the name.
+ */
+static int32_t
+remove_ignorable(
+	UChar		*ustr,
+	int32_t		ustrlen)
+{
+	UChar32		uchr;
+	int32_t		src, dest;
+
+	for (src = 0, dest = 0; src < ustrlen; dest = src) {
+		U16_NEXT(ustr, src, ustrlen, uchr);
+		if (!u_isIDIgnorable(uchr))
+			continue;
+		memmove(&ustr[dest], &ustr[src],
+				(ustrlen - src + 1) * sizeof(UChar));
+		ustrlen -= (src - dest);
+		src = dest;
+	}
+
+	return dest;
+}
+
+/*
+ * Certain unicode codepoints are formatting hints that are not themselves
+ * supposed to be rendered by a display system.  These codepoints can be
+ * encoded in file names to try to confuse users.
+ *
+ * Download https://www.unicode.org/Public/UCD/latest/ucd/UnicodeData.txt and
+ * $ grep -E '(zero width|invisible|joiner|application)' -i UnicodeData.txt
+ */
+static inline bool is_nonrendering(UChar32 uchr)
+{
+	switch (uchr) {
+	case 0x034F:	/* combining grapheme joiner */
+	case 0x200B:	/* zero width space */
+	case 0x200C:	/* zero width non-joiner */
+	case 0x200D:	/* zero width joiner */
+	case 0x2028:	/* line separator */
+	case 0x2029:	/* paragraph separator */
+	case 0x2060:	/* word joiner */
+	case 0x2061:	/* function application */
+	case 0x2062:	/* invisible times (multiply) */
+	case 0x2063:	/* invisible separator (comma) */
+	case 0x2064:	/* invisible plus (addition) */
+	case 0x2D7F:	/* tifinagh consonant joiner */
+	case 0xFEFF:	/* zero width non breaking space */
+		return true;
+	}
+
+	return false;
+}
+
+/*
+ * Decide if this unicode codepoint looks similar enough to a period (".")
+ * to fool users into thinking that any subsequent alphanumeric sequence is
+ * the file extension.  Most of the fullstop characters do not do this.
+ *
+ * $ grep -i 'full stop' UnicodeData.txt
+ */
+static inline bool is_fullstop_lookalike(UChar32 uchr)
+{
+	switch (uchr) {
+	case 0x0701:	/* syriac supralinear full stop */
+	case 0x0702:	/* syriac sublinear full stop */
+	case 0x2024:	/* one dot leader */
+	case 0xA4F8:	/* lisu letter tone mya ti */
+	case 0xFE52:	/* small full stop */
+	case 0xFF61:	/* haflwidth ideographic full stop */
+	case 0xFF0E:	/* fullwidth full stop */
+		return true;
+	}
+
+	return false;
+}
+
+/* How many UChar do we need to fit a full UChar32 codepoint? */
+#define UCHAR_PER_UCHAR32	2
+
+/* Format this UChar32 into a UChar buffer. */
+static inline int32_t
+uchar32_to_uchar(
+	UChar32		uchr,
+	UChar		*buf)
+{
+	int32_t		i = 0;
+	bool		err = false;
+
+	U16_APPEND(buf, i, UCHAR_PER_UCHAR32, uchr, err);
+	if (err)
+		return 0;
+	return i;
+}
+
+/* Extract a single UChar32 code point from this UChar string. */
+static inline UChar32
+uchar_to_uchar32(
+	UChar		*buf,
+	int32_t		buflen)
+{
+	UChar32		ret;
+	int32_t		i = 0;
+
+	U16_NEXT(buf, i, buflen, ret);
+	return ret;
+}
+
+/*
+ * For characters that are not themselves a full stop (0x2E), let's see if the
+ * compatibility normalization (NFKC) will turn it into a full stop.  If so,
+ * then this could be the start of a phony file extension.
+ */
+static bool
+is_period_lookalike(
+	struct unicrash	*uc,
+	UChar32		uchr)
+{
+	UChar		uchrstr[UCHAR_PER_UCHAR32];
+	UChar		nfkcstr[UCHAR_PER_UCHAR32];
+	int32_t		uchrstrlen, nfkcstrlen;
+	UChar32		nfkc_uchr;
+	UErrorCode	uerr = U_ZERO_ERROR;
+
+	if (uchr == UCHAR_PERIOD)
+		return false;
+
+	uchrstrlen = uchar32_to_uchar(uchr, uchrstr);
+	if (!uchrstrlen)
+		return false;
+
+	/*
+	 * Normalize the UChar string to NFKC form, which does all the
+	 * compatibility transformations.
+	 */
+	nfkcstrlen = unorm2_normalize(uc->nfkc, uchrstr, uchrstrlen, NULL,
+			0, &uerr);
+	if (uerr == U_BUFFER_OVERFLOW_ERROR)
+		return false;
+
+	uerr = U_ZERO_ERROR;
+	unorm2_normalize(uc->nfkc, uchrstr, uchrstrlen, nfkcstr, nfkcstrlen,
+			&uerr);
+	if (U_FAILURE(uerr))
+		return false;
+
+	nfkc_uchr = uchar_to_uchar32(nfkcstr, nfkcstrlen);
+	return nfkc_uchr == UCHAR_PERIOD;
+}
+
+/*
+ * Detect directory entry names that contain deceptive sequences that look like
+ * file extensions but are not.  This we define as a sequence that begins with
+ * a code point that renders like a period ("full stop" in unicode parlance)
+ * but is not actually a period, followed by any number of alphanumeric code
+ * points or a period, all the way to the end.
+ *
+ * The 3cx attack used a zip file containing an executable file named "job
+ * offer․pdf".  Note that the dot mark in the extension is /not/ a period but
+ * the Unicode codepoint "leader dot".  The file was also marked executable
+ * inside the zip file, which meant that naïve file explorers could inflate
+ * the file and restore the execute bit.  If a user double-clicked on the file,
+ * the binary would open a decoy pdf while infecting the system.
+ *
+ * For this check, we need to normalize with canonical (and not compatibility)
+ * decomposition, because compatibility mode will turn certain code points
+ * (e.g. one dot leader, 0x2024) into actual periods (0x2e).  The NFC
+ * composition is not needed after this, so we save some memory by keeping this
+ * a separate function from name_entry_examine.
+ */
+static badname_t
+name_entry_phony_extension(
+	struct unicrash	*uc,
+	const UChar	*unistr,
+	int32_t		unistrlen)
+{
+	UCharIterator	uiter;
+	UChar		*nfcstr;
+	int32_t		nfcstrlen;
+	UChar32		uchr;
+	bool		maybe_phony_extension = false;
+	badname_t	ret = UNICRASH_OK;
+	UErrorCode	uerr = U_ZERO_ERROR;
+
+	/* Normalize with NFC. */
+	nfcstrlen = unorm2_normalize(uc->nfc, unistr, unistrlen, NULL,
+			0, &uerr);
+	if (uerr != U_BUFFER_OVERFLOW_ERROR || nfcstrlen < 0)
+		return ret;
+	uerr = U_ZERO_ERROR;
+	nfcstr = calloc(nfcstrlen + 1, sizeof(UChar));
+	if (!nfcstr)
+		return ret;
+	unorm2_normalize(uc->nfc, unistr, unistrlen, nfcstr, nfcstrlen,
+			&uerr);
+	if (U_FAILURE(uerr))
+		goto out_nfcstr;
+
+	/* Examine the NFC normalized string... */
+	uiter_setString(&uiter, nfcstr, nfcstrlen);
+	while ((uchr = uiter_next32(&uiter)) != U_SENTINEL) {
+		/*
+		 * If this *looks* like, but is not, a full stop (0x2E), this
+		 * could be the start of a phony file extension.
+		 */
+		if (is_period_lookalike(uc, uchr)) {
+			maybe_phony_extension = true;
+			continue;
+		}
+
+		if (is_fullstop_lookalike(uchr)) {
+			/*
+			 * The normalizer above should catch most of these
+			 * codepoints that look like periods, but record the
+			 * ones known to have been used in attacks.
+			 */
+			maybe_phony_extension = true;
+		} else if (uchr == UCHAR_PERIOD) {
+			/*
+			 * Due to the propensity of file explorers to obscure
+			 * file extensions in the name of "user friendliness",
+			 * this classifier ignores periods.
+			 */
+		} else {
+			/*
+			 * File extensions (as far as the author knows) tend
+			 * only to use ascii alphanumerics.
+			 */
+			if (maybe_phony_extension &&
+			    !u_isalnum(uchr) && !is_nonrendering(uchr))
+				maybe_phony_extension = false;
+		}
+	}
+	if (maybe_phony_extension)
+		ret |= UNICRASH_PHONY_EXTENSION;
+
+out_nfcstr:
+	free(nfcstr);
+	return ret;
+}
+
+/*
  * Generate normalized form and skeleton of the name.  If this fails, just
  * forget everything and return false; this is an advisory checker.
  */
@@ -160,14 +421,11 @@ name_entry_compute_checknames(
 	int32_t			normstrlen;
 	int32_t			unistrlen;
 	int32_t			skelstrlen;
-	UChar32			uchr;
-	int32_t			i, j;
-
 	UErrorCode		uerr = U_ZERO_ERROR;
 
 	/* Convert bytestr to unistr for normalization */
 	u_strFromUTF8(NULL, 0, &unistrlen, entry->name, entry->namelen, &uerr);
-	if (uerr != U_BUFFER_OVERFLOW_ERROR)
+	if (uerr != U_BUFFER_OVERFLOW_ERROR || unistrlen < 0)
 		return false;
 	uerr = U_ZERO_ERROR;
 	unistr = calloc(unistrlen + 1, sizeof(UChar));
@@ -179,15 +437,15 @@ name_entry_compute_checknames(
 		goto out_unistr;
 
 	/* Normalize the string. */
-	normstrlen = unorm2_normalize(uc->normalizer, unistr, unistrlen, NULL,
+	normstrlen = unorm2_normalize(uc->nfkc, unistr, unistrlen, NULL,
 			0, &uerr);
-	if (uerr != U_BUFFER_OVERFLOW_ERROR)
+	if (uerr != U_BUFFER_OVERFLOW_ERROR || normstrlen < 0)
 		goto out_unistr;
 	uerr = U_ZERO_ERROR;
 	normstr = calloc(normstrlen + 1, sizeof(UChar));
 	if (!normstr)
 		goto out_unistr;
-	unorm2_normalize(uc->normalizer, unistr, unistrlen, normstr, normstrlen,
+	unorm2_normalize(uc->nfkc, unistr, unistrlen, normstr, normstrlen,
 			&uerr);
 	if (U_FAILURE(uerr))
 		goto out_normstr;
@@ -195,7 +453,7 @@ name_entry_compute_checknames(
 	/* Compute skeleton. */
 	skelstrlen = uspoof_getSkeleton(uc->spoof, 0, unistr, unistrlen, NULL,
 			0, &uerr);
-	if (uerr != U_BUFFER_OVERFLOW_ERROR)
+	if (uerr != U_BUFFER_OVERFLOW_ERROR || skelstrlen < 0)
 		goto out_normstr;
 	uerr = U_ZERO_ERROR;
 	skelstr = calloc(skelstrlen + 1, sizeof(UChar));
@@ -206,16 +464,12 @@ name_entry_compute_checknames(
 	if (U_FAILURE(uerr))
 		goto out_skelstr;
 
-	/* Remove control/formatting characters from skeleton. */
-	for (i = 0, j = 0; i < skelstrlen; j = i) {
-		U16_NEXT_UNSAFE(skelstr, i, uchr);
-		if (!u_isIDIgnorable(uchr))
-			continue;
-		memmove(&skelstr[j], &skelstr[i],
-				(skelstrlen - i + 1) * sizeof(UChar));
-		skelstrlen -= (i - j);
-		i = j;
-	}
+	skelstrlen = remove_ignorable(skelstr, skelstrlen);
+
+	/* Check for deceptive file extensions in directory entry names. */
+	if (entry->ino)
+		entry->badflags |= name_entry_phony_extension(uc, unistr,
+						unistrlen);
 
 	entry->skelstr = skelstr;
 	entry->skelstrlen = skelstrlen;
@@ -233,6 +487,55 @@ out_unistr:
 	return false;
 }
 
+/*
+ * Check a name for suspicious elements that have appeared in filename
+ * spoofing attacks.  This includes names that mixed directions or contain
+ * direction overrides control characters, both of which have appeared in
+ * filename spoofing attacks.
+ */
+static unsigned int
+name_entry_examine(
+	const struct name_entry	*entry)
+{
+	UCharIterator		uiter;
+	UChar32			uchr;
+	uint8_t			mask = 0;
+	unsigned int		ret = 0;
+
+	uiter_setString(&uiter, entry->normstr, entry->normstrlen);
+	while ((uchr = uiter_next32(&uiter)) != U_SENTINEL) {
+		/* characters are invisible */
+		if (is_nonrendering(uchr))
+			ret |= UNICRASH_INVISIBLE;
+
+		/* control characters */
+		if (u_iscntrl(uchr))
+			ret |= UNICRASH_CONTROL_CHAR;
+
+		switch (u_charDirection(uchr)) {
+		case U_LEFT_TO_RIGHT:
+			mask |= 0x01;
+			break;
+		case U_RIGHT_TO_LEFT:
+			mask |= 0x02;
+			break;
+		case U_RIGHT_TO_LEFT_OVERRIDE:
+			ret |= UNICRASH_BIDI_OVERRIDE;
+			break;
+		case U_LEFT_TO_RIGHT_OVERRIDE:
+			ret |= UNICRASH_BIDI_OVERRIDE;
+			break;
+		default:
+			break;
+		}
+	}
+
+	/* mixing left-to-right and right-to-left chars */
+	if (mask == 0x3)
+		ret |= UNICRASH_BIDI_MIXED;
+	return ret;
+}
+
 /* Create a new name entry, returns false if we could not succeed. */
 static bool
 name_entry_create(
@@ -243,6 +546,12 @@ name_entry_create(
 {
 	struct name_entry	*new_entry;
 	size_t			namelen = strlen(name);
+
+	/* should never happen */
+	if (namelen > UINT16_MAX) {
+		ASSERT(namelen <= UINT16_MAX);
+		return false;
+	}
 
 	/* Create new entry */
 	new_entry = calloc(NAME_ENTRY_SZ(namelen), 1);
@@ -258,6 +567,7 @@ name_entry_create(
 	if (!name_entry_compute_checknames(uc, new_entry))
 		goto out;
 
+	new_entry->badflags |= name_entry_examine(new_entry);
 	*entry = new_entry;
 	return true;
 
@@ -319,66 +629,6 @@ name_entry_hash(
 	}
 }
 
-/*
- * Check a name for suspicious elements that have appeared in filename
- * spoofing attacks.  This includes names that mixed directions or contain
- * direction overrides control characters, both of which have appeared in
- * filename spoofing attacks.
- */
-static void
-name_entry_examine(
-	struct name_entry	*entry,
-	unsigned int		*badflags)
-{
-	UChar32			uchr;
-	int32_t			i;
-	uint8_t			mask = 0;
-
-	for (i = 0; i < entry->normstrlen;) {
-		U16_NEXT_UNSAFE(entry->normstr, i, uchr);
-
-		/* zero width character sequences */
-		switch (uchr) {
-		case 0x200B:	/* zero width space */
-		case 0x200C:	/* zero width non-joiner */
-		case 0x200D:	/* zero width joiner */
-		case 0xFEFF:	/* zero width non breaking space */
-		case 0x2060:	/* word joiner */
-		case 0x2061:	/* function application */
-		case 0x2062:	/* invisible times (multiply) */
-		case 0x2063:	/* invisible separator (comma) */
-		case 0x2064:	/* invisible plus (addition) */
-			*badflags |= UNICRASH_ZERO_WIDTH;
-			break;
-		}
-
-		/* control characters */
-		if (u_iscntrl(uchr))
-			*badflags |= UNICRASH_CONTROL_CHAR;
-
-		switch (u_charDirection(uchr)) {
-		case U_LEFT_TO_RIGHT:
-			mask |= 0x01;
-			break;
-		case U_RIGHT_TO_LEFT:
-			mask |= 0x02;
-			break;
-		case U_RIGHT_TO_LEFT_OVERRIDE:
-			*badflags |= UNICRASH_BIDI_OVERRIDE;
-			break;
-		case U_LEFT_TO_RIGHT_OVERRIDE:
-			*badflags |= UNICRASH_BIDI_OVERRIDE;
-			break;
-		default:
-			break;
-		}
-	}
-
-	/* mixing left-to-right and right-to-left chars */
-	if (mask == 0x3)
-		*badflags |= UNICRASH_BIDI_MIXED;
-}
-
 /* Initialize the collision detector. */
 static int
 unicrash_init(
@@ -407,7 +657,10 @@ unicrash_init(
 	p->ctx = ctx;
 	p->nr_buckets = nr_buckets;
 	p->compare_ino = compare_ino;
-	p->normalizer = unorm2_getNFKCInstance(&uerr);
+	p->nfkc = unorm2_getNFKCInstance(&uerr);
+	if (U_FAILURE(uerr))
+		goto out_free;
+	p->nfc = unorm2_getNFCInstance(&uerr);
 	if (U_FAILURE(uerr))
 		goto out_free;
 	p->spoof = uspoof_open(&uerr);
@@ -506,7 +759,7 @@ unicrash_complain(
 	struct descr		*dsc,
 	const char		*what,
 	struct name_entry	*entry,
-	unsigned int		badflags,
+	badname_t		badflags,
 	struct name_entry	*dup_entry)
 {
 	char			*bad1 = NULL;
@@ -546,11 +799,22 @@ _("Unicode name \"%s\" in %s renders identically to \"%s\"."),
 	 * confused with another name as a result, we should complain.
 	 * "moo<zerowidthspace>cow" and "moocow" are misleading.
 	 */
-	if ((badflags & UNICRASH_ZERO_WIDTH) &&
+	if ((badflags & UNICRASH_INVISIBLE) &&
 	    (badflags & UNICRASH_CONFUSABLE)) {
 		str_warn(uc->ctx, descr_render(dsc),
 _("Unicode name \"%s\" in %s could be confused with '%s' due to invisible characters."),
 				bad1, what, bad2);
+		goto out;
+	}
+
+	/*
+	 * Fake looking file extensions have tricked Linux users into thinking
+	 * that an executable is actually a pdf.  See Lazarus 3cx attack.
+	 */
+	if (badflags & UNICRASH_PHONY_EXTENSION) {
+		str_warn(uc->ctx, descr_render(dsc),
+_("Unicode name \"%s\" in %s contains a possibly deceptive file extension."),
+				bad1, what);
 		goto out;
 	}
 
@@ -609,16 +873,17 @@ out:
  * must be skeletonized according to Unicode TR39 to detect names that
  * could be visually confused with each other.
  */
-static void
+static badname_t
 unicrash_add(
 	struct unicrash		*uc,
-	struct name_entry	*new_entry,
-	unsigned int		*badflags,
+	struct name_entry	**new_entryp,
 	struct name_entry	**existing_entry)
 {
+	struct name_entry	*new_entry = *new_entryp;
 	struct name_entry	*entry;
 	size_t			bucket;
 	xfs_dahash_t		hash;
+	badname_t		badflags = new_entry->badflags;
 
 	/* Store name in hashtable. */
 	hash = name_entry_hash(new_entry);
@@ -638,29 +903,31 @@ unicrash_add(
 			entry->ino = new_entry->ino;
 			uc->buckets[bucket] = new_entry->next;
 			name_entry_free(new_entry);
-			*badflags = 0;
-			return;
+			*new_entryp = NULL;
+			return 0;
 		}
 
 		/* Same normalization? */
 		if (new_entry->normstrlen == entry->normstrlen &&
 		    !u_strcmp(new_entry->normstr, entry->normstr) &&
 		    (uc->compare_ino ? entry->ino != new_entry->ino : true)) {
-			*badflags |= UNICRASH_NOT_UNIQUE;
+			badflags |= UNICRASH_NOT_UNIQUE;
 			*existing_entry = entry;
-			return;
+			break;
 		}
 
 		/* Confusable? */
 		if (new_entry->skelstrlen == entry->skelstrlen &&
 		    !u_strcmp(new_entry->skelstr, entry->skelstr) &&
 		    (uc->compare_ino ? entry->ino != new_entry->ino : true)) {
-			*badflags |= UNICRASH_CONFUSABLE;
+			badflags |= UNICRASH_CONFUSABLE;
 			*existing_entry = entry;
-			return;
+			break;
 		}
 		entry = entry->next;
 	}
+
+	return badflags;
 }
 
 /* Check a name for unicode normalization problems or collisions. */
@@ -674,15 +941,14 @@ __unicrash_check_name(
 {
 	struct name_entry	*dup_entry = NULL;
 	struct name_entry	*new_entry = NULL;
-	unsigned int		badflags = 0;
+	badname_t		badflags;
 
 	/* If we can't create entry data, just skip it. */
 	if (!name_entry_create(uc, name, ino, &new_entry))
 		return 0;
 
-	name_entry_examine(new_entry, &badflags);
-	unicrash_add(uc, new_entry, &badflags, &dup_entry);
-	if (badflags)
+	badflags = unicrash_add(uc, &new_entry, &dup_entry);
+	if (new_entry && badflags != UNICRASH_OK)
 		unicrash_complain(uc, dsc, namedescr, new_entry, badflags,
 				dup_entry);
 
@@ -738,14 +1004,68 @@ unicrash_check_fs_label(
 			label, 0);
 }
 
+/* Dump a unicode code point and its properties. */
+static inline void dump_uchar32(UChar32 c)
+{
+	UChar		uchrstr[UCHAR_PER_UCHAR32];
+	const char	*descr;
+	char		buf[16];
+	int32_t		uchrstrlen, buflen;
+	UProperty	p;
+	UErrorCode	uerr = U_ZERO_ERROR;
+
+	printf("Unicode point 0x%x:", c);
+
+	/* Convert UChar32 to UTF8 representation. */
+	uchrstrlen = uchar32_to_uchar(c, uchrstr);
+	if (!uchrstrlen)
+		return;
+
+	u_strToUTF8(buf, sizeof(buf), &buflen, uchrstr, uchrstrlen, &uerr);
+	if (!U_FAILURE(uerr) && buflen > 0) {
+		int32_t	i;
+
+		printf(" \"");
+		for (i = 0; i < buflen; i++)
+			printf("\\x%02x", buf[i]);
+		printf("\"");
+	}
+	printf("\n");
+
+	for (p = 0; p < UCHAR_BINARY_LIMIT; p++) {
+		int	has;
+
+		descr = u_getPropertyName(p, U_LONG_PROPERTY_NAME);
+		if (!descr)
+			descr = u_getPropertyName(p, U_SHORT_PROPERTY_NAME);
+
+		has = u_hasBinaryProperty(c, p) ? 1 : 0;
+		if (descr) {
+			printf("  %s(%u) = %d\n", descr, p, has);
+		} else {
+			printf("  ?(%u) = %d\n", p, has);
+		}
+	}
+}
+
 /* Load libicu and initialize it. */
 bool
 unicrash_load(void)
 {
-	UErrorCode		uerr = U_ZERO_ERROR;
+	char		*dbgstr;
+	UChar32		uchr;
+	UErrorCode	uerr = U_ZERO_ERROR;
 
 	u_init(&uerr);
-	return U_FAILURE(uerr);
+	if (U_FAILURE(uerr))
+		return true;
+
+	dbgstr = getenv("XFS_SCRUB_DUMP_CHAR");
+	if (dbgstr) {
+		uchr = strtol(dbgstr, NULL, 0);
+		dump_uchar32(uchr);
+	}
+	return false;
 }
 
 /* Unload libicu once we're done with it. */
