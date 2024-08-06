@@ -65,10 +65,10 @@ static int	pagesize;
 
 void usage(int ret);
 static int  fsrfile(char *fname, xfs_ino_t ino);
-static int  fsrfile_common( char *fname, char *tname, char *mnt,
-                            int fd, struct xfs_bstat *statp);
-static int  packfile(char *fname, char *tname, int fd,
-                     struct xfs_bstat *statp, struct fsxattr *fsxp);
+static int  fsrfile_common(char *fname, char *tname, char *mnt,
+			   struct xfs_fd *file_fd, struct xfs_bulkstat *statp);
+static int  packfile(char *fname, char *tname, struct xfs_fd *file_fd,
+                     struct xfs_bulkstat *statp, struct fsxattr *fsxp);
 static void fsrdir(char *dirname);
 static int  fsrfs(char *mntdir, xfs_ino_t ino, int targetrange);
 static void initallfs(char *mtab);
@@ -80,7 +80,7 @@ int xfs_getrt(int fd, struct statvfs *sfbp);
 char * gettmpname(char *fname);
 char * getparent(char *fname);
 int fsrprintf(const char *fmt, ...);
-int read_fd_bmap(int, struct xfs_bstat *, int *);
+int read_fd_bmap(int, struct xfs_bulkstat *, int *);
 static void tmp_init(char *mnt);
 static char * tmp_next(char *mnt);
 static void tmp_close(char *mnt);
@@ -101,6 +101,26 @@ static int	fsbufsize = 10;	/* A starting value */
 static int	nfrags = 0;	/* Debug option: Coerse into specific number
 				 * of extents */
 static int	openopts = O_CREAT|O_EXCL|O_RDWR|O_DIRECT;
+
+/*
+ * Open a file on an XFS filesystem from file handle components and fs geometry
+ * data.  Returns zero or a negative error code.
+ */
+static int
+open_handle(
+	struct xfs_fd		*xfd,
+	jdm_fshandle_t		*fshandle,
+	struct xfs_bulkstat	*bulkstat,
+	struct xfs_fsop_geom	*fsgeom,
+	int			flags)
+{
+	xfd->fd = jdm_open_v5(fshandle, bulkstat, flags);
+	if (xfd->fd < 0)
+		return errno;
+
+	xfd_install_geometry(xfd, fsgeom);
+	return 0;
+}
 
 static int
 xfs_swapext(int fd, xfs_swapext_t *sx)
@@ -627,7 +647,6 @@ static int
 fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 {
 	struct xfs_fd	fsxfd = XFS_FD_INIT_EMPTY;
-	int	fd;
 	int	count = 0;
 	int	ret;
 	char	fname[64];
@@ -665,10 +684,10 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 	}
 
 	while ((ret = -xfrog_bulkstat(&fsxfd, breq) == 0)) {
-		struct xfs_bstat	bs1;
 		struct xfs_bulkstat	*buf = breq->bulkstat;
 		struct xfs_bulkstat	*p;
 		struct xfs_bulkstat	*endp;
+		struct xfs_fd		file_fd = XFS_FD_INIT_EMPTY;
 		uint32_t		buflenout = breq->hdr.ocount;
 
 		if (buflenout == 0)
@@ -685,15 +704,9 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 			     (p->bs_extents64 < 2))
 				continue;
 
-			ret = -xfrog_bulkstat_v5_to_v1(&fsxfd, &bs1, p);
+			ret = open_handle(&file_fd, fshandlep, p,
+					&fsxfd.fsgeom, O_RDWR | O_DIRECT);
 			if (ret) {
-				fsrprintf(_("bstat conversion error: %s\n"),
-						strerror(ret));
-				continue;
-			}
-
-			fd = jdm_open(fshandlep, &bs1, O_RDWR | O_DIRECT);
-			if (fd < 0) {
 				/* This probably means the file was
 				 * removed while in progress of handling
 				 * it.  Just quietly ignore this file.
@@ -710,11 +723,12 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 			/* Get a tmp file name */
 			tname = tmp_next(mntdir);
 
-			ret = fsrfile_common(fname, tname, mntdir, fd, &bs1);
+			ret = fsrfile_common(fname, tname, mntdir, &file_fd,
+					p);
 
 			leftoffino = p->bs_ino;
 
-			close(fd);
+			xfd_close(&file_fd);
 
 			if (ret == 0) {
 				if (--count <= 0)
@@ -762,9 +776,8 @@ fsrfile(
 {
 	struct xfs_fd		fsxfd = XFS_FD_INIT_EMPTY;
 	struct xfs_bulkstat	bulkstat;
-	struct xfs_bstat	statbuf;
+	struct xfs_fd		file_fd = XFS_FD_INIT_EMPTY;
 	jdm_fshandle_t		*fshandlep;
-	int			fd = -1;
 	int			error = -1;
 	char			*tname;
 
@@ -792,17 +805,12 @@ fsrfile(
 			fname, strerror(error));
 		goto out;
 	}
-	error = -xfrog_bulkstat_v5_to_v1(&fsxfd, &statbuf, &bulkstat);
-	if (error) {
-		fsrprintf(_("bstat conversion error on %s: %s\n"),
-			fname, strerror(error));
-		goto out;
-	}
 
-	fd = jdm_open(fshandlep, &statbuf, O_RDWR|O_DIRECT);
-	if (fd < 0) {
+	error = open_handle(&file_fd, fshandlep, &bulkstat, &fsxfd.fsgeom,
+			O_RDWR | O_DIRECT);
+	if (error) {
 		fsrprintf(_("unable to open handle %s: %s\n"),
-			fname, strerror(errno));
+			fname, strerror(error));
 		goto out;
 	}
 
@@ -810,14 +818,13 @@ fsrfile(
 	memcpy(&fsgeom, &fsxfd.fsgeom, sizeof(fsgeom));
 
 	tname = gettmpname(fname);
-
 	if (tname)
-		error = fsrfile_common(fname, tname, NULL, fd, &statbuf);
+		error = fsrfile_common(fname, tname, NULL, &file_fd,
+				&bulkstat);
 
 out:
 	xfd_close(&fsxfd);
-	if (fd >= 0)
-		close(fd);
+	xfd_close(&file_fd);
 	free(fshandlep);
 
 	return error;
@@ -843,8 +850,8 @@ fsrfile_common(
 	char		*fname,
 	char		*tname,
 	char		*fsname,
-	int		fd,
-	struct xfs_bstat *statp)
+	struct xfs_fd	*file_fd,
+	struct xfs_bulkstat *statp)
 {
 	int		error;
 	struct statvfs  vfss;
@@ -854,7 +861,7 @@ fsrfile_common(
 	if (vflag)
 		fsrprintf("%s\n", fname);
 
-	if (fsync(fd) < 0) {
+	if (fsync(file_fd->fd) < 0) {
 		fsrprintf(_("sync failed: %s: %s\n"), fname, strerror(errno));
 		return -1;
 	}
@@ -878,7 +885,7 @@ fsrfile_common(
 		fl.l_whence = SEEK_SET;
 		fl.l_start = (off_t)0;
 		fl.l_len = 0;
-		if ((fcntl(fd, F_GETLK, &fl)) < 0 ) {
+		if ((fcntl(file_fd->fd, F_GETLK, &fl)) < 0 ) {
 			if (vflag)
 				fsrprintf(_("locking check failed: %s\n"),
 					fname);
@@ -896,7 +903,7 @@ fsrfile_common(
 	/*
 	 * Check if there is room to copy the file.
 	 *
-	 * Note that xfs_bstat.bs_blksize returns the filesystem blocksize,
+	 * Note that xfs_bulkstat.bs_blksize returns the filesystem blocksize,
 	 * not the optimal I/O size as struct stat.
 	 */
 	if (statvfs(fsname ? fsname : fname, &vfss) < 0) {
@@ -913,7 +920,7 @@ fsrfile_common(
 		return 1;
 	}
 
-	if ((ioctl(fd, FS_IOC_FSGETXATTR, &fsx)) < 0) {
+	if ((ioctl(file_fd->fd, FS_IOC_FSGETXATTR, &fsx)) < 0) {
 		fsrprintf(_("failed to get inode attrs: %s\n"), fname);
 		return(-1);
 	}
@@ -929,7 +936,7 @@ fsrfile_common(
 		return(0);
 	}
 	if (fsx.fsx_xflags & FS_XFLAG_REALTIME) {
-		if (xfs_getrt(fd, &vfss) < 0) {
+		if (xfs_getrt(file_fd->fd, &vfss) < 0) {
 			fsrprintf(_("cannot get realtime geometry for: %s\n"),
 				fname);
 			return(-1);
@@ -955,7 +962,7 @@ fsrfile_common(
 	 * file we're defragging, in packfile().
 	 */
 
-	if ((error = packfile(fname, tname, fd, statp, &fsx)))
+	if ((error = packfile(fname, tname, file_fd, statp, &fsx)))
 		return error;
 	return -1; /* no error */
 }
@@ -979,7 +986,7 @@ static int
 fsr_setup_attr_fork(
 	int		fd,
 	int		tfd,
-	struct xfs_bstat *bstatp)
+	struct xfs_bulkstat *bstatp)
 {
 	struct xfs_fd	txfd = XFS_FD_INIT(tfd);
 	struct stat	tstatbuf;
@@ -990,6 +997,20 @@ fsr_setup_attr_fork(
 	int		ret;
 
 	if (!(bstatp->bs_xflags & FS_XFLAG_HASATTR))
+		return 0;
+
+	/*
+	 * If the filesystem has the ability to perform atomic file mapping
+	 * exchanges, the file extent swap implementation uses a higher level
+	 * algorithm that calls into the bmap code instead of playing games
+	 * with swapping the extent forks.
+	 *
+	 * This new functionality does not require specific values of
+	 * bs_forkoff, unlike the old fork swap code.  Leave the extended
+	 * attributes alone if we know we're not using the old fork swap
+	 * strategy.  This eliminates a major source of runtime errors in fsr.
+	 */
+	if (fsgeom.flags & XFS_FSOP_GEOM_FLAGS_EXCHANGE_RANGE)
 		return 0;
 
 	/*
@@ -1161,23 +1182,28 @@ out:
  *  1: No change / No Error
  */
 static int
-packfile(char *fname, char *tname, int fd,
-	 struct xfs_bstat *statp, struct fsxattr *fsxp)
+packfile(
+	char			*fname,
+	char			*tname,
+	struct xfs_fd		*file_fd,
+	struct xfs_bulkstat	*statp,
+	struct fsxattr		*fsxp)
 {
-	int 		tfd = -1;
-	int		srval;
-	int		retval = -1;	/* Failure is the default */
-	int		nextents, extent, cur_nextents, new_nextents;
-	unsigned	blksz_dio;
-	unsigned	dio_min;
-	struct dioattr	dio;
-	static xfs_swapext_t   sx;
-	struct xfs_flock64  space;
-	off_t 	cnt, pos;
-	void 		*fbuf = NULL;
-	int 		ct, wc, wc_b4;
-	char		ffname[SMBUFSZ];
-	int		ffd = -1;
+	int			tfd = -1;
+	int			srval;
+	int			retval = -1;	/* Failure is the default */
+	int			nextents, extent, cur_nextents, new_nextents;
+	unsigned		blksz_dio;
+	unsigned		dio_min;
+	struct dioattr		dio;
+	static xfs_swapext_t	sx;
+	struct xfs_flock64	space;
+	off_t			cnt, pos;
+	void			*fbuf = NULL;
+	int			ct, wc, wc_b4;
+	char			ffname[SMBUFSZ];
+	int			ffd = -1;
+	int			error;
 
 	/*
 	 * Work out the extent map - nextents will be set to the
@@ -1185,7 +1211,7 @@ packfile(char *fname, char *tname, int fd,
 	 * into account holes), cur_nextents is the current number
 	 * of extents.
 	 */
-	nextents = read_fd_bmap(fd, statp, &cur_nextents);
+	nextents = read_fd_bmap(file_fd->fd, statp, &cur_nextents);
 
 	if (cur_nextents == 1 || cur_nextents <= nextents) {
 		if (vflag)
@@ -1208,7 +1234,7 @@ packfile(char *fname, char *tname, int fd,
 	unlink(tname);
 
 	/* Setup extended attributes */
-	if (fsr_setup_attr_fork(fd, tfd, statp) != 0) {
+	if (fsr_setup_attr_fork(file_fd->fd, tfd, statp) != 0) {
 		fsrprintf(_("failed to set ATTR fork on tmp: %s:\n"), tname);
 		goto out;
 	}
@@ -1266,6 +1292,8 @@ packfile(char *fname, char *tname, int fd,
 	for (extent = 0; extent < nextents; extent++) {
 		pos = outmap[extent].bmv_offset;
 		if (outmap[extent].bmv_block == -1) {
+			off_t	where;
+
 			space.l_whence = SEEK_SET;
 			space.l_start = pos;
 			space.l_len = outmap[extent].bmv_length;
@@ -1273,7 +1301,8 @@ packfile(char *fname, char *tname, int fd,
 				fsrprintf(_("could not trunc tmp %s\n"),
 					   tname);
 			}
-			if (lseek(tfd, outmap[extent].bmv_length, SEEK_CUR) < 0) {
+			where = lseek(tfd, outmap[extent].bmv_length, SEEK_CUR);
+			if (where < 0) {
 				fsrprintf(_("could not lseek in tmpfile: %s : %s\n"),
 				   tname, strerror(errno));
 				goto out;
@@ -1326,7 +1355,7 @@ packfile(char *fname, char *tname, int fd,
 				   tname, strerror(errno));
 				goto out;
 			}
-			if (lseek(fd, outmap[extent].bmv_length, SEEK_CUR) < 0) {
+			if (lseek(file_fd->fd, outmap[extent].bmv_length, SEEK_CUR) < 0) {
 				fsrprintf(_("could not lseek in file: %s : %s\n"),
 				   fname, strerror(errno));
 				goto out;
@@ -1346,7 +1375,7 @@ packfile(char *fname, char *tname, int fd,
 				ct = min(cnt + dio_min - (cnt % dio_min),
 					blksz_dio);
 			}
-			ct = read(fd, fbuf, ct);
+			ct = read(file_fd->fd, fbuf, ct);
 			if (ct == 0) {
 				/* EOF, stop trying to read */
 				extent = nextents;
@@ -1417,9 +1446,15 @@ packfile(char *fname, char *tname, int fd,
 		goto out;
 	}
 
-	sx.sx_stat     = *statp; /* struct copy */
+	error = -xfrog_bulkstat_v5_to_v1(file_fd, &sx.sx_stat, statp);
+	if (error) {
+		fsrprintf(_("bstat conversion error on %s: %s\n"),
+				fname, strerror(error));
+		goto out;
+	}
+
 	sx.sx_version  = XFS_SX_VERSION;
-	sx.sx_fdtarget = fd;
+	sx.sx_fdtarget = file_fd->fd;
 	sx.sx_fdtmp    = tfd;
 	sx.sx_offset   = 0;
 	sx.sx_length   = statp->bs_size;
@@ -1433,7 +1468,7 @@ packfile(char *fname, char *tname, int fd,
         }
 
 	/* Swap the extents */
-	srval = xfs_swapext(fd, &sx);
+	srval = xfs_swapext(file_fd->fd, &sx);
 	if (srval < 0) {
 		if (errno == ENOTSUP) {
 			if (vflag || dflag)
@@ -1529,7 +1564,7 @@ getparent(char *fname)
 #define MAPSIZE	128
 #define	OUTMAP_SIZE_INCREMENT	MAPSIZE
 
-int	read_fd_bmap(int fd, struct xfs_bstat *sin, int *cur_nextents)
+int read_fd_bmap(int fd, struct xfs_bulkstat *sin, int *cur_nextents)
 {
 	int		i, cnt;
 	struct getbmap	map[MAPSIZE];

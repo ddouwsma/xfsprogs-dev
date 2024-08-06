@@ -440,6 +440,12 @@ xlog_recover_print_logitem(
 	case XFS_LI_BUI:
 		xlog_recover_print_bui(item);
 		break;
+	case XFS_LI_XMD:
+		xlog_recover_print_xmd(item);
+		break;
+	case XFS_LI_XMI:
+		xlog_recover_print_xmi(item);
+		break;
 	case XFS_LI_DQUOT:
 		xlog_recover_print_dquot(item);
 		break;
@@ -497,6 +503,12 @@ xlog_recover_print_item(
 		break;
 	case XFS_LI_BUI:
 		printf("BUI");
+		break;
+	case XFS_LI_XMD:
+		printf("XMD");
+		break;
+	case XFS_LI_XMI:
+		printf("XMI");
 		break;
 	case XFS_LI_DQUOT:
 		printf("DQ ");

@@ -88,6 +88,7 @@ init_commands(void)
 	truncate_init();
 	utimes_init();
 	crc32cselftest_init();
+	exchangerange_init();
 }
 
 /*
