@@ -212,6 +212,34 @@ Only one namespace option can be specified.
 Read the name from this file.
 .RE
 .TP
+.BI "attr_list [\-p|\-r|\-u|\-s|\-Z] [\-v] "
+Lists the extended attributes of the current file.
+.RS 1.0i
+.TP 0.4i
+.B \-p
+Sets the attribute in the parent namespace.
+Only one namespace option can be specified.
+.TP
+.B \-r
+Sets the attribute in the root namespace.
+Only one namespace option can be specified.
+.TP
+.B \-u
+Sets the attribute in the user namespace.
+Only one namespace option can be specified.
+.TP
+.B \-s
+Sets the attribute in the secure namespace.
+Only one namespace option can be specified.
+.TP
+.B \-Z
+Sets a filesystem property in the root namespace.
+Only one namespace option can be specified.
+.TP
+.B \-v
+Print the extended attribute values too.
+.RE
+.TP
 .BI "attr_remove [\-p|\-r|\-u|\-s|\-Z] [\-n] [\-N " namefile "|" name "] "
 Remove the specified extended attribute from the current file.
 .RS 1.0i
