@@ -17,19 +17,42 @@
 #include "inode.h"
 #include "malloc.h"
 #include <sys/xattr.h>
+#include "libfrog/fsproperties.h"
 
+static int		attr_get_f(int argc, char **argv);
 static int		attr_set_f(int argc, char **argv);
 static int		attr_remove_f(int argc, char **argv);
+static void		attrget_help(void);
 static void		attrset_help(void);
 
+static const cmdinfo_t	attr_get_cmd =
+	{ "attr_get", "aget", attr_get_f, 1, -1, 0,
+	  N_("[-r|-s|-u|-p|-Z] name"),
+	  N_("get the named attribute on the current inode"), attrget_help };
 static const cmdinfo_t	attr_set_cmd =
 	{ "attr_set", "aset", attr_set_f, 1, -1, 0,
-	  N_("[-r|-s|-u|-p] [-n] [-R|-C] [-v n] name"),
+	  N_("[-r|-s|-u|-p|-Z] [-n] [-R|-C] [-v n] name"),
 	  N_("set the named attribute on the current inode"), attrset_help };
 static const cmdinfo_t	attr_remove_cmd =
 	{ "attr_remove", "aremove", attr_remove_f, 1, -1, 0,
-	  N_("[-r|-s|-u|-p] [-n] name"),
+	  N_("[-r|-s|-u|-p|-Z] [-n] name"),
 	  N_("remove the named attribute from the current inode"), attrset_help };
+
+static void
+attrget_help(void)
+{
+	dbprintf(_(
+"\n"
+" The attr_get command provide interfaces for retrieving the values of extended\n"
+" attributes of a file.  This command requires attribute names to be specified.\n"
+" There are 4 namespace flags:\n"
+"  -r -- 'root'\n"
+"  -u -- 'user'		(default)\n"
+"  -s -- 'secure'\n"
+"  -p -- 'parent'\n"
+"  -Z -- fs property\n"
+"\n"));
+}
 
 static void
 attrset_help(void)
@@ -45,10 +68,15 @@ attrset_help(void)
 "  -u -- 'user'		(default)\n"
 "  -s -- 'secure'\n"
 "  -p -- 'parent'\n"
+"  -Z -- fs property\n"
 "\n"
 " For attr_set, these options further define the type of set operation:\n"
 "  -C -- 'create'    - create attribute, fail if it already exists\n"
 "  -R -- 'replace'   - replace attribute, fail if it does not exist\n"
+"\n"
+" If the attribute value is a string, it can be specified after the\n"
+" attribute name.\n"
+"\n"
 " The backward compatibility mode 'noattr2' can be emulated (-n) also.\n"
 "\n"));
 }
@@ -59,6 +87,7 @@ attrset_init(void)
 	if (!expert_mode)
 		return;
 
+	add_command(&attr_get_cmd);
 	add_command(&attr_set_cmd);
 	add_command(&attr_remove_cmd);
 }
@@ -106,6 +135,58 @@ out_free:
 				 LIBXFS_ATTR_ROOT | \
 				 LIBXFS_ATTR_PARENT)
 
+static bool
+adjust_fsprop_attr_name(
+	struct xfs_da_args	*args,
+	bool			*free_name)
+{
+	const char		*o = (const char *)args->name;
+	char			*p;
+	int			ret;
+
+	if ((args->attr_filter & LIBXFS_ATTR_NS) != LIBXFS_ATTR_ROOT) {
+		dbprintf(_("fs properties must be ATTR_ROOT\n"));
+		return false;
+	}
+
+	ret = fsprop_name_to_attr_name(o, &p);
+	if (ret < 0) {
+		dbprintf(_("could not allocate fs property name string\n"));
+		return false;
+	}
+	args->namelen = ret;
+	args->name = (const uint8_t *)p;
+
+	if (*free_name)
+		free((void *)o);
+	*free_name = true;
+
+	if (args->namelen > MAXNAMELEN) {
+		dbprintf(_("%s: name too long\n"), args->name);
+		return false;
+	}
+
+	if (args->valuelen > ATTR_MAX_VALUELEN) {
+		dbprintf(_("%s: value too long\n"), args->name);
+		return false;
+	}
+
+	return true;
+}
+
+static void
+print_fsprop(
+	struct xfs_da_args	*args)
+{
+	const char		*p =
+		attr_name_to_fsprop_name((const char *)args->name);
+
+	if (p)
+		printf("%s=%.*s\n", p, args->valuelen, (char *)args->value);
+	else
+		fprintf(stderr, _("%s: not a fs property?\n"), args->name);
+}
+
 static int
 attr_set_f(
 	int			argc,
@@ -119,7 +200,9 @@ attr_set_f(
 	char			*sp;
 	char			*name_from_file = NULL;
 	char			*value_from_file = NULL;
+	bool			free_name = false;
 	enum xfs_attr_update	op = XFS_ATTRUPDATE_UPSERT;
+	bool			fsprop = false;
 	int			c;
 	int			error;
 
@@ -132,9 +215,12 @@ attr_set_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "ruspCRnN:v:V:")) != EOF) {
+	while ((c = getopt(argc, argv, "ruspCRnN:v:V:Z")) != EOF) {
 		switch (c) {
 		/* namespaces */
+		case 'Z':
+			fsprop = true;
+			fallthrough;
 		case 'r':
 			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_ROOT;
@@ -213,9 +299,10 @@ attr_set_f(
 		if (!args.name)
 			return 0;
 
+		free_name = true;
 		args.namelen = namelen;
 	} else {
-		if (optind != argc - 1) {
+		if (optind != argc - 1 && optind != argc - 2) {
 			dbprintf(_("too few options for attr_set (no name given)\n"));
 			return 0;
 		}
@@ -250,6 +337,25 @@ attr_set_f(
 			goto out;
 		}
 		memset(args.value, 'v', args.valuelen);
+	} else if (optind == argc - 2) {
+		args.valuelen = strlen(argv[optind + 1]);
+		args.value = strdup(argv[optind + 1]);
+		if (!args.value) {
+			dbprintf(_("cannot allocate buffer (%d)\n"),
+					args.valuelen);
+			goto out;
+		}
+	}
+
+	if (fsprop) {
+		if (!fsprop_validate((const char *)args.name, args.value)) {
+			dbprintf(_("%s: invalid value \"%s\"\n"),
+					args.name, args.value);
+			goto out;
+		}
+
+		if (!adjust_fsprop_attr_name(&args, &free_name))
+			goto out;
 	}
 
 	if (libxfs_iget(mp, NULL, iocur_top->ino, 0, &args.dp)) {
@@ -269,6 +375,9 @@ attr_set_f(
 		goto out;
 	}
 
+	if (fsprop)
+		print_fsprop(&args);
+
 	/* refresh with updated inode contents */
 	set_cur_inode(iocur_top->ino);
 
@@ -277,7 +386,7 @@ out:
 		libxfs_irele(args.dp);
 	if (args.value)
 		free(args.value);
-	if (name_from_file)
+	if (free_name)
 		free((void *)args.name);
 	return 0;
 }
@@ -293,6 +402,8 @@ attr_remove_f(
 		.op_flags	= XFS_DA_OP_OKNOENT,
 	};
 	char			*name_from_file = NULL;
+	bool			free_name = false;
+	bool			fsprop = false;
 	int			c;
 	int			error;
 
@@ -305,9 +416,12 @@ attr_remove_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "ruspnN:")) != EOF) {
+	while ((c = getopt(argc, argv, "ruspnN:Z")) != EOF) {
 		switch (c) {
 		/* namespaces */
+		case 'Z':
+			fsprop = true;
+			fallthrough;
 		case 'r':
 			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_ROOT;
@@ -354,6 +468,7 @@ attr_remove_f(
 		if (!args.name)
 			return 0;
 
+		free_name = true;
 		args.namelen = namelen;
 	} else {
 		if (optind != argc - 1) {
@@ -373,6 +488,9 @@ attr_remove_f(
 			return 0;
 		}
 	}
+
+	if (fsprop && !adjust_fsprop_attr_name(&args, &free_name))
+		goto out;
 
 	if (libxfs_iget(mp, NULL, iocur_top->ino, 0, &args.dp)) {
 		dbprintf(_("failed to iget inode %llu\n"),
@@ -398,7 +516,137 @@ attr_remove_f(
 out:
 	if (args.dp)
 		libxfs_irele(args.dp);
-	if (name_from_file)
+	if (free_name)
+		free((void *)args.name);
+	return 0;
+}
+
+static int
+attr_get_f(
+	int			argc,
+	char			**argv)
+{
+	struct xfs_da_args	args = {
+		.geo		= mp->m_attr_geo,
+		.whichfork	= XFS_ATTR_FORK,
+		.op_flags	= XFS_DA_OP_OKNOENT,
+	};
+	char			*name_from_file = NULL;
+	bool			free_name = false;
+	bool			fsprop = false;
+	int			c;
+	int			error;
+
+	if (cur_typ == NULL) {
+		dbprintf(_("no current type\n"));
+		return 0;
+	}
+	if (cur_typ->typnm != TYP_INODE) {
+		dbprintf(_("current type is not inode\n"));
+		return 0;
+	}
+
+	while ((c = getopt(argc, argv, "ruspN:Z")) != EOF) {
+		switch (c) {
+		/* namespaces */
+		case 'Z':
+			fsprop = true;
+			fallthrough;
+		case 'r':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= LIBXFS_ATTR_ROOT;
+			break;
+		case 'u':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			break;
+		case 's':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= LIBXFS_ATTR_SECURE;
+			break;
+		case 'p':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= XFS_ATTR_PARENT;
+			break;
+
+		case 'N':
+			name_from_file = optarg;
+			break;
+		default:
+			dbprintf(_("bad option for attr_get command\n"));
+			return 0;
+		}
+	}
+
+	if (name_from_file) {
+		int namelen;
+
+		if (optind != argc) {
+			dbprintf(_("too many options for attr_get (no name needed)\n"));
+			return 0;
+		}
+
+		args.name = get_buf_from_file(name_from_file, MAXNAMELEN,
+				&namelen);
+		if (!args.name)
+			return 0;
+
+		free_name = true;
+		args.namelen = namelen;
+	} else {
+		if (optind != argc - 1) {
+			dbprintf(_("too few options for attr_get (no name given)\n"));
+			return 0;
+		}
+
+		args.name = (const unsigned char *)argv[optind];
+		if (!args.name) {
+			dbprintf(_("invalid name\n"));
+			return 0;
+		}
+
+		args.namelen = strlen(argv[optind]);
+		if (args.namelen >= MAXNAMELEN) {
+			dbprintf(_("name too long\n"));
+			goto out;
+		}
+	}
+
+	if (libxfs_iget(mp, NULL, iocur_top->ino, 0, &args.dp)) {
+		dbprintf(_("failed to iget inode %llu\n"),
+			(unsigned long long)iocur_top->ino);
+		goto out;
+	}
+
+	if (fsprop && !adjust_fsprop_attr_name(&args, &free_name))
+		goto out;
+
+	args.owner = iocur_top->ino;
+	libxfs_attr_sethash(&args);
+
+	/*
+	 * Look up attr value with a maximally long length and a null buffer
+	 * to return the value and the correct length.
+	 */
+	args.valuelen = XATTR_SIZE_MAX;
+	error = -libxfs_attr_get(&args);
+	if (error) {
+		dbprintf(_("failed to get attr %s on inode %llu: %s\n"),
+			args.name, (unsigned long long)iocur_top->ino,
+			strerror(error));
+		goto out;
+	}
+
+	if (fsprop)
+		print_fsprop(&args);
+	else
+		printf("%.*s\n", args.valuelen, (char *)args.value);
+
+out:
+	if (args.dp)
+		libxfs_irele(args.dp);
+	if (args.value)
+		free(args.value);
+	if (free_name)
 		free((void *)args.name);
 	return 0;
 }
