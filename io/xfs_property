@@ -1,0 +1,77 @@
+#!/bin/bash -f
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright (c) 2024 Oracle.  All Rights Reserved.
+# Author: Darrick J. Wong <djwong@kernel.org>
+#
+
+OPTS=""
+USAGE="Usage: xfs_property [-V] [mountpoint|device|file] [list [-v]|get name...|set name=value...|remove name...]"
+
+# Try to find a loop device associated with a file.  We only want to return
+# one loopdev (multiple loop devices can attach to a single file) so we grab
+# the last line and return it if it's actually a block device.
+try_find_loop_dev_for_file() {
+	local x="$(losetup -O NAME -j "$1" 2> /dev/null | tail -n 1)"
+	test -b "${x}" && echo "${x}"
+}
+
+while getopts "V" c
+do
+	case $c in
+	V)	xfs_io -p xfs_info -V
+		status=$?
+		exit ${status}
+		;;
+	*)	echo "${USAGE}" 1>&2
+		exit 2
+		;;
+	esac
+done
+set -- extra "$@"
+shift $OPTIND
+
+if [ $# -lt 2 ]; then
+	echo "${USAGE}" 1>&2
+	exit 2
+fi
+
+target="$1"
+shift
+subcommand="$1"
+shift
+
+db_args=()
+io_args=()
+
+case "$subcommand" in
+"list")
+	vparam=
+	if [ $# -eq 1 ] && [ "$1" = "-v" ]; then
+		vparam=" -v"
+	fi
+	db_args+=('-c' "attr_list -Z${vparam}")
+	io_args+=('-c' "listfsprops${vparam}")
+	;;
+"get"|"remove"|"set")
+	for arg in "$@"; do
+		db_args+=('-c' "attr_${subcommand} -Z ${arg/=/ }")
+		io_args+=('-c' "${subcommand}fsprops ${arg}")
+	done
+	;;
+*)
+	echo "${USAGE}" 1>&2
+	exit 2
+esac
+
+# See if we can map the arg to a loop device
+loopdev="$(try_find_loop_dev_for_file "${target}")"
+test -n "${loopdev}" && target="${loopdev}"
+
+# If we find a mountpoint for the device, do a live query; otherwise try
+# reading the fs with xfs_db.
+if mountpt="$(findmnt -t xfs -f -n -o TARGET "${target}" 2> /dev/null)"; then
+	exec xfs_io -p xfs_property "${io_args[@]}" "${mountpt}"
+else
+	exec xfs_db -p xfs_property -x -c 'path /' "${db_args[@]}" "${target}"
+fi
