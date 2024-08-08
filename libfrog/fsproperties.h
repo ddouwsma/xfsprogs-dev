@@ -50,4 +50,17 @@ bool fsprop_validate(const char *name, const char *value);
 
 /* Specific Filesystem Properties */
 
+#define FSPROP_AUTOFSCK_NAME		"autofsck"
+
+enum fsprop_autofsck {
+	FSPROP_AUTOFSCK_UNSET = 0,	/* do not set property */
+	FSPROP_AUTOFSCK_NONE,		/* no background scrubs */
+	FSPROP_AUTOFSCK_CHECK,		/* allow only background checking */
+	FSPROP_AUTOFSCK_OPTIMIZE,	/* allow background optimization */
+	FSPROP_AUTOFSCK_REPAIR,		/* allow background repair & optimization */
+};
+
+const char *fsprop_autofsck_write(enum fsprop_autofsck x);
+enum fsprop_autofsck fsprop_autofsck_read(const char *value);
+
 #endif /* __LIBFROG_FSPROPERTIES_H__ */
