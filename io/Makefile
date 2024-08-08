@@ -20,6 +20,7 @@ CFILES = \
 	fiemap.c \
 	file.c \
 	freeze.c \
+	fsproperties.c \
 	fsuuid.c \
 	fsync.c \
 	getrusage.c \
