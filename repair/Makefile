@@ -24,7 +24,6 @@ HFILES = \
 	err_protos.h \
 	globals.h \
 	incore.h \
-	listxattr.h \
 	pptr.h \
 	prefetch.h \
 	progress.h \
@@ -59,7 +58,6 @@ CFILES = \
 	incore_ext.c \
 	incore_ino.c \
 	init.c \
-	listxattr.c \
 	phase1.c \
 	phase2.c \
 	phase3.c \

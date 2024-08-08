@@ -6,7 +6,7 @@
 #include "libxfs.h"
 #include "libxlog.h"
 #include "libfrog/bitmap.h"
-#include "repair/listxattr.h"
+#include "listxattr.h"
 
 /* Call a function for every entry in a shortform xattr structure. */
 STATIC int

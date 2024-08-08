@@ -11,7 +11,7 @@
 #include "repair/globals.h"
 #include "repair/err_protos.h"
 #include "repair/slab.h"
-#include "repair/listxattr.h"
+#include "libxfs/listxattr.h"
 #include "repair/threads.h"
 #include "repair/incore.h"
 #include "repair/pptr.h"

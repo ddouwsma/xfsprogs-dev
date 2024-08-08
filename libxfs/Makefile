@@ -23,6 +23,7 @@ HFILES = \
 	defer_item.h \
 	libxfs_io.h \
 	libxfs_api_defs.h \
+	listxattr.h \
 	init.h \
 	libxfs_priv.h \
 	linux-err.h \
@@ -69,6 +70,7 @@ CFILES = buf_mem.c \
 	defer_item.c \
 	init.c \
 	kmem.c \
+	listxattr.c \
 	logitem.c \
 	rdwr.c \
 	topology.c \
