@@ -20,6 +20,7 @@ convert.c \
 crc32.c \
 file_exchange.c \
 fsgeom.c \
+fsproperties.c \
 getparents.c \
 histogram.c \
 list_sort.c \
@@ -47,6 +48,7 @@ dahashselftest.h \
 div64.h \
 file_exchange.h \
 fsgeom.h \
+fsproperties.h \
 getparents.h \
 histogram.h \
 logging.h \
@@ -59,6 +61,11 @@ scrub.h \
 workqueue.h
 
 LSRCFILES += gen_crc32table.c
+
+ifeq ($(HAVE_LIBATTR),yes)
+CFILES+=fsprops.c
+HFILES+=fsprops.h
+endif
 
 LDIRT = gen_crc32table crc32table.h
 
