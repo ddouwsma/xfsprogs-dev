@@ -323,6 +323,12 @@ option set. When the option
 .B \-m crc=0
 is used, the reference count btree feature is not supported and reflink is
 disabled.
+.TP
+.BI autofsck= value
+Set the autofsck filesystem property to this value.
+See the
+.BI xfs_scrub (8)
+manual page for more information on this property.
 .RE
 .PP
 .PD 0
