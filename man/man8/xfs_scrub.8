@@ -107,6 +107,14 @@ The
 supported are:
 .RS 1.0i
 .TP
+.B autofsck
+Decide the operating mode from the value of the
+.I autofsck
+filesystem property.
+See the
+.B filesystem properties
+section for more details.
+.TP
 .BI fstrim_pct= percentage
 To constrain the amount of time spent on fstrim activities during phase 8,
 this program tries to balance estimated runtime against completeness of the
@@ -192,6 +200,44 @@ Scheduling a quotacheck for the next mount.
 .PP
 If corrupt metadata is successfully repaired, this program will log that
 a repair has succeeded instead of a corruption report.
+.SH FILESYSTEM PROPERTIES
+System administrators can convey their preferences for scrubbing of a
+particular filesystem by setting the filesystem property
+.B autofsck
+via the
+.BR xfs_property (8)
+command on the filesystem.
+These preferences will be honored if the
+.B -o autofsck
+option is specified.
+
+Recognized values for the
+.B autofsck
+property are:
+.RS
+.TP
+.I none
+Do not scan the filesystem at all.
+.TP
+.I check
+Scan and report corruption and opportunities for optimization, but do not
+change anything.
+.TP
+.I optimize
+Scan the filesystem and optimize where possible.
+Report corruptions, but do not fix them.
+.TP
+.I repair
+Scan the filesystem, fix corruptions, and optimize where possible.
+.RE
+
+If the property is not set, the default is
+.I check
+if the filesystem has either reverse mapping btrees or parent pointers enabled,
+or
+.I none
+otherwise.
+
 .SH EXIT CODE
 The exit code returned by
 .B xfs_scrub

@@ -26,6 +26,13 @@ extern bool			use_force_rebuild;
 extern bool			info_is_warning;
 
 enum scrub_mode {
+	/*
+	 * Prior to phase 1, this means that xfs_scrub should read the
+	 * "autofsck" fs property from the mount and set the value
+	 * appropriate.  If it's still set after phase 1, this means we should
+	 * exit without doing anything.
+	 */
+	SCRUB_MODE_NONE,
 	SCRUB_MODE_DRY_RUN,
 	SCRUB_MODE_PREEN,
 	SCRUB_MODE_REPAIR,
