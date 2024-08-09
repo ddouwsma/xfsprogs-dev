@@ -11,7 +11,7 @@
 #include "repair/globals.h"
 #include "repair/err_protos.h"
 #include "repair/slab.h"
-#include "repair/listxattr.h"
+#include "libxfs/listxattr.h"
 #include "repair/threads.h"
 #include "repair/incore.h"
 #include "repair/pptr.h"
@@ -593,6 +593,7 @@ store_file_pptr_name(
 /* Decide if this is a directory parent pointer and stash it if so. */
 static int
 examine_xattr(
+	struct xfs_trans	*tp,
 	struct xfs_inode	*ip,
 	unsigned int		attr_flags,
 	const unsigned char	*name,
@@ -1205,6 +1206,7 @@ check_file_parent_ptrs(
 	struct xfs_inode	*ip,
 	struct file_scan	*fscan)
 {
+	struct xfs_trans	*tp = NULL;
 	int			error;
 
 	error = -init_slab(&fscan->file_pptr_recs, sizeof(struct file_pptr));
@@ -1215,7 +1217,10 @@ check_file_parent_ptrs(
 	fscan->have_garbage = false;
 	fscan->nr_file_pptrs = 0;
 
-	error = xattr_walk(ip, examine_xattr, fscan);
+	libxfs_trans_alloc_empty(ip->i_mount, &tp);
+	error = xattr_walk(tp, ip, examine_xattr, fscan);
+	if (tp)
+		libxfs_trans_cancel(tp);
 	if (error && !no_modify)
 		do_error(_("ino %llu parent pointer scan failed: %s\n"),
 				(unsigned long long)ip->i_ino,

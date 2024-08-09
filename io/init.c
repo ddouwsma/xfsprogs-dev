@@ -89,6 +89,7 @@ init_commands(void)
 	utimes_init();
 	crc32cselftest_init();
 	exchangerange_init();
+	fsprops_init();
 }
 
 /*

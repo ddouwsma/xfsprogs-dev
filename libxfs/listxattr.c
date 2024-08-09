@@ -6,11 +6,12 @@
 #include "libxfs.h"
 #include "libxlog.h"
 #include "libfrog/bitmap.h"
-#include "repair/listxattr.h"
+#include "listxattr.h"
 
 /* Call a function for every entry in a shortform xattr structure. */
 STATIC int
 xattr_walk_sf(
+	struct xfs_trans		*tp,
 	struct xfs_inode		*ip,
 	xattr_walk_fn			attr_fn,
 	void				*priv)
@@ -22,7 +23,7 @@ xattr_walk_sf(
 
 	sfe = libxfs_attr_sf_firstentry(hdr);
 	for (i = 0; i < hdr->count; i++) {
-		error = attr_fn(ip, sfe->flags, sfe->nameval, sfe->namelen,
+		error = attr_fn(tp, ip, sfe->flags, sfe->nameval, sfe->namelen,
 				&sfe->nameval[sfe->namelen], sfe->valuelen,
 				priv);
 		if (error)
@@ -37,6 +38,7 @@ xattr_walk_sf(
 /* Call a function for every entry in this xattr leaf block. */
 STATIC int
 xattr_walk_leaf_entries(
+	struct xfs_trans		*tp,
 	struct xfs_inode		*ip,
 	xattr_walk_fn			attr_fn,
 	struct xfs_buf			*bp,
@@ -75,7 +77,7 @@ xattr_walk_leaf_entries(
 			valuelen = be32_to_cpu(name_rmt->valuelen);
 		}
 
-		error = attr_fn(ip, entry->flags, name, namelen, value,
+		error = attr_fn(tp, ip, entry->flags, name, namelen, value,
 				valuelen, priv);
 		if (error)
 			return error;
@@ -91,6 +93,7 @@ xattr_walk_leaf_entries(
  */
 STATIC int
 xattr_walk_leaf(
+	struct xfs_trans		*tp,
 	struct xfs_inode		*ip,
 	xattr_walk_fn			attr_fn,
 	void				*priv)
@@ -98,18 +101,19 @@ xattr_walk_leaf(
 	struct xfs_buf			*leaf_bp;
 	int				error;
 
-	error = -libxfs_attr3_leaf_read(NULL, ip, ip->i_ino, 0, &leaf_bp);
+	error = -libxfs_attr3_leaf_read(tp, ip, ip->i_ino, 0, &leaf_bp);
 	if (error)
 		return error;
 
-	error = xattr_walk_leaf_entries(ip, attr_fn, leaf_bp, priv);
-	libxfs_trans_brelse(NULL, leaf_bp);
+	error = xattr_walk_leaf_entries(tp, ip, attr_fn, leaf_bp, priv);
+	libxfs_trans_brelse(tp, leaf_bp);
 	return error;
 }
 
 /* Find the leftmost leaf in the xattr dabtree. */
 STATIC int
 xattr_walk_find_leftmost_leaf(
+	struct xfs_trans		*tp,
 	struct xfs_inode		*ip,
 	struct bitmap			*seen_blocks,
 	struct xfs_buf			**leaf_bpp)
@@ -127,7 +131,7 @@ xattr_walk_find_leftmost_leaf(
 	for (;;) {
 		uint16_t		magic;
 
-		error = -libxfs_da3_node_read(NULL, ip, blkno, &bp,
+		error = -libxfs_da3_node_read(tp, ip, blkno, &bp,
 				XFS_ATTR_FORK);
 		if (error)
 			return error;
@@ -164,7 +168,7 @@ xattr_walk_find_leftmost_leaf(
 		/* Find the next level towards the leaves of the dabtree. */
 		btree = nodehdr.btree;
 		blkno = be32_to_cpu(btree->before);
-		libxfs_trans_brelse(NULL, bp);
+		libxfs_trans_brelse(tp, bp);
 
 		/* Make sure we haven't seen this new block already. */
 		if (bitmap_test(seen_blocks, blkno, 1))
@@ -184,13 +188,14 @@ xattr_walk_find_leftmost_leaf(
 	return 0;
 
 out_buf:
-	libxfs_trans_brelse(NULL, bp);
+	libxfs_trans_brelse(tp, bp);
 	return error;
 }
 
 /* Call a function for every entry in a node-format xattr structure. */
 STATIC int
 xattr_walk_node(
+	struct xfs_trans		*tp,
 	struct xfs_inode		*ip,
 	xattr_walk_fn			attr_fn,
 	void				*priv)
@@ -204,12 +209,12 @@ xattr_walk_node(
 
 	bitmap_alloc(&seen_blocks);
 
-	error = xattr_walk_find_leftmost_leaf(ip, seen_blocks, &leaf_bp);
+	error = xattr_walk_find_leftmost_leaf(tp, ip, seen_blocks, &leaf_bp);
 	if (error)
 		goto out_bitmap;
 
 	for (;;) {
-		error = xattr_walk_leaf_entries(ip, attr_fn, leaf_bp,
+		error = xattr_walk_leaf_entries(tp, ip, attr_fn, leaf_bp,
 				priv);
 		if (error)
 			goto out_leaf;
@@ -220,13 +225,13 @@ xattr_walk_node(
 		if (leafhdr.forw == 0)
 			goto out_leaf;
 
-		libxfs_trans_brelse(NULL, leaf_bp);
+		libxfs_trans_brelse(tp, leaf_bp);
 
 		/* Make sure we haven't seen this new leaf already. */
 		if (bitmap_test(seen_blocks, leafhdr.forw, 1))
 			goto out_bitmap;
 
-		error = -libxfs_attr3_leaf_read(NULL, ip, ip->i_ino,
+		error = -libxfs_attr3_leaf_read(tp, ip, ip->i_ino,
 				leafhdr.forw, &leaf_bp);
 		if (error)
 			goto out_bitmap;
@@ -238,7 +243,7 @@ xattr_walk_node(
 	}
 
 out_leaf:
-	libxfs_trans_brelse(NULL, leaf_bp);
+	libxfs_trans_brelse(tp, leaf_bp);
 out_bitmap:
 	bitmap_free(&seen_blocks);
 	return error;
@@ -247,6 +252,7 @@ out_bitmap:
 /* Call a function for every extended attribute in a file. */
 int
 xattr_walk(
+	struct xfs_trans	*tp,
 	struct xfs_inode	*ip,
 	xattr_walk_fn		attr_fn,
 	void			*priv)
@@ -257,15 +263,15 @@ xattr_walk(
 		return 0;
 
 	if (ip->i_af.if_format == XFS_DINODE_FMT_LOCAL)
-		return xattr_walk_sf(ip, attr_fn, priv);
+		return xattr_walk_sf(tp, ip, attr_fn, priv);
 
 	/* attr functions require that the attr fork is loaded */
-	error = -libxfs_iread_extents(NULL, ip, XFS_ATTR_FORK);
+	error = -libxfs_iread_extents(tp, ip, XFS_ATTR_FORK);
 	if (error)
 		return error;
 
 	if (libxfs_attr_is_leaf(ip))
-		return xattr_walk_leaf(ip, attr_fn, priv);
+		return xattr_walk_leaf(tp, ip, attr_fn, priv);
 
-	return xattr_walk_node(ip, attr_fn, priv);
+	return xattr_walk_node(tp, ip, attr_fn, priv);
 }

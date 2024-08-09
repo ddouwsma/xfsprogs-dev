@@ -1,0 +1,69 @@
+.TH xfs_property 8
+.SH NAME
+xfs_property \- examine and edit properties about an XFS filesystem
+.SH SYNOPSIS
+.B xfs_property
+.I target
+.B get
+.IR name ...
+.br
+.B xfs_property
+.I target
+.B list [ \-v ]
+.br
+.B xfs_property
+.I target
+.B set
+.IR name=value ...
+.br
+.B xfs_property
+.I target
+.B remove
+.IR name ...
+.br
+.B xfs_property \-V
+.SH DESCRIPTION
+.B xfs_property
+retrieves, lists, sets, or removes properties of an XFS filesystem.
+Filesystem properties are root-controlled attributes set on the root directory
+of the filesystem to enable the system administrator to coordinate with
+userspace programs.
+
+.I target
+is one of: the root directory of a mounted filesystem; a block device containing
+an XFS filesystem; or a regular file containing an XFS filesystem.
+
+.SH OPTIONS
+.TP
+.B \-V
+Print the version number and exits.
+
+.SH COMMANDS
+.TP
+.B get
+.IR name ...
+Prints the values of the given filesystem properties.
+.TP
+.B list
+Lists the names of all filesystem properties.
+If the
+.B -v
+flag is specified, prints the values as well.
+.TP
+.B set
+.IR name = value ...
+Sets the given filesystem properties to the specified values and prints what
+was set.
+.TP
+.B
+remove
+.IR name ...
+Unsets the given filesystem properties.
+
+.SH FILESYSTEM PROPERTIES
+Known filesystem properties for XFS are:
+
+.I autofsck
+See
+.BR xfs_scrub (8)
+for more information.

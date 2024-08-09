@@ -1578,7 +1578,21 @@ Print the sysfs or debugfs path for the mounted filesystem.
 The
 .B -d
 option selects debugfs instead of sysfs.
-
+.TP
+.BI "getfsprops " name " [ " names "... ]"
+Retrieve the values of the given filesystem properties.
+.TP
+.BI "listfsprops [ " \-v " ]"
+List all filesystem properties that have been stored in the filesystem.
+If the
+.B \-v
+flag is specified, prints the values of the properties.
+.TP
+.BI "setfsprops " name = value " [ " name = value "... ]"
+Set the given filesystem properties to the specified values.
+.TP
+.BI "removefsprops " name " [ " names "... ]"
+Remove the given filesystem properties.
 
 .SH OTHER COMMANDS
 .TP
