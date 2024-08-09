@@ -66,12 +66,15 @@ get_next_unlinked(
 	}
 
 	error = -libxfs_imap_to_bp(mp, NULL, &ip->i_imap, &ino_bp);
-	if (error)
+	if (error) {
+		libxfs_irele(ip);
 		goto bad;
+	}
 
 	dip = xfs_buf_offset(ino_bp, ip->i_imap.im_boffset);
 	ret = be32_to_cpu(dip->di_next_unlinked);
 	libxfs_buf_relse(ino_bp);
+	libxfs_irele(ip);
 
 	return ret;
 bad:
