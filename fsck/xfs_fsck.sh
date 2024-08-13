@@ -55,12 +55,12 @@ fi
 # directly.
 #
 # Use multiple methods to capture most of the cases:
-# The case for *i* and -n "$PS1" are commonly suggested in bash manual
+# The case for *i* is commonly suggested in bash manual
 # and the -t 0 test checks stdin
 case $- in
 	*i*) FORCE=false ;;
 esac
-if [ -n "$PS1" -o -t 0 ]; then
+if [ -t 0 ]; then
 	FORCE=false
 fi
 
