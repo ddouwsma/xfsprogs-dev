@@ -36,35 +36,6 @@
 #endif
 
 /*
- * Since the log2_data_unit_size field was added later than fscrypt_policy_v2
- * itself, we may need to override the system definition to get that field.
- * And also fscrypt_get_policy_ex_arg since it contains fscrypt_policy_v2.
- */
-#if !defined(FS_IOC_GET_ENCRYPTION_POLICY_EX) || \
-	defined(OVERRIDE_SYSTEM_FSCRYPT_POLICY_V2)
-#undef fscrypt_policy_v2
-struct fscrypt_policy_v2 {
-	__u8 version;
-	__u8 contents_encryption_mode;
-	__u8 filenames_encryption_mode;
-	__u8 flags;
-	__u8 log2_data_unit_size;
-	__u8 __reserved[3];
-	__u8 master_key_identifier[FSCRYPT_KEY_IDENTIFIER_SIZE];
-};
-
-#undef fscrypt_get_policy_ex_arg
-struct fscrypt_get_policy_ex_arg {
-	__u64 policy_size; /* input/output */
-	union {
-		__u8 version;
-		struct fscrypt_policy_v1 v1;
-		struct fscrypt_policy_v2 v2;
-	} policy; /* output */
-};
-#endif
-
-/*
  * Second batch of ioctls (Linux headers v5.4+), plus some renamings from FS_ to
  * FSCRYPT_.  We don't bother defining the old names here.
  */
@@ -102,12 +73,8 @@ struct fscrypt_policy_v1 {
 
 #define FSCRYPT_POLICY_V2		2
 #define FSCRYPT_KEY_IDENTIFIER_SIZE	16
-/* struct fscrypt_policy_v2 was defined earlier */
 
 #define FSCRYPT_MAX_KEY_SIZE		64
-
-#define FS_IOC_GET_ENCRYPTION_POLICY_EX		_IOWR('f', 22, __u8[9]) /* size + version */
-/* struct fscrypt_get_policy_ex_arg was defined earlier */
 
 #define FSCRYPT_KEY_SPEC_TYPE_DESCRIPTOR	1
 #define FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER	2
@@ -151,6 +118,40 @@ struct fscrypt_get_key_status_arg {
 };
 
 #endif /* !FS_IOC_GET_ENCRYPTION_POLICY_EX */
+
+/*
+ * Since the log2_data_unit_size field was added later than fscrypt_policy_v2
+ * itself, we may need to override the system definition to get that field.
+ * And also fscrypt_get_policy_ex_arg since it contains fscrypt_policy_v2.
+ */
+#if !defined(FS_IOC_GET_ENCRYPTION_POLICY_EX) || \
+	defined(OVERRIDE_SYSTEM_FSCRYPT_POLICY_V2)
+#undef fscrypt_policy_v2
+struct fscrypt_policy_v2 {
+	__u8 version;
+	__u8 contents_encryption_mode;
+	__u8 filenames_encryption_mode;
+	__u8 flags;
+	__u8 log2_data_unit_size;
+	__u8 __reserved[3];
+	__u8 master_key_identifier[FSCRYPT_KEY_IDENTIFIER_SIZE];
+};
+
+#undef fscrypt_get_policy_ex_arg
+struct fscrypt_get_policy_ex_arg {
+	__u64 policy_size; /* input/output */
+	union {
+		__u8 version;
+		struct fscrypt_policy_v1 v1;
+		struct fscrypt_policy_v2 v2;
+	} policy; /* output */
+};
+
+#endif
+
+#ifndef FS_IOC_GET_ENCRYPTION_POLICY_EX
+#  define FS_IOC_GET_ENCRYPTION_POLICY_EX		_IOWR('f', 22, __u8[9]) /* size + version */
+#endif
 
 /*
  * Since the key_id field was added later than struct fscrypt_add_key_arg
