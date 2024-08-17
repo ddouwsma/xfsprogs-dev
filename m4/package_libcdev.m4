@@ -177,6 +177,24 @@ test = mallinfo2();
     AC_SUBST(have_mallinfo2)
   ])
 
+#
+# Check if we have a memfd_create libc call (Linux)
+#
+AC_DEFUN([AC_HAVE_MEMFD_CREATE],
+  [ AC_MSG_CHECKING([for memfd_create])
+    AC_LINK_IFELSE(
+    [	AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <sys/mman.h>
+	]], [[
+memfd_create(0, 0);
+	]])
+    ], have_memfd_create=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_memfd_create)
+  ])
+
 AC_DEFUN([AC_PACKAGE_CHECK_LTO],
   [ AC_MSG_CHECKING([if C compiler supports LTO])
     OLD_CFLAGS="$CFLAGS"

@@ -128,6 +128,10 @@ CFILES = buf_mem.c \
 #
 #LCFLAGS +=
 
+ifeq ($(HAVE_MEMFD_CREATE),yes)
+LCFLAGS += -DHAVE_MEMFD_CREATE
+endif
+
 FCFLAGS = -I.
 
 LTLIBS = $(LIBPTHREAD) $(LIBRT)

@@ -8,6 +8,9 @@
 #include "libxfs/xfile.h"
 #include <linux/memfd.h>
 #include <sys/mman.h>
+#ifndef HAVE_MEMFD_CREATE
+#include <sys/syscall.h>
+#endif
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -34,6 +37,19 @@
  */
 #ifndef MFD_NOEXEC_SEAL
 # define MFD_NOEXEC_SEAL	(0x0008U)
+#endif
+
+/*
+ * The memfd_create system call was added to kernel 3.17 (2014), but
+ * its corresponding glibc wrapper was only added in glibc 2.27
+ * (2018).  In case a libc is not providing the wrapper, we provide
+ * one here.
+ */
+#ifndef HAVE_MEMFD_CREATE
+static int memfd_create(const char *name, unsigned int flags)
+{
+	return syscall(SYS_memfd_create, name, flags);
+}
 #endif
 
 /*
