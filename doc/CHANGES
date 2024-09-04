@@ -1,3 +1,6 @@
+xfsprogs-6.10.1 (04 Sep 2024)
+	fix C++ compilation errors in xfs_fs.h (Darrick J. Wong)
+
 xfsprogs-6.10.0 (26 Aug 2024)
 	debian: enable xfs_scrub_all systemd timer services by default (Darrick J. Wong)
 	mkfs: set autofsck filesystem property (Darrick J. Wong)
