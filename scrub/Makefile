@@ -100,10 +100,6 @@ ifeq ($(HAVE_MALLINFO2),yes)
 LCFLAGS += -DHAVE_MALLINFO2
 endif
 
-ifeq ($(HAVE_LIBATTR),yes)
-LCFLAGS += -DHAVE_LIBATTR
-endif
-
 ifeq ($(HAVE_LIBICU),yes)
 CFILES += unicrash.c
 LCFLAGS += -DHAVE_LIBICU $(LIBICU_CFLAGS)

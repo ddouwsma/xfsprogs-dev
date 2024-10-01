@@ -21,6 +21,7 @@ crc32.c \
 file_exchange.c \
 fsgeom.c \
 fsproperties.c \
+fsprops.c \
 getparents.c \
 histogram.c \
 list_sort.c \
@@ -46,9 +47,11 @@ crc32defs.h \
 crc32table.h \
 dahashselftest.h \
 div64.h \
+fakelibattr.h \
 file_exchange.h \
 fsgeom.h \
 fsproperties.h \
+fsprops.h \
 getparents.h \
 histogram.h \
 logging.h \
@@ -61,11 +64,6 @@ scrub.h \
 workqueue.h
 
 LSRCFILES += gen_crc32table.c
-
-ifeq ($(HAVE_LIBATTR),yes)
-CFILES+=fsprops.c
-HFILES+=fsprops.h
-endif
 
 LDIRT = gen_crc32table crc32table.h
 

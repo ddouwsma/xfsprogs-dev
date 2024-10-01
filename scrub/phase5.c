@@ -8,9 +8,6 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/statvfs.h>
-#ifdef HAVE_LIBATTR
-# include <attr/attributes.h>
-#endif
 #include <linux/fs.h>
 #include "handle.h"
 #include "list.h"
@@ -20,6 +17,7 @@
 #include "libfrog/scrub.h"
 #include "libfrog/bitmap.h"
 #include "libfrog/bulkstat.h"
+#include "libfrog/fakelibattr.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "inodes.h"
@@ -164,7 +162,6 @@ out_unicrash:
 	return ret;
 }
 
-#ifdef HAVE_LIBATTR
 /* Routines to scan all of an inode's xattrs for name problems. */
 struct attrns_decode {
 	int			flags;
@@ -173,8 +170,8 @@ struct attrns_decode {
 
 static const struct attrns_decode attr_ns[] = {
 	{0,			"user"},
-	{ATTR_ROOT,		"system"},
-	{ATTR_SECURE,		"secure"},
+	{XFS_IOC_ATTR_ROOT,	"system"},
+	{XFS_IOC_ATTR_SECURE,	"secure"},
 	{0, NULL},
 };
 
@@ -190,9 +187,9 @@ check_xattr_ns_names(
 	struct xfs_bulkstat		*bstat,
 	const struct attrns_decode	*attr_ns)
 {
-	struct attrlist_cursor		cur = { };
+	struct xfs_attrlist_cursor	cur = { };
 	char				*keybuf;
-	struct attrlist			*attrlist;
+	struct xfs_attrlist		*attrlist;
 	struct unicrash			*uc = NULL;
 	int				i;
 	int				error;
@@ -217,12 +214,13 @@ check_xattr_ns_names(
 		goto out_keybuf;
 	}
 
-	while ((error = attr_list_by_handle(handle, sizeof(*handle), attrlist,
-				XFS_XATTR_LIST_MAX, attr_ns->flags,
+	while ((error = libfrog_attr_list_by_handle(handle, sizeof(*handle),
+				attrlist, XFS_XATTR_LIST_MAX, attr_ns->flags,
 				&cur)) == 0) {
 		/* Examine the xattrs. */
 		for (i = 0; i < attrlist->al_count; i++) {
-			struct attrlist_ent	*ent = ATTR_ENTRY(attrlist, i);
+			struct xfs_attrlist_ent	*ent =
+					libfrog_attr_entry(attrlist, i);
 
 			snprintf(keybuf, XATTR_NAME_MAX, "%s.%s", attr_ns->name,
 					ent->a_name);
@@ -279,9 +277,6 @@ check_xattr_names(
 	}
 	return ret;
 }
-#else
-# define check_xattr_names(c, d, h, b)	(0)
-#endif /* HAVE_LIBATTR */
 
 static int
 render_ino_from_handle(
