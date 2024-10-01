@@ -69,13 +69,14 @@ fsprops_walk_names(
 	void			*priv)
 {
 	struct attrlist_cursor	cur = { };
-	char			attrbuf[XFS_XATTR_LIST_MAX];
-	struct attrlist		*attrlist = (struct attrlist *)attrbuf;
+	struct attrlist		*attrlist;
 	int			ret;
 
-	memset(attrbuf, 0, XFS_XATTR_LIST_MAX);
+	attrlist = calloc(XFS_XATTR_LIST_MAX, 1);
+	if (!attrlist)
+		return -1;
 
-	while ((ret = attr_list_by_handle(fph->hanp, fph->hlen, attrbuf,
+	while ((ret = attr_list_by_handle(fph->hanp, fph->hlen, attrlist,
 				XFS_XATTR_LIST_MAX, XFS_IOC_ATTR_ROOT,
 				&cur)) == 0) {
 		unsigned int	i;
@@ -96,6 +97,7 @@ fsprops_walk_names(
 			break;
 	}
 
+	free(attrlist);
 	return ret;
 }
 
