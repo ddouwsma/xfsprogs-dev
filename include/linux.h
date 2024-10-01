@@ -231,6 +231,11 @@ struct fsxattr {
 #define FS_XFLAG_COWEXTSIZE	0x00010000	/* CoW extent size allocator hint */
 #endif
 
+/* Atomic Write */
+#ifndef RWF_ATOMIC
+#define RWF_ATOMIC	((__kernel_rwf_t)0x00000040)
+#endif
+
 /*
  * Reminder: anything added to this file will be compiled into downstream
  * userspace projects!
