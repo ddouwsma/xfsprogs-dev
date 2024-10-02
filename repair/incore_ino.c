@@ -714,7 +714,7 @@ get_inode_parent(ino_tree_node_t *irec, int offset)
 	else
 		ptbl = irec->ino_un.plist;
 
-	if (ptbl->pmask & (1ULL << offset))  {
+	if (ptbl && (ptbl->pmask & (1ULL << offset)))  {
 		bitmask = 1ULL;
 		target = 0;
 
