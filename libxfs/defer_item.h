@@ -23,4 +23,11 @@ struct xfs_exchmaps_intent;
 void xfs_exchmaps_defer_add(struct xfs_trans *tp,
 		struct xfs_exchmaps_intent *xmi);
 
+struct xfs_extent_free_item;
+struct xfs_defer_pending;
+
+void xfs_extent_free_defer_add(struct xfs_trans *tp,
+		struct xfs_extent_free_item *xefi,
+		struct xfs_defer_pending **dfpp);
+
 #endif /* __LIBXFS_DEFER_ITEM_H_ */
