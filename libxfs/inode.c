@@ -212,7 +212,7 @@ xfs_inode_init(
  * Initialise a newly allocated inode and return the in-core inode to the
  * caller locked exclusively.
  */
-static int
+int
 libxfs_icreate(
 	struct xfs_trans	*tp,
 	xfs_ino_t		ino,
@@ -299,81 +299,6 @@ libxfs_iflush_int(
 	/* generate the checksum. */
 	xfs_dinode_calc_crc(mp, dip);
 
-	return 0;
-}
-
-/*
- * Wrapper around call to libxfs_ialloc. Takes care of committing and
- * allocating a new transaction as needed.
- *
- * Originally there were two copies of this code - one in mkfs, the
- * other in repair - now there is just the one.
- */
-int
-libxfs_dir_ialloc(
-	struct xfs_trans	**tpp,
-	struct xfs_inode	*dp,
-	mode_t			mode,
-	nlink_t			nlink,
-	xfs_dev_t		rdev,
-	struct cred		*cr,
-	struct fsxattr		*fsx,
-	struct xfs_inode	**ipp)
-{
-	struct xfs_icreate_args	args = {
-		.pip		= dp,
-		.mode		= mode,
-	};
-	struct xfs_inode	*ip;
-	struct inode		*inode;
-	xfs_ino_t		parent_ino = dp ? dp->i_ino : 0;
-	xfs_ino_t		ino;
-	int			error;
-
-	if (dp && xfs_has_parent(dp->i_mount))
-		args.flags |= XFS_ICREATE_INIT_XATTRS;
-
-	/* Only devices get rdev numbers */
-	switch (mode & S_IFMT) {
-	case S_IFCHR:
-	case S_IFBLK:
-		args.rdev = rdev;
-		break;
-	}
-
-	/*
-	 * Call the space management code to pick the on-disk inode to be
-	 * allocated.
-	 */
-	error = xfs_dialloc(tpp, parent_ino, mode, &ino);
-	if (error)
-		return error;
-
-	error = libxfs_icreate(*tpp, ino, &args, &ip);
-	if (error)
-		return error;
-
-	inode = VFS_I(ip);
-	i_uid_write(inode, cr->cr_uid);
-	if (cr->cr_flags & CRED_FORCE_GID)
-		i_gid_write(inode, cr->cr_gid);
-	set_nlink(inode, nlink);
-
-	/* If there is no parent dir, initialize the file from fsxattr data. */
-	if (dp == NULL) {
-		ip->i_projid = fsx->fsx_projid;
-		ip->i_extsize = fsx->fsx_extsize;
-		ip->i_diflags = xfs_flags2diflags(ip, fsx->fsx_xflags);
-
-		if (xfs_has_v3inodes(ip->i_mount)) {
-			ip->i_diflags2 = xfs_flags2diflags2(ip,
-							fsx->fsx_xflags);
-			ip->i_cowextsize = fsx->fsx_cowextsize;
-		}
-	}
-
-	xfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);
-	*ipp = ip;
 	return 0;
 }
 
