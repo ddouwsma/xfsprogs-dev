@@ -94,6 +94,7 @@ libxfs_icreate(
 	struct inode		*inode;
 	struct xfs_inode	*ip;
 	unsigned int		flags;
+	int			times = XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG;
 	int			error;
 
 	error = libxfs_iget(mp, tp, ino, XFS_IGET_CREATE, &ip);
@@ -112,7 +113,6 @@ libxfs_icreate(
 	inode->i_uid = GLOBAL_ROOT_UID;
 	inode->i_gid = GLOBAL_ROOT_GID;
 	ip->i_projid = 0;
-	xfs_trans_ichgtime(tp, ip, XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD);
 
 	if (pip && (dir->i_mode & S_ISGID)) {
 		inode->i_gid = dir->i_gid;
@@ -129,9 +129,11 @@ libxfs_icreate(
 	if (xfs_has_v3inodes(ip->i_mount)) {
 		inode->i_version = 1;
 		ip->i_diflags2 = ip->i_mount->m_ino_geo.new_diflags2;
-		ip->i_crtime = inode_get_mtime(inode); /* struct copy */
 		ip->i_cowextsize = 0;
+		times |= XFS_ICHGTIME_CREATE;
 	}
+
+	xfs_trans_ichgtime(tp, ip, times);
 
 	flags = XFS_ILOG_CORE;
 	switch (args->mode & S_IFMT) {
