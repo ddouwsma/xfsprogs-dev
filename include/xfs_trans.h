@@ -163,7 +163,7 @@ libxfs_trans_read_buf(
 #define xfs_log_item_in_current_chkpt(lip)	(false)
 
 /* Contorted mess to make gcc shut up about unused vars. */
-#define xlog_grant_push_threshold(log, need)    \
+#define xfs_ail_push_target(ail)    \
 		((log) == (log) ? NULLCOMMITLSN : NULLCOMMITLSN)
 
 /* from xfs_log.h */
