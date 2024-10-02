@@ -462,6 +462,9 @@ creatproto(
 							fsx->fsx_xflags);
 			ip->i_cowextsize = fsx->fsx_cowextsize;
 		}
+
+		/* xfsdump breaks if the root dir has a nonzero generation */
+		inode->i_generation = 0;
 	}
 
 	libxfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);

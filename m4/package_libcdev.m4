@@ -195,6 +195,21 @@ memfd_create(0, 0);
     AC_SUBST(have_memfd_create)
   ])
 
+#
+# Check if we have a getrandom syscall with a GRND_NONBLOCK flag
+#
+AC_DEFUN([AC_HAVE_GETRANDOM_NONBLOCK],
+  [ AC_MSG_CHECKING([for getrandom and GRND_NONBLOCK])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/random.h>
+    ]], [[
+         unsigned int moo;
+         return getrandom(&moo, sizeof(moo), GRND_NONBLOCK);
+    ]])],[have_getrandom_nonblock=yes
+       AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)])
+    AC_SUBST(have_getrandom_nonblock)
+  ])
+
 AC_DEFUN([AC_PACKAGE_CHECK_LTO],
   [ AC_MSG_CHECKING([if C compiler supports LTO])
     OLD_CFLAGS="$CFLAGS"
