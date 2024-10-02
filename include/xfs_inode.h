@@ -78,6 +78,12 @@ struct inode {
 	spinlock_t		i_lock;
 };
 
+static inline void
+inode_set_iversion(struct inode *inode, uint64_t version)
+{
+	inode->i_version = version;
+}
+
 static inline uint32_t i_uid_read(struct inode *inode)
 {
 	return inode->i_uid.val;
@@ -93,6 +99,18 @@ static inline void i_uid_write(struct inode *inode, uid_t uid)
 static inline void i_gid_write(struct inode *inode, gid_t gid)
 {
 	inode->i_gid.val = gid;
+}
+
+static inline void inode_fsuid_set(struct inode *inode,
+				   struct mnt_idmap *idmap)
+{
+	inode->i_uid = make_kuid(0);
+}
+
+static inline void inode_fsgid_set(struct inode *inode,
+				   struct mnt_idmap *idmap)
+{
+	inode->i_gid = make_kgid(0);
 }
 
 static inline void ihold(struct inode *inode)
@@ -407,5 +425,7 @@ extern int	libxfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 extern void	libxfs_irele(struct xfs_inode *ip);
 
 #define XFS_DEFAULT_COWEXTSZ_HINT	32
+
+#define XFS_INHERIT_GID(pip)		(VFS_I(pip)->i_mode & S_ISGID)
 
 #endif /* __XFS_INODE_H__ */

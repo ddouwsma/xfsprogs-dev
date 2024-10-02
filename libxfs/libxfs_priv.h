@@ -225,6 +225,12 @@ static inline bool WARN_ON(bool expr) {
 	(inode)->i_version = (version);	\
 } while (0)
 
+struct inode;
+struct mnt_idmap;
+
+void inode_init_owner(struct mnt_idmap *idmap, struct inode *inode,
+		      const struct inode *dir, umode_t mode);
+
 #define __must_check	__attribute__((__warn_unused_result__))
 
 /*
@@ -638,5 +644,9 @@ int xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 #define lower_32_bits(n) ((uint32_t)((n) & 0xffffffff))
 
 #define cond_resched()	((void)0)
+
+/* xfs_linux.h */
+#define irix_sgid_inherit		(false)
+#define vfsgid_in_group_p(...)		(false)
 
 #endif	/* __LIBXFS_INTERNAL_XFS_H__ */

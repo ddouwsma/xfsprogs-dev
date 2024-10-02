@@ -31,7 +31,7 @@
 
 /* Propagate di_flags from a parent inode to a child inode. */
 static void
-xfs_inode_propagate_flags(
+xfs_inode_inherit_flags(
 	struct xfs_inode	*ip,
 	const struct xfs_inode	*pip)
 {
@@ -106,35 +106,52 @@ xfs_inode_init(
 	int			times = XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG |
 					XFS_ICHGTIME_ACCESS;
 
-	inode->i_mode = args->mode;
 	if (args->flags & XFS_ICREATE_TMPFILE)
 		set_nlink(inode, 0);
 	else if (S_ISDIR(args->mode))
 		set_nlink(inode, 2);
 	else
 		set_nlink(inode, 1);
-	inode->i_uid = GLOBAL_ROOT_UID;
-	inode->i_gid = GLOBAL_ROOT_GID;
-	ip->i_projid = 0;
+	inode->i_rdev = args->rdev;
 
-	if (pip && (dir->i_mode & S_ISGID)) {
-		inode->i_gid = dir->i_gid;
-		if (S_ISDIR(args->mode))
-			inode->i_mode |= S_ISGID;
+	if (!args->idmap || pip == NULL) {
+		/* creating a tree root, sb rooted, or detached file */
+		inode->i_uid = GLOBAL_ROOT_UID;
+		inode->i_gid = GLOBAL_ROOT_GID;
+		ip->i_projid = 0;
+		inode->i_mode = args->mode;
+	} else {
+		/* creating a child in the directory tree */
+		if (dir && !(dir->i_mode & S_ISGID) && xfs_has_grpid(mp)) {
+			inode_fsuid_set(inode, args->idmap);
+			inode->i_gid = dir->i_gid;
+			inode->i_mode = args->mode;
+		} else {
+			inode_init_owner(args->idmap, inode, dir, args->mode);
+		}
+
+		/*
+		 * If the group ID of the new file does not match the effective
+		 * group ID or one of the supplementary group IDs, the S_ISGID
+		 * bit is cleared (and only if the irix_sgid_inherit
+		 * compatibility variable is set).
+		 */
+		if (irix_sgid_inherit && (inode->i_mode & S_ISGID) &&
+		    !vfsgid_in_group_p(i_gid_into_vfsgid(args->idmap, inode)))
+			inode->i_mode &= ~S_ISGID;
+
+		ip->i_projid = pip ? xfs_get_initial_prid(pip) : 0;
 	}
-
-	if (pip)
-		ip->i_projid = libxfs_get_initial_prid(pip);
 
 	ip->i_disk_size = 0;
 	ip->i_df.if_nextents = 0;
 	ASSERT(ip->i_nblocks == 0);
+
 	ip->i_extsize = 0;
 	ip->i_diflags = 0;
 
-	if (xfs_has_v3inodes(ip->i_mount)) {
-		inode->i_version = 1;
-		ip->i_diflags2 = ip->i_mount->m_ino_geo.new_diflags2;
+	if (xfs_has_v3inodes(mp)) {
+		inode_set_iversion(inode, 1);
 		ip->i_cowextsize = 0;
 		times |= XFS_ICHGTIME_CREATE;
 	}
@@ -149,15 +166,14 @@ xfs_inode_init(
 	case S_IFBLK:
 		ip->i_df.if_format = XFS_DINODE_FMT_DEV;
 		flags |= XFS_ILOG_DEV;
-		VFS_I(ip)->i_rdev = args->rdev;
 		break;
 	case S_IFREG:
 	case S_IFDIR:
 		if (pip && (pip->i_diflags & XFS_DIFLAG_ANY))
-			xfs_inode_propagate_flags(ip, pip);
+			xfs_inode_inherit_flags(ip, pip);
 		if (pip && (pip->i_diflags2 & XFS_DIFLAG2_ANY))
 			xfs_inode_inherit_flags2(ip, pip);
-		/* FALLTHROUGH */
+		fallthrough;
 	case S_IFLNK:
 		ip->i_df.if_format = XFS_DINODE_FMT_EXTENTS;
 		ip->i_df.if_bytes = 0;
@@ -391,6 +407,7 @@ libxfs_iget(
 	VFS_I(ip)->i_count = 1;
 	ip->i_ino = ino;
 	ip->i_mount = mp;
+	ip->i_diflags2 = mp->m_ino_geo.new_diflags2;
 	ip->i_af.if_format = XFS_DINODE_FMT_EXTENTS;
 	spin_lock_init(&VFS_I(ip)->i_lock);
 
@@ -471,4 +488,19 @@ libxfs_irele(
 		libxfs_idestroy(ip);
 		kmem_cache_free(xfs_inode_cache, ip);
 	}
+}
+
+void inode_init_owner(struct mnt_idmap *idmap, struct inode *inode,
+		      const struct inode *dir, umode_t mode)
+{
+	inode_fsuid_set(inode, idmap);
+	if (dir && dir->i_mode & S_ISGID) {
+		inode->i_gid = dir->i_gid;
+
+		/* Directories are special, and always inherit S_ISGID */
+		if (S_ISDIR(mode))
+			mode |= S_ISGID;
+	} else
+		inode_fsgid_set(inode, idmap);
+	inode->i_mode = mode;
 }
