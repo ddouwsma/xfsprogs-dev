@@ -432,8 +432,9 @@ creatproto(
 	xfs_ino_t		ino;
 	int			error;
 
-	if (dp && xfs_has_parent(dp->i_mount))
-		args.flags |= XFS_ICREATE_INIT_XATTRS;
+	/* Root directories cannot be linked to a parent. */
+	if (!dp)
+		args.flags |= XFS_ICREATE_UNLINKABLE;
 
 	/*
 	 * Call the space management code to pick the on-disk inode to be

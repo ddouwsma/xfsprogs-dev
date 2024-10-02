@@ -315,7 +315,7 @@ create_unlinked(
 	struct xfs_icreate_args	args = {
 		.idmap		= libxfs_nop_idmap,
 		.mode		= S_IFREG | 0600,
-		.flags		= XFS_ICREATE_TMPFILE,
+		.flags		= XFS_ICREATE_TMPFILE | XFS_ICREATE_UNLINKABLE,
 	};
 	struct xfs_inode	*ip;
 	struct xfs_trans	*tp;

@@ -909,9 +909,6 @@ mk_orphanage(
 	struct xfs_name		xname;
 	struct xfs_parent_args	*ppargs = NULL;
 
-	if (xfs_has_parent(mp))
-		args.flags |= XFS_ICREATE_INIT_XATTRS;
-
 	i = -libxfs_parent_start(mp, &ppargs);
 	if (i)
 		do_error(_("%d - couldn't allocate parent pointer for %s\n"),
