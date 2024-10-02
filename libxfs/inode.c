@@ -121,6 +121,9 @@ libxfs_icreate(
 			inode->i_mode |= S_ISGID;
 	}
 
+	if (pip)
+		ip->i_projid = libxfs_get_initial_prid(pip);
+
 	ip->i_disk_size = 0;
 	ip->i_df.if_nextents = 0;
 	ASSERT(ip->i_nblocks == 0);
