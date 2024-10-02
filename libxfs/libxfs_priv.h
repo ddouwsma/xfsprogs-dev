@@ -482,6 +482,8 @@ xfs_buf_readahead(
 #define xfs_filestream_new_ag(ip,ag)		(0)
 #define xfs_filestream_select_ag(...)		(-ENOSYS)
 
+#define xfs_trans_inode_buf(tp, bp)		((void) 0)
+
 /* quota bits */
 #define xfs_trans_mod_dquot_byino(t,i,f,d)		({ \
 	uint _f = (f); \

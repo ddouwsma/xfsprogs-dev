@@ -25,6 +25,7 @@ HFILES = \
 	libxfs_api_defs.h \
 	listxattr.h \
 	init.h \
+	iunlink.h \
 	libxfs_priv.h \
 	linux-err.h \
 	topology.h \
@@ -71,6 +72,7 @@ CFILES = buf_mem.c \
 	defer_item.c \
 	init.c \
 	inode.c \
+	iunlink.c \
 	kmem.c \
 	listxattr.c \
 	logitem.c \
