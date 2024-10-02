@@ -205,7 +205,7 @@ set_exchrange(
 	}
 
 	printf(_("Adding file exchange-range support to filesystem.\n"));
-	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_INCOMPAT_EXCHRANGE;
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_EXCHRANGE;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
 	return true;
 }
