@@ -420,4 +420,10 @@ extern void	libxfs_irele(struct xfs_inode *ip);
 
 #define XFS_INHERIT_GID(pip)		(VFS_I(pip)->i_mode & S_ISGID)
 
+#define xfs_inherit_noatime		(false)
+#define xfs_inherit_nodump		(false)
+#define xfs_inherit_sync		(false)
+#define xfs_inherit_nosymlinks		(false)
+#define xfs_inherit_nodefrag		(false)
+
 #endif /* __XFS_INODE_H__ */
