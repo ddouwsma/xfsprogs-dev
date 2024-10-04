@@ -33,6 +33,7 @@
 /config.status
 /config.sub
 /configure
+/*~
 
 # libtool
 /libtool
@@ -69,13 +70,16 @@ cscope.*
 /rtcp/xfs_rtcp
 /spaceman/xfs_spaceman
 /scrub/xfs_scrub
-/scrub/xfs_scrub@.service
 /scrub/xfs_scrub_all
-/scrub/xfs_scrub_all.cron
-/scrub/xfs_scrub_all.service
-/scrub/xfs_scrub_fail@.service
+/scrub/xfs_scrub_fail
+/scrub/*.cron
+/scrub/*.service
 
 # generated crc files
 /libfrog/crc32selftest
 /libfrog/crc32table.h
 /libfrog/gen_crc32table
+
+# docs
+/man/man8/mkfs.xfs.8
+/man/man8/xfs_scrub_all.8
