@@ -1,3 +1,8 @@
+xfsprogs-6.11.0 (19 Oct 2024)
+	Cleanups and bugfixes in mkfs/xfs_db/repair/scrub/mdrestore (Darrick J. Wong)
+	Drop libattr dependency (Darrick J. Wong)
+	Debian and Ubuntu archive changes (Bastian Germann)
+
 xfsprogs-6.10.1 (04 Sep 2024)
 	fix C++ compilation errors in xfs_fs.h (Darrick J. Wong)
 
