@@ -7,10 +7,12 @@
 #ifndef __LIBXFS_H__
 #define __LIBXFS_H__
 
+/* CONFIG_XFS_* must be defined to 1 to work with IS_ENABLED() */
+
 /* For userspace XFS_RT is always defined */
-#define CONFIG_XFS_RT
+#define CONFIG_XFS_RT 1
 /* Ditto in-memory btrees */
-#define CONFIG_XFS_BTREE_IN_MEM
+#define CONFIG_XFS_BTREE_IN_MEM 1
 
 #include "libxfs_api_defs.h"
 #include "platform_defs.h"
