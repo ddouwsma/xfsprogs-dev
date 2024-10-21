@@ -1958,8 +1958,7 @@ init(
 
 		dbmap[c] = xcalloc(mp->m_sb.sb_rblocks, sizeof(**dbmap));
 		inomap[c] = xcalloc(mp->m_sb.sb_rblocks, sizeof(**inomap));
-		words = libxfs_rtsummary_wordcount(mp, mp->m_rsumlevels,
-				mp->m_sb.sb_rbmblocks);
+		words = mp->m_rsumsize >> XFS_WORDLOG;
 		sumfile = xcalloc(words, sizeof(union xfs_suminfo_raw));
 		sumcompute = xcalloc(words, sizeof(union xfs_suminfo_raw));
 	}

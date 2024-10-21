@@ -27,14 +27,13 @@ rtinit(xfs_mount_t *mp)
 	 * information.  The rtbitmap buffer must be large enough to compare
 	 * against any unused bytes in the last block of the file.
 	 */
-	wordcnt = libxfs_rtbitmap_wordcount(mp, mp->m_sb.sb_rextents);
+	wordcnt = XFS_FSB_TO_B(mp, mp->m_sb.sb_rbmblocks) >> XFS_WORDLOG;
 	btmcompute = calloc(wordcnt, sizeof(union xfs_rtword_raw));
 	if (!btmcompute)
 		do_error(
 	_("couldn't allocate memory for incore realtime bitmap.\n"));
 
-	wordcnt = libxfs_rtsummary_wordcount(mp, mp->m_rsumlevels,
-			mp->m_sb.sb_rbmblocks);
+	wordcnt = mp->m_rsumsize >> XFS_WORDLOG;
 	sumcompute = calloc(wordcnt, sizeof(union xfs_suminfo_raw));
 	if (!sumcompute)
 		do_error(
