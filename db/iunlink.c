@@ -223,7 +223,7 @@ create_unlinked(
 		return error;
 	}
 
-	error = -libxfs_dialloc(&tp, 0, args.mode, &ino);
+	error = -libxfs_dialloc(&tp, &args, &ino);
 	if (error) {
 		dbprintf(_("alloc inode: %s\n"), strerror(error));
 		goto out_cancel;
