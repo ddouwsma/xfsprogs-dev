@@ -5,6 +5,11 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([include/libxfs.h])
 AC_PREFIX_DEFAULT(/usr)
 
+# Default CFLAGS if nobody specifies anything else
+if test "${CFLAGS+set}" != "set"; then
+	CFLAGS="-g -O2 -std=gnu11"
+fi
+
 AC_PROG_INSTALL
 LT_INIT
 
@@ -22,7 +27,7 @@ if test "${BUILD_CFLAGS+set}" != "set"; then
   if test $cross_compiling = no; then
     BUILD_CFLAGS="$CFLAGS"
   else
-    BUILD_CFLAGS="-g -O2"
+    BUILD_CFLAGS="-g -O2 -std=gnu11"
   fi
 fi
 
