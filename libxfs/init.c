@@ -22,6 +22,7 @@
 #include "xfs_rmap_btree.h"
 #include "xfs_refcount_btree.h"
 #include "libfrog/platform.h"
+#include "libfrog/util.h"
 #include "libxfs/xfile.h"
 #include "libxfs/buf_mem.h"
 
@@ -43,6 +44,8 @@ int libxfs_bhash_size;		/* #buckets in bcache */
 int	use_xfs_buf_lock;	/* global flag: use xfs_buf locks for MT */
 
 static int nextfakedev = -1;	/* device number to give to next fake device */
+
+unsigned int PAGE_SHIFT;
 
 /*
  * Checks whether a given device has a mounted, writable
@@ -257,6 +260,8 @@ libxfs_close_devices(
 int
 libxfs_init(struct libxfs_init *a)
 {
+	if (!PAGE_SHIFT)
+		PAGE_SHIFT = log2_roundup(PAGE_SIZE);
 	xfs_check_ondisk_structs();
 	xmbuf_libinit();
 	rcu_init();
