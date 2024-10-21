@@ -63,4 +63,39 @@ int radix_tree_tagged(struct radix_tree_root *root, unsigned int tag);
 static inline int radix_tree_preload(int gfp_mask) { return 0; }
 static inline void radix_tree_preload_end(void) { }
 
+/*
+ * Emulation of the kernel xarray API.  Note that unlike the kernel
+ * xarray, there is no internal locking so code using this should not
+ * allow concurrent operations in userspace.
+ */
+struct xarray {
+	struct radix_tree_root	r;
+};
+
+static inline void xa_init(struct xarray *xa)
+{
+	INIT_RADIX_TREE(&xa->r, GFP_KERNEL);
+}
+
+static inline void *xa_load(struct xarray *xa, unsigned long index)
+{
+	return radix_tree_lookup(&xa->r, index);
+}
+
+static inline void *xa_erase(struct xarray *xa, unsigned long index)
+{
+	return radix_tree_delete(&xa->r, index);
+}
+
+static inline int xa_insert(struct xarray *xa, unsigned long index, void *entry,
+		unsigned int gfp)
+{
+	int error;
+
+	error = radix_tree_insert(&xa->r, index, entry);
+	if (error == -EEXIST)
+		return -EBUSY;
+	return error;
+}
+
 #endif /* __LIBFROG_RADIX_TREE_H__ */
