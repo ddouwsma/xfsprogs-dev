@@ -633,12 +633,10 @@ fill_rsumino(xfs_mount_t *mp)
 	int		nmap;
 	int		error;
 	xfs_fileoff_t	bno;
-	xfs_fileoff_t	end_bno;
 	xfs_bmbt_irec_t	map;
 
 	smp = sumcompute;
 	bno = 0;
-	end_bno = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
 
 	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
 	if (error)
@@ -651,7 +649,7 @@ fill_rsumino(xfs_mount_t *mp)
 			error);
 	}
 
-	while (bno < end_bno)  {
+	while (bno < mp->m_rsumblocks)  {
 		struct xfs_rtalloc_args	args = {
 			.mp		= mp,
 			.tp		= tp,
@@ -711,7 +709,6 @@ mk_rsumino(xfs_mount_t *mp)
 	int		i;
 	int		nmap;
 	int		error;
-	int		nsumblocks;
 	xfs_fileoff_t	bno;
 	xfs_bmbt_irec_t	map[XFS_BMAP_MAX_NMAP];
 	uint		blocks;
@@ -732,7 +729,7 @@ mk_rsumino(xfs_mount_t *mp)
 
 	/* Reset the rt summary inode. */
 	reset_sbroot_ino(tp, S_IFREG, ip);
-	ip->i_disk_size = mp->m_rsumsize;
+	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	error = -libxfs_trans_commit(tp);
 	if (error)
@@ -742,19 +739,18 @@ mk_rsumino(xfs_mount_t *mp)
 	 * then allocate blocks for file and fill with zeroes (stolen
 	 * from mkfs)
 	 */
-	nsumblocks = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
-	blocks = nsumblocks + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) - 1;
+	blocks = mp->m_rsumblocks + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) - 1;
 	error = -libxfs_trans_alloc_rollable(mp, blocks, &tp);
 	if (error)
 		res_failed(error);
 
 	libxfs_trans_ijoin(tp, ip, 0);
 	bno = 0;
-	while (bno < nsumblocks) {
+	while (bno < mp->m_rsumblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, ip, bno,
-			  (xfs_extlen_t)(nsumblocks - bno),
-			  0, nsumblocks, map, &nmap);
+			  (xfs_extlen_t)(mp->m_rsumblocks - bno),
+			  0, mp->m_rsumblocks, map, &nmap);
 		if (error) {
 			do_error(
 		_("couldn't allocate realtime summary inode, error = %d\n"),

@@ -1736,10 +1736,11 @@ _("realtime bitmap inode %" PRIu64 " has bad size %" PRId64 " (should be %" PRIu
 		break;
 
 	case XR_INO_RTSUM:
-		if (size != mp->m_rsumsize)  {
+		if (size != XFS_FSB_TO_B(mp, mp->m_rsumblocks))  {
 			do_warn(
-_("realtime summary inode %" PRIu64 " has bad size %" PRId64 " (should be %d)\n"),
-				lino, size, mp->m_rsumsize);
+_("realtime summary inode %" PRIu64 " has bad size %" PRIu64 " (should be %" PRIu64 ")\n"),
+				lino, size,
+				XFS_FSB_TO_B(mp, mp->m_rsumblocks));
 			return 1;
 		}
 		break;

@@ -813,7 +813,7 @@ rtsummary_create(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 
-	ip->i_disk_size = mp->m_rsumsize;
+	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
 
 	mp->m_sb.sb_rsumino = ip->i_ino;
 	mp->m_rsumip = ip;
@@ -874,25 +874,23 @@ rtsummary_init(
 	struct xfs_trans	*tp;
 	struct xfs_bmbt_irec	*ep;
 	xfs_fileoff_t		bno;
-	xfs_extlen_t		nsumblocks;
 	uint			blocks;
 	int			i;
 	int			nmap;
 	int			error;
 
-	nsumblocks = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
-	blocks = nsumblocks + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) - 1;
+	blocks = mp->m_rsumblocks + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) - 1;
 	error = -libxfs_trans_alloc_rollable(mp, blocks, &tp);
 	if (error)
 		res_failed(error);
 	libxfs_trans_ijoin(tp, mp->m_rsumip, 0);
 
 	bno = 0;
-	while (bno < nsumblocks) {
+	while (bno < mp->m_rsumblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, mp->m_rsumip, bno,
-				(xfs_extlen_t)(nsumblocks - bno),
-				0, nsumblocks, map, &nmap);
+				(xfs_extlen_t)(mp->m_rsumblocks - bno),
+				0, mp->m_rsumblocks, map, &nmap);
 		if (error)
 			fail(_("Allocation of the realtime summary failed"),
 				error);
