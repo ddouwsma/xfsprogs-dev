@@ -14,6 +14,7 @@ MALLOCLIB = @malloc_lib@
 LOADERFLAGS = @LDFLAGS@
 LTLDFLAGS = @LDFLAGS@
 CFLAGS = @CFLAGS@ -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64 -Wno-address-of-packed-member
+CXXFLAGS = @CXXFLAGS@ -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64 -Wno-address-of-packed-member
 BUILD_CFLAGS = @BUILD_CFLAGS@ -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64
 
 # make sure we don't pick up whacky LDFLAGS from the make environment and
@@ -63,6 +64,7 @@ XFS_SCRUB_ALL_AUTO_MEDIA_SCAN_STAMP=$(PKG_STATE_DIR)/xfs_scrub_all_media.stamp
 
 CC		= @cc@
 BUILD_CC	= @BUILD_CC@
+CXX		= @cxx@
 AWK		= @awk@
 SED		= @sed@
 TAR		= @tar@
@@ -161,9 +163,15 @@ ifeq ($(ENABLE_GETTEXT),yes)
 GCFLAGS += -DENABLE_GETTEXT
 endif
 
+# Override these if C++ needs other options
+SANITIZER_CXXFLAGS = $(SANITIZER_CFLAGS)
+GCXXFLAGS = $(GCFLAGS)
+PCXXFLAGS = $(PCFLAGS)
+
 BUILD_CFLAGS += $(GCFLAGS) $(PCFLAGS)
 # First, Sanitizer, Global, Platform, Local CFLAGS
 CFLAGS += $(FCFLAGS) $(SANITIZER_CFLAGS) $(OPTIMIZER) $(GCFLAGS) $(PCFLAGS) $(LCFLAGS)
+CXXFLAGS += $(FCXXFLAGS) $(SANITIZER_CXXFLAGS) $(OPTIMIZER) $(GCXXFLAGS) $(PCXXFLAGS) $(LCXXFLAGS)
 
 include $(TOPDIR)/include/buildmacros
 

@@ -42,6 +42,11 @@ AC_DEFUN([AC_PACKAGE_UTILITIES],
     AC_SUBST(cc)
     AC_PACKAGE_NEED_UTILITY($1, "$cc", cc, [C compiler])
 
+    AC_PROG_CXX
+    cxx="$CXX"
+    AC_SUBST(cxx)
+    AC_PACKAGE_NEED_UTILITY($1, "$cxx", cxx, [C++ compiler])
+
     if test -z "$MAKE"; then
         AC_PATH_PROG(MAKE, gmake,, $PATH)
     fi

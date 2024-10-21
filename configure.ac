@@ -9,6 +9,9 @@ AC_PREFIX_DEFAULT(/usr)
 if test "${CFLAGS+set}" != "set"; then
 	CFLAGS="-g -O2 -std=gnu11"
 fi
+if test "${CXXFLAGS+set}" != "set"; then
+	CXXFLAGS="-g -O2 -std=gnu++11"
+fi
 
 AC_PROG_INSTALL
 LT_INIT
@@ -30,6 +33,9 @@ if test "${BUILD_CFLAGS+set}" != "set"; then
     BUILD_CFLAGS="-g -O2 -std=gnu11"
   fi
 fi
+
+AC_PROG_CXX
+# no C++ build tools yet
 
 AC_ARG_ENABLE(shared,
 [  --enable-shared=[yes/no]  Enable use of shared libraries [default=yes]],,

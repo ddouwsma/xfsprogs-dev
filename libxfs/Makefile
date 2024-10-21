@@ -125,6 +125,18 @@ CFILES = buf_mem.c \
 	xfs_trans_space.c \
 	xfs_types.c
 
+EXTRA_CFILES=\
+	ioctl_c_dummy.c
+
+EXTRA_CXXFILES=\
+	ioctl_cxx_dummy.cpp
+
+EXTRA_OBJECTS=\
+	$(patsubst %.c,%.o,$(EXTRA_CFILES)) \
+	$(patsubst %.cpp,%.o,$(EXTRA_CXXFILES))
+
+LDIRT += $(EXTRA_OBJECTS)
+
 #
 # Tracing flags:
 # -DMEM_DEBUG		all zone memory use
@@ -148,7 +160,23 @@ LTLIBS = $(LIBPTHREAD) $(LIBRT)
 # don't try linking xfs_repair with a debug libxfs.
 DEBUG = -DNDEBUG
 
-default: ltdepend $(LTLIBRARY)
+default: ltdepend $(LTLIBRARY) $(EXTRA_OBJECTS)
+
+%dummy.o: %dummy.cpp
+	@echo "    [CXXD]   $@"
+	$(Q)$(CXX) $(CXXFLAGS) -c $<
+
+%dummy.o: %dummy.c
+	@echo "    [CCD]    $@"
+	$(Q)$(CC) $(CFLAGS) -c $<
+
+MAKECXXDEP := $(MAKEDEPEND) $(CXXFLAGS)
+
+.PHONY: .extradep
+
+.extradep: $(EXTRA_CFILES) $(EXTRA_CXXFILES) $(HFILES)
+	$(Q)$(MAKEDEP) $(EXTRA_CFILES) > .extradep
+	$(Q)$(MAKECXXDEP) $(EXTRA_CXXFILES) >> .extradep
 
 # set up include/xfs header directory
 include $(BUILDRULES)
@@ -172,4 +200,5 @@ install-dev: install
 # running the install-headers target.
 ifndef NODEP
 -include .ltdep
+-include .extradep
 endif
