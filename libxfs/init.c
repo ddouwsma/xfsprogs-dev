@@ -662,7 +662,7 @@ libxfs_mount(
 	mp->m_finobt_nores = true;
 	xfs_set_inode32(mp);
 	mp->m_sb = *sb;
-	INIT_RADIX_TREE(&mp->m_perag_tree, GFP_KERNEL);
+	xa_init(&mp->m_perags);
 	sbp = &mp->m_sb;
 	spin_lock_init(&mp->m_sb_lock);
 	spin_lock_init(&mp->m_agirotor_lock);
