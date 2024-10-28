@@ -789,8 +789,8 @@ libxfs_mount(
 			libxfs_buf_relse(bp);
 	}
 
-	error = libxfs_initialize_perag(mp, sbp->sb_agcount, sbp->sb_dblocks,
-			&mp->m_maxagi);
+	error = libxfs_initialize_perag(mp, 0, sbp->sb_agcount,
+			sbp->sb_dblocks, &mp->m_maxagi);
 	if (error) {
 		fprintf(stderr, _("%s: perag init failed\n"),
 			progname);
@@ -930,7 +930,7 @@ libxfs_umount(
 	 * first place.
 	 */
 	if (xfs_is_perag_data_loaded(mp))
-		libxfs_free_perag(mp);
+		libxfs_free_perag_range(mp, 0, mp->m_sb.sb_agcount);
 
 	xfs_da_unmount(mp);
 
