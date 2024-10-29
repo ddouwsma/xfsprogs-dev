@@ -143,7 +143,7 @@ libxfs_iget(
 	int			error = 0;
 
 	/* reject inode numbers outside existing AGs */
-	if (!ino || XFS_INO_TO_AGNO(mp, ino) >= mp->m_sb.sb_agcount)
+	if (!xfs_verify_ino(mp, ino))
 		return -EINVAL;
 
 	ip = kmem_cache_zalloc(xfs_inode_cache, 0);
