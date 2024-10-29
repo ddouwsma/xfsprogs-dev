@@ -309,6 +309,7 @@
 
 #define xfs_update_secondary_sbs	libxfs_update_secondary_sbs
 
+#define xfs_validate_rt_geometry	libxfs_validate_rt_geometry
 #define xfs_validate_stripe_geometry	libxfs_validate_stripe_geometry
 #define xfs_verify_agbno		libxfs_verify_agbno
 #define xfs_verify_agbext		libxfs_verify_agbext

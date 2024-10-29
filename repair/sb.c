@@ -447,44 +447,8 @@ verify_sb(char *sb_buf, xfs_sb_t *sb, int is_primary_sb)
 			return(XR_BAD_SECT_SIZE_DATA);
 	}
 
-	/*
-	 * real-time extent size is always set
-	 */
-	if (sb->sb_rextsize * sb->sb_blocksize > XFS_MAX_RTEXTSIZE)
-		return(XR_BAD_RT_GEO_DATA);
-
-	if (sb->sb_rextsize * sb->sb_blocksize < XFS_MIN_RTEXTSIZE)
-			return(XR_BAD_RT_GEO_DATA);
-
-	if (sb->sb_rblocks == 0)  {
-		if (sb->sb_rextents != 0)
-			return(XR_BAD_RT_GEO_DATA);
-
-		if (sb->sb_rbmblocks != 0)
-			return(XR_BAD_RT_GEO_DATA);
-
-		if (sb->sb_rextslog != 0)
-			return(XR_BAD_RT_GEO_DATA);
-
-		if (sb->sb_frextents != 0)
-			return(XR_BAD_RT_GEO_DATA);
-	} else  {
-		/*
-		 * if we have a real-time partition, sanity-check geometry
-		 */
-		if (sb->sb_rblocks / sb->sb_rextsize != sb->sb_rextents)
-			return(XR_BAD_RT_GEO_DATA);
-
-		if (sb->sb_rextents == 0)
-			return XR_BAD_RT_GEO_DATA;
-
-		if (sb->sb_rextslog != libxfs_compute_rextslog(sb->sb_rextents))
-			return(XR_BAD_RT_GEO_DATA);
-
-		if (sb->sb_rbmblocks != (xfs_extlen_t) howmany(sb->sb_rextents,
-						NBBY * sb->sb_blocksize))
-			return(XR_BAD_RT_GEO_DATA);
-	}
+	if (!libxfs_validate_rt_geometry(sb))
+		return XR_BAD_RT_GEO_DATA;
 
 	/*
 	 * verify correctness of inode alignment if it's there
