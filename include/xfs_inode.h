@@ -215,7 +215,6 @@ typedef struct xfs_inode {
 	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino) */
 	struct xfs_imap		i_imap;		/* location for xfs_imap() */
-	struct xfs_buftarg	i_dev;		/* dev for this inode */
 	struct xfs_ifork	*i_cowfp;	/* copy on write extents */
 	struct xfs_ifork	i_df;		/* data fork */
 	struct xfs_ifork	i_af;		/* attribute fork */
@@ -238,9 +237,6 @@ typedef struct xfs_inode {
 	/* unlinked list pointers */
 	xfs_agino_t		i_next_unlinked;
 	xfs_agino_t		i_prev_unlinked;
-
-	xfs_extnum_t		i_cnextents;	/* # of extents in cow fork */
-	unsigned int		i_cformat;	/* format of cow fork */
 
 	xfs_fsize_t		i_size;		/* in-memory size */
 	struct inode		i_vnode;
