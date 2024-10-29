@@ -249,6 +249,54 @@ class scrub_service(scrub_control):
 				print(e, file = sys.stderr)
 			return 'failed'
 
+	def last_activation(self):
+		'''Retrieve the last activation time, in microseconds since
+		boot.'''
+		global debug
+
+		l = lambda: self.prop.Get('org.freedesktop.systemd1.Unit',
+				'InactiveExitTimestampMonotonic')
+		try:
+			return self.__dbusrun(l)
+		except Exception as e:
+			if debug:
+				print(e, file = sys.stderr)
+			return 0
+
+	def wait_for_startup(self, last_active, wait_for = 30, interval = 0.5):
+		'''Wait for the service to start up.  This is defined as
+		exiting the inactive state.'''
+
+		for i in range(0, int(wait_for / interval)):
+			s = self.state()
+			if debug:
+				print('waiting for activation %s %s' % (self.unitname, s))
+			if s == 'failed':
+				return 1
+			if s != 'inactive':
+				return 0
+			# If the unit is inactive but the last activation time
+			# doesn't match, then the service ran so quickly that
+			# it's already gone.
+			if last_active != self.last_activation():
+				return 0
+			time.sleep(interval)
+
+		s = self.state()
+		if debug:
+			print('waited for startup %s %s' % (self.unitname, s))
+		if s == 'failed':
+			return 1
+		if s != 'inactive':
+			return 0
+
+		# If the unit is inactive but the last activation time doesn't
+		# match, then the service ran so quickly that it's already
+		# gone.
+		if last_active != self.last_activation():
+			return 0
+		return 2
+
 	def wait(self, interval = 1):
 		'''Wait until the service finishes.'''
 		global debug
@@ -278,7 +326,11 @@ class scrub_service(scrub_control):
 			print('starting %s' % self.unitname)
 
 		try:
+			last_active = self.last_activation()
 			self.__dbusrun(lambda: self.unit.Start('replace'))
+			ret = self.wait_for_startup(last_active)
+			if ret > 0:
+				return ret
 			return self.wait()
 		except dbus.exceptions.DBusException as e:
 			# If the unit was masked, the sysadmin doesn't want us
