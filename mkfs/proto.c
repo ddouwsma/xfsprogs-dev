@@ -819,94 +819,6 @@ rtsummary_create(
 	ihold(VFS_I(ip));
 }
 
-/* Zero the realtime bitmap. */
-static void
-rtbitmap_init(
-	struct xfs_mount	*mp)
-{
-	struct xfs_bmbt_irec	map[XFS_BMAP_MAX_NMAP];
-	struct xfs_trans	*tp;
-	struct xfs_bmbt_irec	*ep;
-	xfs_fileoff_t		bno;
-	uint			blocks;
-	int			i;
-	int			nmap;
-	int			error;
-
-	blocks = mp->m_sb.sb_rbmblocks +
-			XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) - 1;
-	error = -libxfs_trans_alloc_rollable(mp, blocks, &tp);
-	if (error)
-		res_failed(error);
-
-	libxfs_trans_ijoin(tp, mp->m_rbmip, 0);
-	bno = 0;
-	while (bno < mp->m_sb.sb_rbmblocks) {
-		nmap = XFS_BMAP_MAX_NMAP;
-		error = -libxfs_bmapi_write(tp, mp->m_rbmip, bno,
-				(xfs_extlen_t)(mp->m_sb.sb_rbmblocks - bno),
-				0, mp->m_sb.sb_rbmblocks, map, &nmap);
-		if (error)
-			fail(_("Allocation of the realtime bitmap failed"),
-				error);
-
-		for (i = 0, ep = map; i < nmap; i++, ep++) {
-			libxfs_device_zero(mp->m_ddev_targp,
-				XFS_FSB_TO_DADDR(mp, ep->br_startblock),
-				XFS_FSB_TO_BB(mp, ep->br_blockcount));
-			bno += ep->br_blockcount;
-		}
-	}
-
-	error = -libxfs_trans_commit(tp);
-	if (error)
-		fail(_("Block allocation of the realtime bitmap inode failed"),
-				error);
-}
-
-/* Zero the realtime summary file. */
-static void
-rtsummary_init(
-	struct xfs_mount	*mp)
-{
-	struct xfs_bmbt_irec	map[XFS_BMAP_MAX_NMAP];
-	struct xfs_trans	*tp;
-	struct xfs_bmbt_irec	*ep;
-	xfs_fileoff_t		bno;
-	uint			blocks;
-	int			i;
-	int			nmap;
-	int			error;
-
-	blocks = mp->m_rsumblocks + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) - 1;
-	error = -libxfs_trans_alloc_rollable(mp, blocks, &tp);
-	if (error)
-		res_failed(error);
-	libxfs_trans_ijoin(tp, mp->m_rsumip, 0);
-
-	bno = 0;
-	while (bno < mp->m_rsumblocks) {
-		nmap = XFS_BMAP_MAX_NMAP;
-		error = -libxfs_bmapi_write(tp, mp->m_rsumip, bno,
-				(xfs_extlen_t)(mp->m_rsumblocks - bno),
-				0, mp->m_rsumblocks, map, &nmap);
-		if (error)
-			fail(_("Allocation of the realtime summary failed"),
-				error);
-
-		for (i = 0, ep = map; i < nmap; i++, ep++) {
-			libxfs_device_zero(mp->m_ddev_targp,
-				XFS_FSB_TO_DADDR(mp, ep->br_startblock),
-				XFS_FSB_TO_BB(mp, ep->br_blockcount));
-			bno += ep->br_blockcount;
-		}
-	}
-	error = -libxfs_trans_commit(tp);
-	if (error)
-		fail(_("Block allocation of the realtime summary inode failed"),
-				error);
-}
-
 /*
  * Free the whole realtime area using transactions.
  * Do one transaction per bitmap block.
@@ -920,6 +832,22 @@ rtfreesp_init(
 	xfs_rtxnum_t		ertx;
 	int			error;
 
+	/*
+	 * First zero the realtime bitmap and summary files.
+	 */
+	error = -libxfs_rtfile_initialize_blocks(mp->m_rbmip, 0,
+			mp->m_sb.sb_rbmblocks, NULL);
+	if (error)
+		fail(_("Initialization of rtbitmap inode failed"), error);
+
+	error = -libxfs_rtfile_initialize_blocks(mp->m_rsumip, 0,
+			mp->m_rsumblocks, NULL);
+	if (error)
+		fail(_("Initialization of rtsummary inode failed"), error);
+
+	/*
+	 * Then free the blocks into the allocator, one bitmap block at a time.
+	 */
 	for (rtx = 0; rtx < mp->m_sb.sb_rextents; rtx = ertx) {
 		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 				0, 0, 0, &tp);
@@ -953,8 +881,6 @@ rtinit(
 	create_sb_metadata_file(mp, rtbitmap_create);
 	create_sb_metadata_file(mp, rtsummary_create);
 
-	rtbitmap_init(mp);
-	rtsummary_init(mp);
 	rtfreesp_init(mp);
 }
 
