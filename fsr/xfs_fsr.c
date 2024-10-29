@@ -13,6 +13,7 @@
 #include "libfrog/paths.h"
 #include "libfrog/fsgeom.h"
 #include "libfrog/bulkstat.h"
+#include "libfrog/file_exchange.h"
 
 #include <fcntl.h>
 #include <errno.h>
@@ -120,12 +121,6 @@ open_handle(
 
 	xfd_install_geometry(xfd, fsgeom);
 	return 0;
-}
-
-static int
-xfs_swapext(int fd, xfs_swapext_t *sx)
-{
-    return ioctl(fd, XFS_IOC_SWAPEXT, sx);
 }
 
 static int
@@ -1189,14 +1184,13 @@ packfile(
 	struct xfs_bulkstat	*statp,
 	struct fsxattr		*fsxp)
 {
+	struct xfs_commit_range	xdf;
 	int			tfd = -1;
-	int			srval;
 	int			retval = -1;	/* Failure is the default */
 	int			nextents, extent, cur_nextents, new_nextents;
 	unsigned		blksz_dio;
 	unsigned		dio_min;
 	struct dioattr		dio;
-	static xfs_swapext_t	sx;
 	struct xfs_flock64	space;
 	off_t			cnt, pos;
 	void			*fbuf = NULL;
@@ -1236,6 +1230,16 @@ packfile(
 	/* Setup extended attributes */
 	if (fsr_setup_attr_fork(file_fd->fd, tfd, statp) != 0) {
 		fsrprintf(_("failed to set ATTR fork on tmp: %s:\n"), tname);
+		goto out;
+	}
+
+	/*
+	 * Snapshot file_fd before we start copying data but after tweaking
+	 * forkoff.
+	 */
+	error = xfrog_defragrange_prep(&xdf, file_fd->fd, statp, tfd);
+	if (error) {
+		fsrprintf(_("failed to prep for defrag: %s\n"), strerror(error));
 		goto out;
 	}
 
@@ -1446,19 +1450,6 @@ packfile(
 		goto out;
 	}
 
-	error = -xfrog_bulkstat_v5_to_v1(file_fd, &sx.sx_stat, statp);
-	if (error) {
-		fsrprintf(_("bstat conversion error on %s: %s\n"),
-				fname, strerror(error));
-		goto out;
-	}
-
-	sx.sx_version  = XFS_SX_VERSION;
-	sx.sx_fdtarget = file_fd->fd;
-	sx.sx_fdtmp    = tfd;
-	sx.sx_offset   = 0;
-	sx.sx_length   = statp->bs_size;
-
 	/* switch to the owner's id, to keep quota in line */
         if (fchown(tfd, statp->bs_uid, statp->bs_gid) < 0) {
                 if (vflag)
@@ -1468,25 +1459,28 @@ packfile(
         }
 
 	/* Swap the extents */
-	srval = xfs_swapext(file_fd->fd, &sx);
-	if (srval < 0) {
-		if (errno == ENOTSUP) {
-			if (vflag || dflag)
-			   fsrprintf(_("%s: file type not supported\n"), fname);
-		} else if (errno == EFAULT) {
-			/* The file has changed since we started the copy */
-			if (vflag || dflag)
-			   fsrprintf(_("%s: file modified defrag aborted\n"),
-				     fname);
-		} else if (errno == EBUSY) {
-			/* Timestamp has changed or mmap'ed file */
-			if (vflag || dflag)
-			   fsrprintf(_("%s: file busy\n"), fname);
-		} else {
-			fsrprintf(_("XFS_IOC_SWAPEXT failed: %s: %s\n"),
-				  fname, strerror(errno));
-		}
-		goto out;
+	error = xfrog_defragrange(file_fd->fd, &xdf);
+	switch (error) {
+		case 0:
+			break;
+	case ENOTSUP:
+		if (vflag || dflag)
+			fsrprintf(_("%s: file type not supported\n"), fname);
+		break;
+	case EFAULT:
+		/* The file has changed since we started the copy */
+		if (vflag || dflag)
+			fsrprintf(_("%s: file modified defrag aborted\n"),
+					fname);
+		break;
+	case EBUSY:
+		/* Timestamp has changed or mmap'ed file */
+		if (vflag || dflag)
+			fsrprintf(_("%s: file busy\n"), fname);
+		break;
+	default:
+		fsrprintf(_("XFS_IOC_SWAPEXT failed: %s: %s\n"),
+			  fname, strerror(error));
 	}
 
 	/* Report progress */
