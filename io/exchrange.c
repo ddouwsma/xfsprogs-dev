@@ -19,6 +19,7 @@ exchangerange_help(void)
 "\n"
 " Exchange file data between the open file descriptor and the supplied filename.\n"
 " -C   -- Print timing information in a condensed format\n"
+" -c   -- Commit to the exchange only if file2 has not changed.\n"
 " -d N -- Start exchanging contents at this position in the open file\n"
 " -f   -- Flush changed file data and metadata to disk\n"
 " -l N -- Exchange this many bytes between the two files instead of to EOF\n"
@@ -34,9 +35,9 @@ exchangerange_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_exchange_range	fxr;
 	struct stat		stat;
 	struct timeval		t1, t2;
+	bool			use_commit = false;
 	uint64_t		flags = XFS_EXCHANGE_RANGE_TO_EOF;
 	int64_t			src_offset = 0;
 	int64_t			dest_offset = 0;
@@ -52,6 +53,9 @@ exchangerange_f(
 		switch (c) {
 		case 'C':
 			condensed = 1;
+			break;
+		case 'c':
+			use_commit = true;
 			break;
 		case 'd':
 			dest_offset = cvtnum(fsblocksize, fssectsize, optarg);
@@ -117,8 +121,22 @@ exchangerange_f(
 	if (length < 0)
 		length = stat.st_size;
 
-	xfrog_exchangerange_prep(&fxr, dest_offset, fd, src_offset, length);
-	ret = xfrog_exchangerange(file->fd, &fxr, flags);
+	if (use_commit) {
+		struct xfs_commit_range	xcr;
+
+		ret = xfrog_commitrange_prep(&xcr, file->fd, dest_offset, fd,
+				src_offset, length);
+		if (!ret) {
+			gettimeofday(&t1, NULL);
+			ret = xfrog_commitrange(file->fd, &xcr, flags);
+		}
+	} else {
+		struct xfs_exchange_range	fxr;
+
+		xfrog_exchangerange_prep(&fxr, dest_offset, fd, src_offset,
+				length);
+		ret = xfrog_exchangerange(file->fd, &fxr, flags);
+	}
 	if (ret) {
 		xfrog_perror(ret, "exchangerange");
 		exitcode = 1;
@@ -149,7 +167,7 @@ static struct cmdinfo exchangerange_cmd = {
 void
 exchangerange_init(void)
 {
-	exchangerange_cmd.args = _("[-Cfntw] [-d dest_offset] [-s src_offset] [-l length] <donorfile>");
+	exchangerange_cmd.args = _("[-Ccfntw] [-d dest_offset] [-s src_offset] [-l length] <donorfile>");
 	exchangerange_cmd.oneline = _("Exchange contents between files.");
 
 	add_command(&exchangerange_cmd);
