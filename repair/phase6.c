@@ -547,157 +547,60 @@ mk_rbmino(xfs_mount_t *mp)
 	libxfs_irele(ip);
 }
 
-static int
-fill_rbmino(xfs_mount_t *mp)
+static void
+fill_rbmino(
+	struct xfs_mount	*mp)
 {
-	struct xfs_buf	*bp;
-	xfs_trans_t	*tp;
-	xfs_inode_t	*ip;
-	union xfs_rtword_raw	*bmp;
-	int		nmap;
-	int		error;
-	xfs_fileoff_t	bno;
-	xfs_bmbt_irec_t	map;
-
-	bmp = btmcompute;
-	bno = 0;
+	struct xfs_trans	*tp;
+	struct xfs_inode	*ip;
+	int			error;
 
 	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
 	if (error)
 		res_failed(error);
 
 	error = -libxfs_iget(mp, tp, mp->m_sb.sb_rbmino, 0, &ip);
-	if (error) {
-		do_error(
-		_("couldn't iget realtime bitmap inode -- error - %d\n"),
-			error);
-	}
-
-	while (bno < mp->m_sb.sb_rbmblocks)  {
-		struct xfs_rtalloc_args	args = {
-			.mp		= mp,
-			.tp		= tp,
-		};
-		union xfs_rtword_raw	*ondisk;
-
-		/*
-		 * fill the file one block at a time
-		 */
-		nmap = 1;
-		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0, 1, &map, &nmap);
-		if (error || nmap != 1) {
-			do_error(
-	_("couldn't map realtime bitmap block %" PRIu64 ", error = %d\n"),
-				bno, error);
-		}
-
-		ASSERT(map.br_startblock != HOLESTARTBLOCK);
-
-		error = -libxfs_trans_read_buf(
-				mp, tp, mp->m_dev,
-				XFS_FSB_TO_DADDR(mp, map.br_startblock),
-				XFS_FSB_TO_BB(mp, 1), 1, &bp, NULL);
-
-		if (error) {
-			do_warn(
-_("can't access block %" PRIu64 " (fsbno %" PRIu64 ") of realtime bitmap inode %" PRIu64 "\n"),
-				bno, map.br_startblock, mp->m_sb.sb_rbmino);
-			return(1);
-		}
-
-		args.rbmbp = bp;
-		ondisk = xfs_rbmblock_wordptr(&args, 0);
-		memcpy(ondisk, bmp, mp->m_blockwsize << XFS_WORDLOG);
-
-		libxfs_trans_log_buf(tp, bp, 0, mp->m_sb.sb_blocksize - 1);
-
-		bmp += mp->m_blockwsize;
-		bno++;
-	}
-
-	libxfs_trans_ijoin(tp, ip, 0);
-	error = -libxfs_trans_commit(tp);
+	libxfs_trans_cancel(tp);
 	if (error)
-		do_error(_("%s: commit failed, error %d\n"), __func__, error);
+		do_error(
+_("couldn't iget realtime bitmap inode, error %d\n"), error);
+
+	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_sb.sb_rbmblocks,
+			btmcompute);
+	if (error)
+		do_error(
+_("couldn't re-initialize realtime bitmap inode, error %d\n"), error);
+
 	libxfs_irele(ip);
-	return(0);
 }
 
-static int
-fill_rsumino(xfs_mount_t *mp)
+static void
+fill_rsumino(
+	struct xfs_mount	*mp)
 {
-	struct xfs_buf	*bp;
-	xfs_trans_t	*tp;
-	xfs_inode_t	*ip;
-	union xfs_suminfo_raw *smp;
-	int		nmap;
-	int		error;
-	xfs_fileoff_t	bno;
-	xfs_bmbt_irec_t	map;
-
-	smp = sumcompute;
-	bno = 0;
+	struct xfs_trans	*tp;
+	struct xfs_inode	*ip;
+	int			error;
 
 	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
 	if (error)
 		res_failed(error);
 
 	error = -libxfs_iget(mp, tp, mp->m_sb.sb_rsumino, 0, &ip);
-	if (error) {
-		do_error(
-		_("couldn't iget realtime summary inode -- error - %d\n"),
-			error);
-	}
-
-	while (bno < mp->m_rsumblocks)  {
-		struct xfs_rtalloc_args	args = {
-			.mp		= mp,
-			.tp		= tp,
-		};
-		union xfs_suminfo_raw	*ondisk;
-
-		/*
-		 * fill the file one block at a time
-		 */
-		nmap = 1;
-		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0, 1, &map, &nmap);
-		if (error || nmap != 1) {
-			do_error(
-	_("couldn't map realtime summary inode block %" PRIu64 ", error = %d\n"),
-				bno, error);
-		}
-
-		ASSERT(map.br_startblock != HOLESTARTBLOCK);
-
-		error = -libxfs_trans_read_buf(
-				mp, tp, mp->m_dev,
-				XFS_FSB_TO_DADDR(mp, map.br_startblock),
-				XFS_FSB_TO_BB(mp, 1), 1, &bp, NULL);
-
-		if (error) {
-			do_warn(
-_("can't access block %" PRIu64 " (fsbno %" PRIu64 ") of realtime summary inode %" PRIu64 "\n"),
-				bno, map.br_startblock, mp->m_sb.sb_rsumino);
-			libxfs_irele(ip);
-			return(1);
-		}
-
-		args.sumbp = bp;
-		ondisk = xfs_rsumblock_infoptr(&args, 0);
-		memcpy(ondisk, smp, mp->m_blockwsize << XFS_WORDLOG);
-
-		libxfs_trans_log_buf(tp, bp, 0, mp->m_sb.sb_blocksize - 1);
-
-		smp += mp->m_blockwsize;
-		bno++;
-	}
-
-	libxfs_trans_ijoin(tp, ip, 0);
-	error = -libxfs_trans_commit(tp);
+	libxfs_trans_cancel(tp);
 	if (error)
-		do_error(_("%s: commit failed, error %d\n"), __func__, error);
+		do_error(
+_("couldn't iget realtime summary inode, error %d\n"), error);
+
+	mp->m_rsumip = ip;
+	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_rsumblocks,
+			sumcompute);
+	mp->m_rsumip = NULL;
+	if (error)
+		do_error(
+_("couldn't re-initialize realtime summary inode, error %d\n"), error);
+
 	libxfs_irele(ip);
-	return(0);
 }
 
 static void
@@ -3302,15 +3205,8 @@ phase6(xfs_mount_t *mp)
 	if (!no_modify)  {
 		do_log(
 _("        - resetting contents of realtime bitmap and summary inodes\n"));
-		if (fill_rbmino(mp))  {
-			do_warn(
-			_("Warning:  realtime bitmap may be inconsistent\n"));
-		}
-
-		if (fill_rsumino(mp))  {
-			do_warn(
-			_("Warning:  realtime bitmap may be inconsistent\n"));
-		}
+		fill_rbmino(mp);
+		fill_rsumino(mp);
 	}
 
 	mark_standalone_inodes(mp);
