@@ -15,6 +15,7 @@
 #include "bmap.h"
 #include "output.h"
 #include "init.h"
+#include "block.h"
 
 void
 fa_agblock(
@@ -323,7 +324,9 @@ fa_drtbno(
 		dbprintf(_("null block number, cannot set new addr\n"));
 		return;
 	}
-	/* need set_cur to understand rt subvolume */
+
+	set_rt_cur(&typtab[next], xfs_rtb_to_daddr(mp, bno), blkbb,
+			DB_RING_ADD, NULL);
 }
 
 /*ARGSUSED*/
