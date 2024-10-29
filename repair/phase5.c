@@ -694,12 +694,6 @@ phase5(xfs_mount_t *mp)
 	free(sb_ifree_ag);
 	free(sb_fdblocks_ag);
 
-	if (mp->m_sb.sb_rblocks)  {
-		do_log(
-		_("        - generate realtime summary info and bitmap...\n"));
-		check_rtmetadata(mp);
-	}
-
 	do_log(_("        - reset superblock...\n"));
 
 	/*

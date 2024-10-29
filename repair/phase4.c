@@ -401,4 +401,11 @@ phase4(xfs_mount_t *mp)
 	 */
 	quotino_check(mp);
 	quota_sb_check(mp);
+
+	/* Check the rt metadata before we rebuild */
+	if (mp->m_sb.sb_rblocks)  {
+		do_log(
+		_("        - generate realtime summary info and bitmap...\n"));
+		check_rtmetadata(mp);
+	}
 }
