@@ -1050,6 +1050,8 @@ process_aginodes(
 	first_ino_rec = ino_rec = findfirst_inode_rec(agno);
 
 	while (ino_rec != NULL)  {
+		xfs_agino_t	synth_agino;
+
 		/*
 		 * paranoia - step through inode records until we step
 		 * through a full allocation of inodes.  this could
@@ -1068,6 +1070,32 @@ process_aginodes(
 				num_inos += XFS_INODES_PER_CHUNK;
 		}
 
+		/*
+		 * We didn't find all the inobt records for this block, so the
+		 * incore tree is missing a few records.  This implies that the
+		 * inobt is heavily damaged, so synthesize the incore records.
+		 * Mark all the inodes in use to minimize data loss.
+		 */
+		for (synth_agino = first_ino_rec->ino_startnum + num_inos;
+		     num_inos < igeo->ialloc_inos;
+		     synth_agino += XFS_INODES_PER_CHUNK,
+		     num_inos += XFS_INODES_PER_CHUNK) {
+			int		i;
+
+			ino_rec = find_inode_rec(mp, agno, synth_agino);
+			if (ino_rec)
+				continue;
+
+			ino_rec = set_inode_free_alloc(mp, agno, synth_agino);
+			do_warn(
+ _("found inobt record for inode %" PRIu64 " but not inode %" PRIu64 ", pretending that we did\n"),
+					XFS_AGINO_TO_INO(mp, agno,
+						first_ino_rec->ino_startnum),
+					XFS_AGINO_TO_INO(mp, agno,
+						synth_agino));
+			for (i = 0; i < XFS_INODES_PER_CHUNK; i++)
+				set_inode_used(ino_rec, i);
+		}
 		ASSERT(num_inos == igeo->ialloc_inos);
 
 		if (pf_args) {
