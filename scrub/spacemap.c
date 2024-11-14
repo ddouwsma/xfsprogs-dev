@@ -96,21 +96,20 @@ scan_ag_rmaps(
 {
 	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	struct scan_blocks	*sbx = arg;
-	struct fsmap		keys[2];
+	struct fsmap		keys[2] = { };
 	off_t			bperag;
 	int			ret;
 
 	bperag = (off_t)ctx->mnt.fsgeom.agblocks *
 		 (off_t)ctx->mnt.fsgeom.blocksize;
 
-	memset(keys, 0, sizeof(struct fsmap) * 2);
-	keys->fmr_device = ctx->fsinfo.fs_datadev;
-	keys->fmr_physical = agno * bperag;
-	(keys + 1)->fmr_device = ctx->fsinfo.fs_datadev;
-	(keys + 1)->fmr_physical = ((agno + 1) * bperag) - 1;
-	(keys + 1)->fmr_owner = ULLONG_MAX;
-	(keys + 1)->fmr_offset = ULLONG_MAX;
-	(keys + 1)->fmr_flags = UINT_MAX;
+	keys[0].fmr_device = ctx->fsinfo.fs_datadev;
+	keys[0].fmr_physical = agno * bperag;
+	keys[1].fmr_device = ctx->fsinfo.fs_datadev;
+	keys[1].fmr_physical = ((agno + 1) * bperag) - 1;
+	keys[1].fmr_owner = ULLONG_MAX;
+	keys[1].fmr_offset = ULLONG_MAX;
+	keys[1].fmr_flags = UINT_MAX;
 
 	if (sbx->aborted)
 		return;
@@ -135,16 +134,15 @@ scan_dev_rmaps(
 	dev_t			dev,
 	struct scan_blocks	*sbx)
 {
-	struct fsmap		keys[2];
+	struct fsmap		keys[2] = { };
 	int			ret;
 
-	memset(keys, 0, sizeof(struct fsmap) * 2);
-	keys->fmr_device = dev;
-	(keys + 1)->fmr_device = dev;
-	(keys + 1)->fmr_physical = ULLONG_MAX;
-	(keys + 1)->fmr_owner = ULLONG_MAX;
-	(keys + 1)->fmr_offset = ULLONG_MAX;
-	(keys + 1)->fmr_flags = UINT_MAX;
+	keys[0].fmr_device = dev;
+	keys[1].fmr_device = dev;
+	keys[1].fmr_physical = ULLONG_MAX;
+	keys[1].fmr_owner = ULLONG_MAX;
+	keys[1].fmr_offset = ULLONG_MAX;
+	keys[1].fmr_flags = UINT_MAX;
 
 	if (sbx->aborted)
 		return;

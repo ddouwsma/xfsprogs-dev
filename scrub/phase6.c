@@ -495,7 +495,7 @@ report_ioerr(
 	uint64_t			length,
 	void				*arg)
 {
-	struct fsmap			keys[2];
+	struct fsmap			keys[2] = { };
 	struct ioerr_filerange		fr = {
 		.physical		= start,
 		.length			= length,
@@ -506,14 +506,13 @@ report_ioerr(
 	dev = disk_to_dev(dioerr->ctx, dioerr->disk);
 
 	/* Go figure out which blocks are bad from the fsmap. */
-	memset(keys, 0, sizeof(struct fsmap) * 2);
-	keys->fmr_device = dev;
-	keys->fmr_physical = start;
-	(keys + 1)->fmr_device = dev;
-	(keys + 1)->fmr_physical = start + length - 1;
-	(keys + 1)->fmr_owner = ULLONG_MAX;
-	(keys + 1)->fmr_offset = ULLONG_MAX;
-	(keys + 1)->fmr_flags = UINT_MAX;
+	keys[0].fmr_device = dev;
+	keys[0].fmr_physical = start;
+	keys[1].fmr_device = dev;
+	keys[1].fmr_physical = start + length - 1;
+	keys[1].fmr_owner = ULLONG_MAX;
+	keys[1].fmr_offset = ULLONG_MAX;
+	keys[1].fmr_flags = UINT_MAX;
 	return -scrub_iterate_fsmap(dioerr->ctx, keys, report_ioerr_fsmap,
 			&fr);
 }
