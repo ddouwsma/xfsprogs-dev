@@ -764,6 +764,8 @@ pf_queuing_worker(
 			irec = next_ino_rec(irec);
 			num_inos += XFS_INODES_PER_CHUNK;
 		}
+		if (!irec)
+			break;
 
 		if (args->dirs_only && cur_irec->ino_isa_dir == 0)
 			continue;
