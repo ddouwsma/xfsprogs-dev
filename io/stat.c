@@ -6,6 +6,10 @@
  * Portions of statx support written by David Howells (dhowells@redhat.com)
  */
 
+#ifdef OVERRIDE_SYSTEM_STATX
+#define statx sys_statx
+#endif
+
 #include "command.h"
 #include "input.h"
 #include "init.h"
@@ -347,6 +351,9 @@ dump_raw_statx(struct statx *stx)
 	printf("stat.rdev_minor = %u\n", stx->stx_rdev_minor);
 	printf("stat.dev_major = %u\n", stx->stx_dev_major);
 	printf("stat.dev_minor = %u\n", stx->stx_dev_minor);
+	printf("stat.atomic_write_unit_min = %u\n", stx->stx_atomic_write_unit_min);
+	printf("stat.atomic_write_unit_max = %u\n", stx->stx_atomic_write_unit_max);
+	printf("stat.atomic_write_segments_max = %u\n", stx->stx_atomic_write_segments_max);
 	return 0;
 }
 

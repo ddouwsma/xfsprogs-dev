@@ -99,6 +99,26 @@ AC_DEFUN([AC_NEED_INTERNAL_FSCRYPT_POLICY_V2],
   ])
 
 #
+# Check if we need to override the system struct statx with
+# the internal definition.  This /only/ happens if the system
+# actually defines struct statx /and/ the system definition
+# is missing certain fields.
+#
+AC_DEFUN([AC_NEED_INTERNAL_STATX],
+  [ AC_CHECK_TYPE(struct statx,
+      [
+        AC_CHECK_MEMBER(struct statx.stx_atomic_write_unit_min,
+          ,
+          need_internal_statx=yes,
+          [#include <linux/stat.h>]
+        )
+      ],,
+      [#include <linux/stat.h>]
+    )
+    AC_SUBST(need_internal_statx)
+  ])
+
+#
 # Check if we have a FS_IOC_GETFSMAP ioctl (Linux)
 #
 AC_DEFUN([AC_HAVE_GETFSMAP],
