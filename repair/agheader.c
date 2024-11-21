@@ -364,26 +364,19 @@ secondary_sb_whack(
 	 * size is the size of data which is valid for this sb.
 	 */
 	if (xfs_sb_version_hasmetadir(sb))
-		size = offsetof(struct xfs_dsb, sb_metadirino)
-			+ sizeof(sb->sb_metadirino);
+		size = offsetofend(struct xfs_dsb, sb_metadirino);
 	else if (xfs_sb_version_hasmetauuid(sb))
-		size = offsetof(struct xfs_dsb, sb_meta_uuid)
-			+ sizeof(sb->sb_meta_uuid);
+		size = offsetofend(struct xfs_dsb, sb_meta_uuid);
 	else if (xfs_sb_version_hascrc(sb))
-		size = offsetof(struct xfs_dsb, sb_lsn)
-			+ sizeof(sb->sb_lsn);
+		size = offsetofend(struct xfs_dsb, sb_lsn);
 	else if (xfs_sb_version_hasmorebits(sb))
-		size = offsetof(struct xfs_dsb, sb_bad_features2)
-			+ sizeof(sb->sb_bad_features2);
+		size = offsetofend(struct xfs_dsb, sb_bad_features2);
 	else if (xfs_sb_version_haslogv2(sb))
-		size = offsetof(struct xfs_dsb, sb_logsunit)
-			+ sizeof(sb->sb_logsunit);
+		size = offsetofend(struct xfs_dsb, sb_logsunit);
 	else if (xfs_sb_version_hassector(sb))
-		size = offsetof(struct xfs_dsb, sb_logsectsize)
-			+ sizeof(sb->sb_logsectsize);
+		size = offsetofend(struct xfs_dsb, sb_logsectsize);
 	else /* only support dirv2 or more recent */
-		size = offsetof(struct xfs_dsb, sb_dirblklog)
-			+ sizeof(sb->sb_dirblklog);
+		size = offsetofend(struct xfs_dsb, sb_dirblklog);
 
 	/* Check the buffer we read from disk for garbage outside size */
 	for (ip = (char *)sbuf->b_addr + size;
