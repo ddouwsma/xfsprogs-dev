@@ -49,6 +49,7 @@ HFILES = \
 	output.h \
 	print.h \
 	quit.h \
+	rtgroup.h \
 	sb.h \
 	sig.h \
 	strvec.h \
