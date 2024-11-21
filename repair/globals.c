@@ -111,8 +111,6 @@ xfs_extlen_t	sb_inoalignmt;
 uint32_t	sb_unit;
 uint32_t	sb_width;
 
-struct aglock	*ag_locks;
-
 time_t		report_interval;
 uint64_t	*prog_rpt_done;
 

@@ -23,6 +23,9 @@ void		init_bmaps(xfs_mount_t *mp);
 void		reset_bmaps(xfs_mount_t *mp);
 void		free_bmaps(xfs_mount_t *mp);
 
+void		lock_ag(xfs_agnumber_t agno);
+void		unlock_ag(xfs_agnumber_t agno);
+
 void		set_bmap_ext(xfs_agnumber_t agno, xfs_agblock_t agbno,
 			     xfs_extlen_t blen, int state);
 int		get_bmap_ext(xfs_agnumber_t agno, xfs_agblock_t agbno,

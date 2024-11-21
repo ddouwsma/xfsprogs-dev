@@ -152,10 +152,6 @@ extern xfs_extlen_t	sb_inoalignmt;
 extern uint32_t	sb_unit;
 extern uint32_t	sb_width;
 
-struct aglock {
-	pthread_mutex_t	lock __attribute__((__aligned__(64)));
-};
-extern struct aglock	*ag_locks;
 extern pthread_mutex_t	rt_lock;
 
 extern time_t		report_interval;

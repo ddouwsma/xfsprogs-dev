@@ -340,7 +340,7 @@ _("bad back (left) sibling pointer (saw %llu should be NULL (0))\n"
 		agno = XFS_FSB_TO_AGNO(mp, bno);
 		agbno = XFS_FSB_TO_AGBNO(mp, bno);
 
-		pthread_mutex_lock(&ag_locks[agno].lock);
+		lock_ag(agno);
 		state = get_bmap(agno, agbno);
 		switch (state) {
 		case XR_E_INUSE1:
@@ -407,7 +407,7 @@ _("bad state %d, inode %" PRIu64 " bmap block 0x%" PRIx64 "\n"),
 				state, ino, bno);
 			break;
 		}
-		pthread_mutex_unlock(&ag_locks[agno].lock);
+		unlock_ag(agno);
 	} else {
 		if (search_dup_extent(XFS_FSB_TO_AGNO(mp, bno),
 				XFS_FSB_TO_AGBNO(mp, bno),
@@ -420,9 +420,9 @@ _("bad state %d, inode %" PRIu64 " bmap block 0x%" PRIx64 "\n"),
 	/* Record BMBT blocks in the reverse-mapping data. */
 	if (check_dups && collect_rmaps && !zap_metadata) {
 		agno = XFS_FSB_TO_AGNO(mp, bno);
-		pthread_mutex_lock(&ag_locks[agno].lock);
+		lock_ag(agno);
 		rmap_add_bmbt_rec(mp, ino, whichfork, bno);
-		pthread_mutex_unlock(&ag_locks[agno].lock);
+		unlock_ag(agno);
 	}
 
 	if (level == 0) {

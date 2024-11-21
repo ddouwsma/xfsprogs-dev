@@ -761,12 +761,12 @@ mark_reflink_inodes(
 		agno = XFS_INO_TO_AGNO(mp, rciter.ino);
 		agino = XFS_INO_TO_AGINO(mp, rciter.ino);
 
-		pthread_mutex_lock(&ag_locks[agno].lock);
+		lock_ag(agno);
 		irec = find_inode_rec(mp, agno, agino);
 		off = get_inode_offset(mp, rciter.ino, irec);
 		/* lock here because we might go outside this ag */
 		set_inode_is_rl(irec, off);
-		pthread_mutex_unlock(&ag_locks[agno].lock);
+		unlock_ag(agno);
 	}
 	rcbag_ino_iter_stop(rcstack, &rciter);
 }

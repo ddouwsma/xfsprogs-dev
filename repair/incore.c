@@ -24,7 +24,25 @@
 static int states[16] =
 	{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
-static struct btree_root	**ag_bmap;
+struct bmap {
+	pthread_mutex_t		lock __attribute__((__aligned__(64)));
+	struct btree_root	*root;
+};
+static struct bmap	*ag_bmaps;
+
+void
+lock_ag(
+	xfs_agnumber_t		agno)
+{
+	pthread_mutex_lock(&ag_bmaps[agno].lock);
+}
+
+void
+unlock_ag(
+	xfs_agnumber_t		agno)
+{
+	pthread_mutex_unlock(&ag_bmaps[agno].lock);
+}
 
 static void
 update_bmap(
@@ -129,7 +147,7 @@ set_bmap_ext(
 	xfs_extlen_t		blen,
 	int			state)
 {
-	update_bmap(ag_bmap[agno], agbno, blen, &states[state]);
+	update_bmap(ag_bmaps[agno].root, agbno, blen, &states[state]);
 }
 
 int
@@ -139,23 +157,24 @@ get_bmap_ext(
 	xfs_agblock_t		maxbno,
 	xfs_extlen_t		*blen)
 {
+	struct btree_root	*bmap = ag_bmaps[agno].root;
 	int			*statep;
 	unsigned long		key;
 
-	statep = btree_find(ag_bmap[agno], agbno, &key);
+	statep = btree_find(bmap, agbno, &key);
 	if (!statep)
 		return -1;
 
 	if (key == agbno) {
 		if (blen) {
-			if (!btree_peek_next(ag_bmap[agno], &key))
+			if (!btree_peek_next(bmap, &key))
 				return -1;
 			*blen = min(maxbno, key) - agbno;
 		}
 		return *statep;
 	}
 
-	statep = btree_peek_prev(ag_bmap[agno], NULL);
+	statep = btree_peek_prev(bmap, NULL);
 	if (!statep)
 		return -1;
 	if (blen)
@@ -243,13 +262,15 @@ reset_bmaps(xfs_mount_t *mp)
 	ag_size = mp->m_sb.sb_agblocks;
 
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
+		struct btree_root	*bmap = ag_bmaps[agno].root;
+
 		if (agno == mp->m_sb.sb_agcount - 1)
 			ag_size = (xfs_extlen_t)(mp->m_sb.sb_dblocks -
 				   (xfs_rfsblock_t)mp->m_sb.sb_agblocks * agno);
 #ifdef BTREE_STATS
-		if (btree_find(ag_bmap[agno], 0, NULL)) {
+		if (btree_find(bmap, 0, NULL)) {
 			printf("ag_bmap[%d] btree stats:\n", i);
-			btree_print_stats(ag_bmap[agno], stdout);
+			btree_print_stats(bmap, stdout);
 		}
 #endif
 		/*
@@ -260,11 +281,10 @@ reset_bmaps(xfs_mount_t *mp)
 		 *	ag_hdr_block..ag_size:		XR_E_UNKNOWN
 		 *	ag_size...			XR_E_BAD_STATE
 		 */
-		btree_clear(ag_bmap[agno]);
-		btree_insert(ag_bmap[agno], 0, &states[XR_E_INUSE_FS]);
-		btree_insert(ag_bmap[agno],
-				ag_hdr_block, &states[XR_E_UNKNOWN]);
-		btree_insert(ag_bmap[agno], ag_size, &states[XR_E_BAD_STATE]);
+		btree_clear(bmap);
+		btree_insert(bmap, 0, &states[XR_E_INUSE_FS]);
+		btree_insert(bmap, ag_hdr_block, &states[XR_E_UNKNOWN]);
+		btree_insert(bmap, ag_size, &states[XR_E_BAD_STATE]);
 	}
 
 	if (mp->m_sb.sb_logstart != 0) {
@@ -276,44 +296,58 @@ reset_bmaps(xfs_mount_t *mp)
 	reset_rt_bmap();
 }
 
-void
-init_bmaps(xfs_mount_t *mp)
+static struct bmap *
+alloc_bmaps(
+	unsigned int		nr_groups)
 {
-	xfs_agnumber_t i;
+	struct bmap		*bmap;
+	unsigned int		i;
 
-	ag_bmap = calloc(mp->m_sb.sb_agcount, sizeof(struct btree_root *));
-	if (!ag_bmap)
-		do_error(_("couldn't allocate block map btree roots\n"));
+	bmap = calloc(nr_groups, sizeof(*bmap));
+	if (!bmap)
+		return NULL;
 
-	ag_locks = calloc(mp->m_sb.sb_agcount, sizeof(struct aglock));
-	if (!ag_locks)
-		do_error(_("couldn't allocate block map locks\n"));
-
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)  {
-		btree_init(&ag_bmap[i]);
-		pthread_mutex_init(&ag_locks[i].lock, NULL);
+	for (i = 0; i < nr_groups; i++)  {
+		btree_init(&bmap[i].root);
+		pthread_mutex_init(&bmap[i].lock, NULL);
 	}
+
+	return bmap;
+}
+
+static void
+destroy_bmaps(
+	struct bmap		*bmap,
+	unsigned int		nr_groups)
+{
+	unsigned int		i;
+
+	for (i = 0; i < nr_groups; i++) {
+		btree_destroy(bmap[i].root);
+		pthread_mutex_destroy(&bmap[i].lock);
+	}
+
+	free(bmap);
+}
+
+void
+init_bmaps(
+	struct xfs_mount	*mp)
+{
+	ag_bmaps = alloc_bmaps(mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount);
+	if (!ag_bmaps)
+		do_error(_("couldn't allocate block map btree roots\n"));
 
 	init_rt_bmap(mp);
 	reset_bmaps(mp);
 }
 
 void
-free_bmaps(xfs_mount_t *mp)
+free_bmaps(
+	struct xfs_mount	*mp)
 {
-	xfs_agnumber_t i;
-
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
-		pthread_mutex_destroy(&ag_locks[i].lock);
-
-	free(ag_locks);
-	ag_locks = NULL;
-
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
-		btree_destroy(ag_bmap[i]);
-
-	free(ag_bmap);
-	ag_bmap = NULL;
+	destroy_bmaps(ag_bmaps, mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount);
+	ag_bmaps = NULL;
 
 	free_rt_bmap(mp);
 }

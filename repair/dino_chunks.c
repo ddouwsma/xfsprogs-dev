@@ -132,7 +132,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 		if (check_aginode_block(mp, agno, agino) == 0)
 			return 0;
 
-		pthread_mutex_lock(&ag_locks[agno].lock);
+		lock_ag(agno);
 
 		state = get_bmap(agno, agbno);
 		switch (state) {
@@ -167,8 +167,8 @@ verify_inode_chunk(xfs_mount_t		*mp,
 		_("inode block %d/%d multiply claimed, (state %d)\n"),
 				agno, agbno, state);
 			set_bmap(agno, agbno, XR_E_MULT);
-			pthread_mutex_unlock(&ag_locks[agno].lock);
-			return(0);
+			unlock_ag(agno);
+			return 0;
 		default:
 			do_warn(
 		_("inode block %d/%d bad state, (state %d)\n"),
@@ -177,7 +177,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 			break;
 		}
 
-		pthread_mutex_unlock(&ag_locks[agno].lock);
+		unlock_ag(agno);
 
 		start_agino = XFS_AGB_TO_AGINO(mp, agbno);
 		*start_ino = XFS_AGINO_TO_INO(mp, agno, start_agino);
@@ -424,7 +424,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 	 * user data -- we're probably here as a result of a directory
 	 * entry or an iunlinked pointer
 	 */
-	pthread_mutex_lock(&ag_locks[agno].lock);
+	lock_ag(agno);
 	for (cur_agbno = chunk_start_agbno;
 	     cur_agbno < chunk_stop_agbno;
 	     cur_agbno += blen)  {
@@ -438,7 +438,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 	_("inode block %d/%d multiply claimed, (state %d)\n"),
 				agno, cur_agbno, state);
 			set_bmap_ext(agno, cur_agbno, blen, XR_E_MULT);
-			pthread_mutex_unlock(&ag_locks[agno].lock);
+			unlock_ag(agno);
 			return 0;
 		case XR_E_METADATA:
 		case XR_E_INO:
@@ -450,7 +450,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 			break;
 		}
 	}
-	pthread_mutex_unlock(&ag_locks[agno].lock);
+	unlock_ag(agno);
 
 	/*
 	 * ok, chunk is good.  put the record into the tree if required,
@@ -473,8 +473,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 
 	set_inode_used(irec_p, agino - start_agino);
 
-	pthread_mutex_lock(&ag_locks[agno].lock);
-
+	lock_ag(agno);
 	for (cur_agbno = chunk_start_agbno;
 	     cur_agbno < chunk_stop_agbno;
 	     cur_agbno += blen)  {
@@ -516,7 +515,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 			break;
 		}
 	}
-	pthread_mutex_unlock(&ag_locks[agno].lock);
+	unlock_ag(agno);
 
 	return(ino_cnt);
 }
@@ -575,7 +574,7 @@ process_inode_agbno_state(
 {
 	int state;
 
-	pthread_mutex_lock(&ag_locks[agno].lock);
+	lock_ag(agno);
 	state = get_bmap(agno, agbno);
 	switch (state) {
 	case XR_E_INO:	/* already marked */
@@ -605,7 +604,7 @@ process_inode_agbno_state(
 			XFS_AGB_TO_FSB(mp, agno, agbno), state);
 		break;
 	}
-	pthread_mutex_unlock(&ag_locks[agno].lock);
+	unlock_ag(agno);
 }
 
 /*
