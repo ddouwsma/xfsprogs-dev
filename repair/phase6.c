@@ -474,6 +474,24 @@ reset_sbroot_ino(
 	libxfs_inode_init(tp, &args, ip);
 }
 
+/* Load a realtime freespace metadata inode from disk and reset it. */
+static int
+ensure_rtino(
+	struct xfs_trans		*tp,
+	xfs_ino_t			ino,
+	struct xfs_inode		**ipp)
+{
+	struct xfs_mount		*mp = tp->t_mountp;
+	int				error;
+
+	error = -libxfs_iget(mp, tp, ino, 0, ipp);
+	if (error)
+		return error;
+
+	reset_sbroot_ino(tp, S_IFREG, *ipp);
+	return 0;
+}
+
 static void
 mk_rbmino(
 	struct xfs_mount	*mp)
@@ -486,15 +504,14 @@ mk_rbmino(
 	if (error)
 		res_failed(error);
 
-	error = -libxfs_iget(mp, tp, mp->m_sb.sb_rbmino, 0, &ip);
+	/* Reset the realtime bitmap inode. */
+	error = ensure_rtino(tp, mp->m_sb.sb_rbmino, &ip);
 	if (error) {
 		do_error(
 		_("couldn't iget realtime bitmap inode -- error - %d\n"),
 			error);
 	}
 
-	/* Reset the realtime bitmap inode. */
-	reset_sbroot_ino(tp, S_IFREG, ip);
 	ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	error = -libxfs_trans_commit(tp);
@@ -560,7 +577,8 @@ _("couldn't re-initialize realtime summary inode, error %d\n"), error);
 }
 
 static void
-mk_rsumino(xfs_mount_t *mp)
+mk_rsumino(
+	struct xfs_mount	*mp)
 {
 	struct xfs_trans	*tp;
 	struct xfs_inode	*ip;
@@ -570,15 +588,14 @@ mk_rsumino(xfs_mount_t *mp)
 	if (error)
 		res_failed(error);
 
-	error = -libxfs_iget(mp, tp, mp->m_sb.sb_rsumino, 0, &ip);
+	/* Reset the rt summary inode. */
+	error = ensure_rtino(tp, mp->m_sb.sb_rsumino, &ip);
 	if (error) {
 		do_error(
 		_("couldn't iget realtime summary inode -- error - %d\n"),
 			error);
 	}
 
-	/* Reset the rt summary inode. */
-	reset_sbroot_ino(tp, S_IFREG, ip);
 	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	error = -libxfs_trans_commit(tp);
