@@ -484,6 +484,11 @@ ensure_rtino(
 	struct xfs_mount		*mp = tp->t_mountp;
 	int				error;
 
+	/*
+	 * Don't use metafile iget here because we're resetting sb-rooted
+	 * inodes that live at fixed inumbers, but these inodes could be in
+	 * an arbitrary state.
+	 */
 	error = -libxfs_iget(mp, tp, ino, 0, ipp);
 	if (error)
 		return error;
@@ -524,16 +529,11 @@ static void
 fill_rbmino(
 	struct xfs_mount	*mp)
 {
-	struct xfs_trans	*tp;
 	struct xfs_inode	*ip;
 	int			error;
 
-	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
-	if (error)
-		res_failed(error);
-
-	error = -libxfs_iget(mp, tp, mp->m_sb.sb_rbmino, 0, &ip);
-	libxfs_trans_cancel(tp);
+	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rbmino,
+			XFS_METAFILE_RTBITMAP, &ip);
 	if (error)
 		do_error(
 _("couldn't iget realtime bitmap inode, error %d\n"), error);
@@ -551,16 +551,11 @@ static void
 fill_rsumino(
 	struct xfs_mount	*mp)
 {
-	struct xfs_trans	*tp;
 	struct xfs_inode	*ip;
 	int			error;
 
-	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
-	if (error)
-		res_failed(error);
-
-	error = -libxfs_iget(mp, tp, mp->m_sb.sb_rsumino, 0, &ip);
-	libxfs_trans_cancel(tp);
+	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rsumino,
+			XFS_METAFILE_RTSUMMARY, &ip);
 	if (error)
 		do_error(
 _("couldn't iget realtime summary inode, error %d\n"), error);

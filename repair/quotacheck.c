@@ -403,21 +403,26 @@ quotacheck_verify(
 	struct xfs_ifork	*ifp;
 	struct qc_dquots	*dquots = NULL;
 	struct avl64node	*node, *n;
+	struct xfs_trans	*tp;
 	xfs_ino_t		ino = NULLFSINO;
+	enum xfs_metafile_type	metafile_type;
 	int			error;
 
 	switch (type) {
 	case XFS_DQTYPE_USER:
 		ino = mp->m_sb.sb_uquotino;
 		dquots = user_dquots;
+		metafile_type = XFS_METAFILE_USRQUOTA;
 		break;
 	case XFS_DQTYPE_GROUP:
 		ino = mp->m_sb.sb_gquotino;
 		dquots = group_dquots;
+		metafile_type = XFS_METAFILE_GRPQUOTA;
 		break;
 	case XFS_DQTYPE_PROJ:
 		ino = mp->m_sb.sb_pquotino;
 		dquots = proj_dquots;
+		metafile_type = XFS_METAFILE_PRJQUOTA;
 		break;
 	}
 
@@ -429,17 +434,21 @@ quotacheck_verify(
 	if (!dquots || !chkd_flags)
 		return;
 
-	error = -libxfs_iget(mp, NULL, ino, 0, &ip);
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		do_error(_("could not alloc transaction to open quota file\n"));
+
+	error = -libxfs_trans_metafile_iget(tp, ino, metafile_type, &ip);
 	if (error) {
 		do_warn(
 	_("could not open %s inode %"PRIu64" for quotacheck, err=%d\n"),
 			qflags_typestr(type), ino, error);
 		chkd_flags = 0;
-		return;
+		goto out_trans;
 	}
 
 	ifp = xfs_ifork_ptr(ip, XFS_DATA_FORK);
-	error = -libxfs_iread_extents(NULL, ip, XFS_DATA_FORK);
+	error = -libxfs_iread_extents(tp, ip, XFS_DATA_FORK);
 	if (error) {
 		do_warn(
 	_("could not read %s inode %"PRIu64" extents, err=%d\n"),
@@ -477,6 +486,8 @@ _("%s record for id %u not found on disk (bcount %"PRIu64" rtbcount %"PRIu64" ic
 	}
 err:
 	libxfs_irele(ip);
+out_trans:
+	libxfs_trans_cancel(tp);
 }
 
 /*
