@@ -208,7 +208,8 @@ out_destroy:
 /*
  * Get a metadata inode.
  *
- * The metafile type must match the file mode exactly.
+ * The metafile type must match the file mode exactly, and for files in the
+ * metadata directory tree, it must match the inode's metatype exactly.
  */
 int
 libxfs_trans_metafile_iget(
@@ -232,6 +233,12 @@ libxfs_trans_metafile_iget(
 		mode = S_IFREG;
 	if (inode_wrong_type(VFS_I(ip), mode))
 		goto bad_rele;
+	if (xfs_has_metadir(mp)) {
+		if (!xfs_is_metadir_inode(ip))
+			goto bad_rele;
+		if (metafile_type != ip->i_metatype)
+			goto bad_rele;
+	}
 
 	*ipp = ip;
 	return 0;
