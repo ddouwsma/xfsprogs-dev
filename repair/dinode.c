@@ -149,16 +149,36 @@ clear_dinode_unlinked(xfs_mount_t *mp, struct xfs_dinode *dino)
  * until after the agi unlinked lists are walked in phase 3.
  */
 static void
-clear_dinode(xfs_mount_t *mp, struct xfs_dinode *dino, xfs_ino_t ino_num)
+zero_dinode(
+	struct xfs_mount	*mp,
+	struct xfs_dinode	*dino,
+	xfs_ino_t		ino_num)
 {
 	clear_dinode_core(mp, dino, ino_num);
 	clear_dinode_unlinked(mp, dino);
 
 	/* and clear the forks */
 	memset(XFS_DFORK_DPTR(dino), 0, XFS_LITINO(mp));
-	return;
 }
 
+/*
+ * clear the inode core and, if this is a metadata inode, prevent subsequent
+ * phases from checking the (obviously bad) data in the file.
+ */
+static void
+clear_dinode(
+	struct xfs_mount	*mp,
+	struct xfs_dinode	*dino,
+	xfs_ino_t		ino_num)
+{
+	zero_dinode(mp, dino, ino_num);
+
+	if (is_rtbitmap_inode(ino_num))
+		mark_rtgroup_inodes_bad(mp, XFS_RTGI_BITMAP);
+
+	if (is_rtsummary_inode(ino_num))
+		mark_rtgroup_inodes_bad(mp, XFS_RTGI_SUMMARY);
+}
 
 /*
  * misc. inode-related utility routines
@@ -3069,13 +3089,21 @@ _("Bad CoW extent size %u on inode %" PRIu64 ", "),
 		switch (type) {
 		case XR_INO_RTBITMAP:
 		case XR_INO_RTSUM:
+			/*
+			 * rt bitmap and summary files are always recreated
+			 * when rtgroups are enabled.  For older filesystems,
+			 * they exist at fixed locations and cannot be zapped.
+			 */
+			if (xfs_has_rtgroups(mp))
+				zap_metadata = true;
+			break;
 		case XR_INO_UQUOTA:
 		case XR_INO_GQUOTA:
 		case XR_INO_PQUOTA:
 			/*
-			 * This inode was recognized as being filesystem
-			 * metadata, so preserve the inode and its contents for
-			 * later checking and repair.
+			 * Quota checking and repair doesn't happen until
+			 * phase7, so preserve quota inodes and their contents
+			 * for later.
 			 */
 			break;
 		default:
@@ -3165,7 +3193,7 @@ _("Bad CoW extent size %u on inode %" PRIu64 ", "),
 	 * file, zero the ondisk inode and the incore state.
 	 */
 	if (check_dups && zap_metadata && !no_modify) {
-		clear_dinode(mp, dino, lino);
+		zero_dinode(mp, dino, lino);
 		*dirty += 1;
 		*used = is_free;
 		*isa_dir = 0;

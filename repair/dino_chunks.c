@@ -15,6 +15,7 @@
 #include "versions.h"
 #include "prefetch.h"
 #include "progress.h"
+#include "rt.h"
 
 /*
  * validates inode block or chunk, returns # of good inodes
@@ -998,6 +999,28 @@ next_readbuf:
 				} else  {
 					do_warn(
 	_("would clear realtime summary inode %" PRIu64 "\n"),
+						ino);
+				}
+			} else if (is_rtbitmap_inode(ino)) {
+				mark_rtgroup_inodes_bad(mp, XFS_RTGI_BITMAP);
+				if (!no_modify)  {
+					do_warn(
+	_("cleared rtgroup bitmap inode %" PRIu64 "\n"),
+						ino);
+				} else  {
+					do_warn(
+	_("would clear rtgroup bitmap inode %" PRIu64 "\n"),
+						ino);
+				}
+			} else if (is_rtsummary_inode(ino)) {
+				mark_rtgroup_inodes_bad(mp, XFS_RTGI_SUMMARY);
+				if (!no_modify)  {
+					do_warn(
+	_("cleared rtgroup summary inode %" PRIu64 "\n"),
+						ino);
+				} else  {
+					do_warn(
+	_("would clear rtgroup summary inode %" PRIu64 "\n"),
 						ino);
 				}
 			} else if (!no_modify)  {
