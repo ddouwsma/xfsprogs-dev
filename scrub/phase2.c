@@ -21,12 +21,10 @@
 
 struct scan_ctl {
 	/*
-	 * Control mechanism to signal that the rt bitmap file scan is done and
-	 * wake up any waiters.
+	 * Control mechanism to signal that each group's scan of the rt bitmap
+	 * file scan is done and wake up any waiters.
 	 */
-	pthread_cond_t		rbm_wait;
-	pthread_mutex_t		rbm_waitlock;
-	bool			rbm_done;
+	unsigned int		rbm_group_count;
 
 	bool			aborted;
 };
@@ -202,7 +200,7 @@ scan_fs_metadata(
 	int			ret;
 
 	if (sctl->aborted)
-		goto out;
+		return;
 
 	/*
 	 * Try to check all of the metadata files that we just scheduled.  If
@@ -215,14 +213,14 @@ scan_fs_metadata(
 	ret = scrub_item_check(ctx, &sri);
 	if (ret) {
 		sctl->aborted = true;
-		goto out;
+		return;
 	}
 
 	ret = repair_and_scrub_loop(ctx, &sri, xfrog_scrubbers[type].descr,
 			&defer_repairs);
 	if (ret) {
 		sctl->aborted = true;
-		goto out;
+		return;
 	}
 	if (defer_repairs)
 		goto defer;
@@ -235,15 +233,60 @@ defer:
 	ret = defer_fs_repair(ctx, &sri);
 	if (ret) {
 		sctl->aborted = true;
-		goto out;
+		return;
+	}
+}
+
+/*
+ * Scrub each rt group's metadata.  For pre-rtgroup filesystems, we ask to
+ * scrub "rtgroup 0" because that's how the kernel ioctl works.
+ */
+static void
+scan_rtgroup_metadata(
+	struct workqueue	*wq,
+	xfs_agnumber_t		rgno,
+	void			*arg)
+{
+	struct scrub_item	sri;
+	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
+	struct scan_ctl		*sctl = arg;
+	char			descr[DESCR_BUFSZ];
+	bool			defer_repairs;
+	int			ret;
+
+	if (sctl->aborted)
+		return;
+
+	scrub_item_init_rtgroup(&sri, rgno);
+	if (ctx->mnt.fsgeom.rgcount == 0)
+		snprintf(descr, DESCR_BUFSZ, _("realtime"));
+	else
+		snprintf(descr, DESCR_BUFSZ, _("rtgroup %u"), rgno);
+
+	/*
+	 * Try to check all of the rtgroup metadata items that we just
+	 * scheduled.  If we return with some types still needing a check, try
+	 * repairing any damaged metadata that we've found so far, and try
+	 * again.  Abort if we stop making forward progress.
+	 */
+	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_RTGROUP);
+	ret = scrub_item_check(ctx, &sri);
+	if (ret) {
+		sctl->aborted = true;
+		return;
 	}
 
-out:
-	if (type == XFS_SCRUB_TYPE_RTBITMAP) {
-		pthread_mutex_lock(&sctl->rbm_waitlock);
-		sctl->rbm_done = true;
-		pthread_cond_broadcast(&sctl->rbm_wait);
-		pthread_mutex_unlock(&sctl->rbm_waitlock);
+	ret = repair_and_scrub_loop(ctx, &sri, descr, &defer_repairs);
+	if (ret) {
+		sctl->aborted = true;
+		return;
+	}
+
+	/* Everything else gets fixed during phase 4. */
+	ret = defer_fs_repair(ctx, &sri);
+	if (ret) {
+		sctl->aborted = true;
+		return;
 	}
 }
 
@@ -255,16 +298,13 @@ phase2_func(
 	struct workqueue	wq;
 	struct scan_ctl		sctl = {
 		.aborted	= false,
-		.rbm_done	= false,
 	};
 	struct scrub_item	sri;
 	const struct xfrog_scrub_descr *sc = xfrog_scrubbers;
 	xfs_agnumber_t		agno;
+	xfs_rgnumber_t		rgno;
 	unsigned int		type;
 	int			ret, ret2;
-
-	pthread_mutex_init(&sctl.rbm_waitlock, NULL);
-	pthread_cond_init(&sctl.rbm_wait, NULL);
 
 	ret = -workqueue_create(&wq, (struct xfs_mount *)ctx,
 			scrub_nproc_workqueue(ctx));
@@ -311,8 +351,6 @@ phase2_func(
 	for (type = 0; type < XFS_SCRUB_TYPE_NR; type++, sc++) {
 		if (sc->group != XFROG_SCRUB_GROUP_FS)
 			continue;
-		if (type == XFS_SCRUB_TYPE_RTSUM)
-			continue;
 
 		ret = -workqueue_add(&wq, scan_fs_metadata, type, &sctl);
 		if (ret) {
@@ -325,23 +363,36 @@ phase2_func(
 	if (sctl.aborted)
 		goto out_wq;
 
-	/*
-	 * Wait for the rt bitmap to finish scanning, then scan the rt summary
-	 * since the summary can be regenerated completely from the bitmap.
-	 */
-	pthread_mutex_lock(&sctl.rbm_waitlock);
-	while (!sctl.rbm_done)
-		pthread_cond_wait(&sctl.rbm_wait, &sctl.rbm_waitlock);
-	pthread_mutex_unlock(&sctl.rbm_waitlock);
+	if (ctx->mnt.fsgeom.rgcount == 0) {
+		/*
+		 * When rtgroups were added, the bitmap and summary files
+		 * became per-rtgroup metadata so the scrub interface for the
+		 * two started to accept sm_agno.  For pre-rtgroups
+		 * filesystems, we still accept sm_agno==0, so invoke scrub in
+		 * this manner.
+		 */
+		ret = -workqueue_add(&wq, scan_rtgroup_metadata, 0, &sctl);
+		if (ret) {
+			str_liberror(ctx, ret,
+					_("queueing realtime scrub work"));
+			goto out_wq;
+		}
+	}
+
+	/* Scan each rtgroup in parallel. */
+	for (rgno = 0;
+	     rgno < ctx->mnt.fsgeom.rgcount && !sctl.aborted;
+	     rgno++) {
+		ret = -workqueue_add(&wq, scan_rtgroup_metadata, rgno, &sctl);
+		if (ret) {
+			str_liberror(ctx, ret,
+					_("queueing rtgroup scrub work"));
+			goto out_wq;
+		}
+	}
 
 	if (sctl.aborted)
 		goto out_wq;
-
-	ret = -workqueue_add(&wq, scan_fs_metadata, XFS_SCRUB_TYPE_RTSUM, &sctl);
-	if (ret) {
-		str_liberror(ctx, ret, _("queueing rtsummary scrub work"));
-		goto out_wq;
-	}
 
 out_wq:
 	ret2 = -workqueue_terminate(&wq);
@@ -352,9 +403,6 @@ out_wq:
 	}
 	workqueue_destroy(&wq);
 out_wait:
-	pthread_cond_destroy(&sctl.rbm_wait);
-	pthread_mutex_destroy(&sctl.rbm_waitlock);
-
 	if (!ret && sctl.aborted)
 		ret = ECANCELED;
 	return ret;

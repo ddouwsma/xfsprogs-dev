@@ -107,12 +107,12 @@ const struct xfrog_scrub_descr xfrog_scrubbers[XFS_SCRUB_TYPE_NR] = {
 	[XFS_SCRUB_TYPE_RTBITMAP] = {
 		.name	= "rtbitmap",
 		.descr	= "realtime bitmap",
-		.group	= XFROG_SCRUB_GROUP_FS,
+		.group	= XFROG_SCRUB_GROUP_RTGROUP,
 	},
 	[XFS_SCRUB_TYPE_RTSUM] = {
 		.name	= "rtsummary",
 		.descr	= "realtime summary",
-		.group	= XFROG_SCRUB_GROUP_FS,
+		.group	= XFROG_SCRUB_GROUP_RTGROUP,
 	},
 	[XFS_SCRUB_TYPE_UQUOTA] = {
 		.name	= "usrquota",
