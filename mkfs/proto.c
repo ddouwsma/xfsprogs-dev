@@ -16,7 +16,7 @@ static char *getstr(char **pp);
 static void fail(char *msg, int i);
 static struct xfs_trans * getres(struct xfs_mount *mp, uint blocks);
 static void rsvfile(xfs_mount_t *mp, xfs_inode_t *ip, long long len);
-static char *newregfile(char **pp, int *len);
+static int newregfile(char **pp, char **fname);
 static void rtinit(xfs_mount_t *mp);
 static long filesize(int fd);
 static int slashes_are_spaces;
@@ -261,88 +261,120 @@ writesymlink(
 }
 
 static void
-writefile(
-	struct xfs_trans	*tp,
+writefile_range(
 	struct xfs_inode	*ip,
-	char			*buf,
-	int			len)
+	const char		*fname,
+	int			fd,
+	off_t			pos,
+	uint64_t		len)
 {
-	struct xfs_bmbt_irec	map;
-	struct xfs_mount	*mp;
-	struct xfs_buf		*bp;
-	xfs_daddr_t		d;
-	xfs_extlen_t		nb;
-	int			nmap;
+	static char		buf[131072];
 	int			error;
 
-	mp = ip->i_mount;
-	if (len > 0) {
-		int	bcount;
-
-		nb = XFS_B_TO_FSB(mp, len);
-		nmap = 1;
-		error = -libxfs_bmapi_write(tp, ip, 0, nb, 0, nb, &map, &nmap);
-		if (error == ENOSYS && XFS_IS_REALTIME_INODE(ip)) {
-			fprintf(stderr,
-	_("%s: creating realtime files from proto file not supported.\n"),
-					progname);
-			exit(1);
-		}
-		if (error) {
-			fail(_("error allocating space for a file"), error);
-		}
-		if (nmap != 1) {
-			fprintf(stderr,
-				_("%s: cannot allocate space for file\n"),
+	if (XFS_IS_REALTIME_INODE(ip)) {
+		fprintf(stderr,
+ _("%s: creating realtime files from proto file not supported.\n"),
 				progname);
-			exit(1);
-		}
-		d = XFS_FSB_TO_DADDR(mp, map.br_startblock);
-		error = -libxfs_trans_get_buf(NULL, mp->m_dev, d,
-				nb << mp->m_blkbb_log, 0, &bp);
-		if (error) {
-			fprintf(stderr,
-				_("%s: cannot allocate buffer for file\n"),
-				progname);
-			exit(1);
-		}
-		memmove(bp->b_addr, buf, len);
-		bcount = BBTOB(bp->b_length);
-		if (len < bcount)
-			memset((char *)bp->b_addr + len, 0, bcount - len);
-		libxfs_buf_mark_dirty(bp);
-		libxfs_buf_relse(bp);
-	}
-	ip->i_disk_size = len;
-}
-
-static char *
-newregfile(
-	char		**pp,
-	int		*len)
-{
-	char		*buf;
-	int		fd;
-	char		*fname;
-	long		size;
-
-	fname = getstr(pp);
-	if ((fd = open(fname, O_RDONLY)) < 0 || (size = filesize(fd)) < 0) {
-		fprintf(stderr, _("%s: cannot open %s: %s\n"),
-			progname, fname, strerror(errno));
 		exit(1);
 	}
-	if ((*len = (int)size)) {
-		buf = malloc(size);
-		if (read(fd, buf, size) < size) {
+
+	while (len > 0) {
+		ssize_t		read_len;
+
+		read_len = pread(fd, buf, min(len, sizeof(buf)), pos);
+		if (read_len < 0) {
 			fprintf(stderr, _("%s: read failed on %s: %s\n"),
-				progname, fname, strerror(errno));
+					progname, fname, strerror(errno));
 			exit(1);
 		}
-	} else
-		buf = NULL;
-	close(fd);
-	return buf;
+
+		error = -libxfs_alloc_file_space(ip, pos, read_len, 0);
+		if (error)
+			fail(_("error allocating space for a file"), error);
+
+		error = -libxfs_file_write(ip, buf, pos, read_len);
+		if (error)
+			fail(_("error writing file"), error);
+
+		pos += read_len;
+		len -= read_len;
+	}
+}
+
+static void
+writefile(
+	struct xfs_inode	*ip,
+	const char		*fname,
+	int			fd)
+{
+	struct xfs_trans	*tp;
+	struct xfs_mount	*mp = ip->i_mount;
+	struct stat		statbuf;
+	off_t			data_pos;
+	off_t			eof = 0;
+	int			error;
+
+	/* do not try to read from non-regular files */
+	error = fstat(fd, &statbuf);
+	if (error < 0)
+		fail(_("unable to stat file to copyin"), errno);
+
+	if (!S_ISREG(statbuf.st_mode))
+		return;
+
+	data_pos = lseek(fd, 0, SEEK_DATA);
+	while (data_pos >= 0) {
+		off_t		hole_pos;
+
+		hole_pos = lseek(fd, data_pos, SEEK_HOLE);
+		if (hole_pos < 0) {
+			/* save error, break */
+			data_pos = hole_pos;
+			break;
+		}
+		if (hole_pos <= data_pos) {
+			/* shouldn't happen??? */
+			break;
+		}
+
+		writefile_range(ip, fname, fd, data_pos, hole_pos - data_pos);
+		eof = hole_pos;
+
+		data_pos = lseek(fd, hole_pos, SEEK_DATA);
+	}
+	if (data_pos < 0 && errno != ENXIO)
+		fail(_("error finding file data to import"), errno);
+
+	/* extend EOF only after writing all the file data */
+	error = -libxfs_trans_alloc_inode(ip, &M_RES(mp)->tr_ichange, 0, 0,
+			false, &tp);
+	if (error)
+		fail(_("error creating isize transaction"), error);
+
+	libxfs_trans_ijoin(tp, ip, 0);
+	ip->i_disk_size = eof;
+	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		fail(_("error committing isize transaction"), error);
+}
+
+static int
+newregfile(
+	char		**pp,
+	char		**fname)
+{
+	int		fd;
+	off_t		size;
+
+	*fname = getstr(pp);
+	if ((fd = open(*fname, O_RDONLY)) < 0 || (size = filesize(fd)) < 0) {
+		fprintf(stderr, _("%s: cannot open %s: %s\n"),
+			progname, *fname, strerror(errno));
+		exit(1);
+	}
+
+	return fd;
 }
 
 static void
@@ -552,7 +584,8 @@ parseproto(
 	int		fmt;
 	int		i;
 	xfs_inode_t	*ip;
-	int		len;
+	int		fd = -1;
+	off_t		len;
 	long long	llen;
 	int		majdev;
 	int		mindev;
@@ -563,6 +596,7 @@ parseproto(
 	int		isroot = 0;
 	struct cred	creds;
 	char		*value;
+	char		*fname = NULL;
 	struct xfs_name	xname;
 	struct xfs_parent_args *ppargs = NULL;
 
@@ -636,16 +670,13 @@ parseproto(
 	flags = XFS_ILOG_CORE;
 	switch (fmt) {
 	case IF_REGULAR:
-		buf = newregfile(pp, &len);
-		tp = getres(mp, XFS_B_TO_FSB(mp, len));
+		fd = newregfile(pp, &fname);
+		tp = getres(mp, 0);
 		ppargs = newpptr(mp);
 		error = creatproto(&tp, pip, mode | S_IFREG, 0, &creds, fsxp,
 				&ip);
 		if (error)
 			fail(_("Inode allocation failed"), error);
-		writefile(tp, ip, buf, len);
-		if (buf)
-			free(buf);
 		libxfs_trans_ijoin(tp, pip, 0);
 		xname.type = XFS_DIR3_FT_REG_FILE;
 		newdirent(mp, tp, pip, &xname, ip, ppargs);
@@ -800,6 +831,10 @@ parseproto(
 	}
 
 	libxfs_parent_finish(mp, ppargs);
+	if (fmt == IF_REGULAR) {
+		writefile(ip, fname, fd);
+		close(fd);
+	}
 	libxfs_irele(ip);
 }
 
@@ -950,7 +985,7 @@ rtinit(
 	rtfreesp_init(mp);
 }
 
-static long
+static off_t
 filesize(
 	int		fd)
 {
@@ -958,5 +993,5 @@ filesize(
 
 	if (fstat(fd, &stb) < 0)
 		return -1;
-	return (long)stb.st_size;
+	return stb.st_size;
 }

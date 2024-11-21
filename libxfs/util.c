@@ -527,3 +527,70 @@ get_random_u32(void)
 	return ret;
 }
 #endif
+
+/*
+ * Write a buffer to a file on the data device.  There must not be sparse holes
+ * or unwritten extents.
+ */
+int
+libxfs_file_write(
+	struct xfs_inode	*ip,
+	void			*buf,
+	off_t			pos,
+	size_t			len)
+{
+	struct xfs_bmbt_irec	map;
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_buf		*bp;
+	xfs_fileoff_t		bno = XFS_B_TO_FSBT(mp, pos);
+	xfs_fileoff_t		end_bno = XFS_B_TO_FSB(mp, pos + len);
+	unsigned int		block_off = pos % mp->m_sb.sb_blocksize;
+	size_t			count;
+	size_t			bcount;
+	int			nmap;
+	int			error = 0;
+
+	/* Write up to 1MB at a time. */
+	while (bno < end_bno) {
+		xfs_filblks_t	maplen;
+
+		maplen = min(end_bno - bno, XFS_B_TO_FSBT(mp, 1048576));
+		nmap = 1;
+		error = libxfs_bmapi_read(ip, bno, maplen, &map, &nmap, 0);
+		if (error)
+			return error;
+		if (nmap != 1)
+			return -ENOSPC;
+
+		if (map.br_startblock == HOLESTARTBLOCK ||
+		    map.br_state == XFS_EXT_UNWRITTEN)
+			return -EINVAL;
+
+		error = libxfs_buf_get(mp->m_dev,
+				XFS_FSB_TO_DADDR(mp, map.br_startblock),
+				XFS_FSB_TO_BB(mp, map.br_blockcount),
+				&bp);
+		if (error)
+			break;
+		bp->b_ops = NULL;
+
+		if (block_off > 0)
+			memset((char *)bp->b_addr, 0, block_off);
+		count = min(len, XFS_FSB_TO_B(mp, map.br_blockcount));
+		memmove(bp->b_addr, buf + block_off, count);
+		bcount = BBTOB(bp->b_length);
+		if (count < bcount)
+			memset((char *)bp->b_addr + block_off + count, 0,
+					bcount - (block_off + count));
+
+		libxfs_buf_mark_dirty(bp);
+		libxfs_buf_relse(bp);
+
+		buf += count;
+		len -= count;
+		bno += map.br_blockcount;
+		block_off = 0;
+	}
+
+	return error;
+}

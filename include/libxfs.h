@@ -178,6 +178,8 @@ extern int	libxfs_log_header(char *, uuid_t *, int, int, int, xfs_lsn_t,
 
 int	libxfs_alloc_file_space(struct xfs_inode *ip, xfs_off_t offset,
 		xfs_off_t len, uint32_t bmapi_flags);
+int	libxfs_file_write(struct xfs_inode *ip, void *buf, off_t pos,
+		size_t len);
 
 /* XXX: this is messy and needs fixing */
 #ifndef __LIBXFS_INTERNAL_XFS_H__
