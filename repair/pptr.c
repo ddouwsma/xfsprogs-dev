@@ -1334,3 +1334,97 @@ check_parent_ptrs(
 
 	destroy_work_queue(&wq);
 }
+
+static int
+erase_pptrs(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip,
+	unsigned int		attr_flags,
+	const unsigned char	*name,
+	unsigned int		namelen,
+	const void		*value,
+	unsigned int		valuelen,
+	void			*priv)
+{
+	struct garbage_xattr	garbage_xattr = {
+		.attr_filter	= attr_flags,
+		.attrnamelen	= namelen,
+		.attrvaluelen	= valuelen,
+	};
+	struct file_scan	*fscan = priv;
+	int			error;
+
+	if (!(attr_flags & XFS_ATTR_PARENT))
+		return 0;
+
+	error = -xfblob_store(fscan->garbage_xattr_names,
+			&garbage_xattr.attrname_cookie, name, namelen);
+	if (error)
+		do_error(_("storing ino %llu garbage pptr failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	error = -xfblob_store(fscan->garbage_xattr_names,
+			&garbage_xattr.attrvalue_cookie, value, valuelen);
+	if (error)
+		do_error(_("storing ino %llu garbage pptr failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	error = -slab_add(fscan->garbage_xattr_recs, &garbage_xattr);
+	if (error)
+		do_error(_("storing ino %llu garbage pptr rec failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	return 0;
+}
+
+/* Delete all of this file's parent pointers if we can. */
+void
+try_erase_parent_ptrs(
+	struct xfs_inode	*ip)
+{
+	struct file_scan	fscan = {
+		.have_garbage	= true,
+	};
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_trans	*tp = NULL;
+	char			*descr;
+	int			error;
+
+	if (!xfs_has_parent(ip->i_mount))
+		return;
+
+	if (no_modify) {
+		do_warn(
+ _("would delete garbage parent pointers in metadata ino %llu\n"),
+				(unsigned long long)ip->i_ino);
+		return;
+	}
+
+	error = -init_slab(&fscan.garbage_xattr_recs,
+			sizeof(struct garbage_xattr));
+	if (error)
+		do_error(_("init garbage pptr recs failed: %s\n"),
+				strerror(error));
+
+	descr = kasprintf(GFP_KERNEL, "xfs_repair (%s): garbage pptr names",
+			mp->m_fsname);
+	error = -xfblob_create(descr, &fscan.garbage_xattr_names);
+	kfree(descr);
+	if (error)
+		do_error("init garbage pptr names failed: %s\n",
+				strerror(error));
+
+	libxfs_trans_alloc_empty(ip->i_mount, &tp);
+	error = xattr_walk(tp, ip, erase_pptrs, &fscan);
+	if (tp)
+		libxfs_trans_cancel(tp);
+	if (error)
+		do_warn(_("ino %llu garbage pptr collection failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	remove_garbage_xattrs(ip, &fscan);
+}

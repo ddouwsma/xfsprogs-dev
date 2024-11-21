@@ -496,8 +496,8 @@ phase2(
 	struct xfs_mount	*mp,
 	int			scan_threads)
 {
-	int			j;
 	ino_tree_node_t		*ino_rec;
+	unsigned int		inuse = xfs_rootrec_inodes_inuse(mp), j;
 
 	/* now we can start using the buffer cache routines */
 	set_mp(mp);
@@ -541,58 +541,81 @@ phase2(
 	 * make sure we know about the root inode chunk
 	 */
 	if ((ino_rec = find_inode_rec(mp, 0, mp->m_sb.sb_rootino)) == NULL)  {
-		ASSERT(mp->m_sb.sb_rbmino == mp->m_sb.sb_rootino + 1 &&
-			mp->m_sb.sb_rsumino == mp->m_sb.sb_rootino + 2);
+		struct xfs_sb	*sb = &mp->m_sb;
+
+		if (xfs_has_metadir(mp))
+			ASSERT(sb->sb_metadirino == sb->sb_rootino + 1 &&
+			       sb->sb_rbmino  == sb->sb_rootino + 2 &&
+			       sb->sb_rsumino == sb->sb_rootino + 3);
+		else
+			ASSERT(sb->sb_rbmino  == sb->sb_rootino + 1 &&
+			       sb->sb_rsumino == sb->sb_rootino + 2);
 		do_warn(_("root inode chunk not found\n"));
 
 		/*
-		 * mark the first 3 used, the rest are free
+		 * mark the first 3-4 inodes used, the rest are free
 		 */
 		ino_rec = set_inode_used_alloc(mp, 0,
-				(xfs_agino_t) mp->m_sb.sb_rootino);
-		set_inode_used(ino_rec, 1);
-		set_inode_used(ino_rec, 2);
+				XFS_INO_TO_AGINO(mp, sb->sb_rootino));
+		for (j = 1; j < inuse; j++)
+			set_inode_used(ino_rec, j);
 
-		for (j = 3; j < XFS_INODES_PER_CHUNK; j++)
+		for (j = inuse; j < XFS_INODES_PER_CHUNK; j++)
 			set_inode_free(ino_rec, j);
 
 		/*
 		 * also mark blocks
 		 */
-		set_bmap_ext(0, XFS_INO_TO_AGBNO(mp, mp->m_sb.sb_rootino),
+		set_bmap_ext(0, XFS_INO_TO_AGBNO(mp, sb->sb_rootino),
 			     M_IGEO(mp)->ialloc_blks, XR_E_INO);
 	} else  {
 		do_log(_("        - found root inode chunk\n"));
+		j = 0;
 
 		/*
 		 * blocks are marked, just make sure they're in use
 		 */
-		if (is_inode_free(ino_rec, 0))  {
+		if (is_inode_free(ino_rec, j)) {
 			do_warn(_("root inode marked free, "));
-			set_inode_used(ino_rec, 0);
+			set_inode_used(ino_rec, j);
 			if (!no_modify)
 				do_warn(_("correcting\n"));
 			else
 				do_warn(_("would correct\n"));
 		}
+		j++;
 
-		if (is_inode_free(ino_rec, 1))  {
+		if (xfs_has_metadir(mp)) {
+			if (is_inode_free(ino_rec, j))  {
+				do_warn(_("metadata root inode marked free, "));
+				set_inode_used(ino_rec, j);
+				if (!no_modify)
+					do_warn(_("correcting\n"));
+				else
+					do_warn(_("would correct\n"));
+			}
+			j++;
+		}
+
+		if (is_inode_free(ino_rec, j))  {
 			do_warn(_("realtime bitmap inode marked free, "));
-			set_inode_used(ino_rec, 1);
+			set_inode_used(ino_rec, j);
 			if (!no_modify)
 				do_warn(_("correcting\n"));
 			else
 				do_warn(_("would correct\n"));
 		}
+		j++;
 
-		if (is_inode_free(ino_rec, 2))  {
+		if (is_inode_free(ino_rec, j))  {
 			do_warn(_("realtime summary inode marked free, "));
-			set_inode_used(ino_rec, 2);
+			set_inode_used(ino_rec, j);
 			if (!no_modify)
 				do_warn(_("correcting\n"));
 			else
 				do_warn(_("would correct\n"));
 		}
+		j++;
 	}
 
 	/*

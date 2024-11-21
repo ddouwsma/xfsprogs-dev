@@ -661,4 +661,17 @@ inorec_set_freecount(
 		rp->ir_u.f.ir_freecount = cpu_to_be32(freecount);
 }
 
+/*
+ * Number of inodes assumed to be always allocated because they are created
+ * by mkfs.
+ */
+static inline unsigned int
+xfs_rootrec_inodes_inuse(
+	struct xfs_mount	*mp)
+{
+	if (xfs_has_metadir(mp))
+		return 4; /* sb_rootino, sb_rbmino, sb_rsumino, sb_metadirino */
+	return 3; /* sb_rootino, sb_rbmino, sb_rsumino */
+}
+
 #endif /* XFS_REPAIR_INCORE_H */

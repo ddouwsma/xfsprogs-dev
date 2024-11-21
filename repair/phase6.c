@@ -478,11 +478,24 @@ reset_sbroot_ino(
 static int
 ensure_rtino(
 	struct xfs_trans		*tp,
-	xfs_ino_t			ino,
+	enum xfs_metafile_type		metafile_type,
 	struct xfs_inode		**ipp)
 {
 	struct xfs_mount		*mp = tp->t_mountp;
+	xfs_ino_t			ino;
 	int				error;
+
+	switch (metafile_type) {
+	case XFS_METAFILE_RTBITMAP:
+		ino = mp->m_sb.sb_rbmino;
+		break;
+	case XFS_METAFILE_RTSUMMARY:
+		ino = mp->m_sb.sb_rsumino;
+		break;
+	default:
+		ASSERT(0);
+		return -EFSCORRUPTED;
+	}
 
 	/*
 	 * Don't use metafile iget here because we're resetting sb-rooted
@@ -494,6 +507,8 @@ ensure_rtino(
 		return error;
 
 	reset_sbroot_ino(tp, S_IFREG, *ipp);
+	if (xfs_has_metadir(mp))
+		libxfs_metafile_set_iflag(tp, *ipp, metafile_type);
 	return 0;
 }
 
@@ -510,7 +525,7 @@ mk_rbmino(
 		res_failed(error);
 
 	/* Reset the realtime bitmap inode. */
-	error = ensure_rtino(tp, mp->m_sb.sb_rbmino, &ip);
+	error = ensure_rtino(tp, XFS_METAFILE_RTBITMAP, &ip);
 	if (error) {
 		do_error(
 		_("couldn't iget realtime bitmap inode -- error - %d\n"),
@@ -584,7 +599,7 @@ mk_rsumino(
 		res_failed(error);
 
 	/* Reset the rt summary inode. */
-	error = ensure_rtino(tp, mp->m_sb.sb_rsumino, &ip);
+	error = ensure_rtino(tp, XFS_METAFILE_RTSUMMARY, &ip);
 	if (error) {
 		do_error(
 		_("couldn't iget realtime summary inode -- error - %d\n"),
@@ -653,6 +668,36 @@ mk_root_dir(xfs_mount_t *mp)
 			error);
 
 	libxfs_irele(ip);
+}
+
+/* Create a new metadata directory root. */
+static void
+mk_metadir(
+	struct xfs_mount	*mp)
+{
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = init_fs_root_dir(mp, mp->m_sb.sb_metadirino, 0,
+			&mp->m_metadirip);
+	if (error)
+		do_error(
+	_("Initialization of the metadata root directory failed, error %d\n"),
+			error);
+
+	/* Mark the new metadata root dir as metadata. */
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_ichange, 0, 0, 0, &tp);
+	if (error)
+		do_error(
+	_("Marking metadata root directory failed"));
+
+	libxfs_trans_ijoin(tp, mp->m_metadirip, 0);
+	libxfs_metafile_set_iflag(tp, mp->m_metadirip, XFS_METAFILE_DIR);
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		do_error(
+	_("Marking metadata root directory failed, error %d\n"), error);
 }
 
 /*
@@ -1168,6 +1213,8 @@ longform_dir2_rebuild(
 
 	if (ino == mp->m_sb.sb_rootino)
 		need_root_dotdot = 0;
+	else if (ino == mp->m_sb.sb_metadirino)
+		need_metadir_dotdot = 0;
 
 	/* go through the hash list and re-add the inodes */
 
@@ -2789,7 +2836,7 @@ process_dir_inode(
 
 	need_dot = dirty = num_illegal = 0;
 
-	if (mp->m_sb.sb_rootino == ino)  {
+	if (mp->m_sb.sb_rootino == ino || mp->m_sb.sb_metadirino == ino) {
 		/*
 		 * mark root inode reached and bump up
 		 * link count for root inode to account
@@ -2864,6 +2911,9 @@ _("error %d fixing shortform directory %llu\n"),
 	dir_hash_done(hashtab);
 
 	fix_dotdot(mp, ino, ip, mp->m_sb.sb_rootino, "root", &need_root_dotdot);
+	if (xfs_has_metadir(mp))
+		fix_dotdot(mp, ino, ip, mp->m_sb.sb_metadirino, "metadata",
+				&need_metadir_dotdot);
 
 	/*
 	 * if we need to create the '.' entry, do so only if
@@ -3115,6 +3165,21 @@ phase6(xfs_mount_t *mp)
 		} else  {
 			do_warn(_("would reinitialize root directory\n"));
 		}
+	}
+
+	if (!no_modify && xfs_has_metadir(mp)) {
+		/*
+		 * In write mode, we always rebuild the metadata directory
+		 * tree, even if the old one was correct.  However, we still
+		 * want to log something if we couldn't find the old root.
+		 */
+		if (need_metadir_inode)
+			do_warn(_("reinitializing metadata root directory\n"));
+		mk_metadir(mp);
+		need_metadir_inode = false;
+		need_metadir_dotdot = 0;
+	} else if (need_metadir_inode) {
+		do_warn(_("would reinitialize metadata root directory\n"));
 	}
 
 	if (need_rbmino)  {

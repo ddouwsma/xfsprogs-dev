@@ -645,6 +645,46 @@ fix:
 }
 
 /*
+ * Check that the metadata directory inode comes immediately after the root
+ * directory inode and that it seems to look like a metadata directory.
+ */
+STATIC void
+check_metadir_inode(
+	struct xfs_mount	*mp,
+	xfs_ino_t		rootino)
+{
+	int			error;
+
+	validate_sb_ino(&mp->m_sb.sb_metadirino, rootino + 1,
+			_("metadata root directory"));
+
+	/* If we changed the metadir inode, try reloading it. */
+	if (!mp->m_metadirip ||
+	    mp->m_metadirip->i_ino != mp->m_sb.sb_metadirino) {
+		if (mp->m_metadirip)
+			libxfs_irele(mp->m_metadirip);
+
+		error = -libxfs_metafile_iget(mp, mp->m_sb.sb_metadirino,
+				XFS_METAFILE_DIR, &mp->m_metadirip);
+		if (error) {
+			need_metadir_inode = true;
+			goto done;
+		}
+	}
+
+done:
+	if (need_metadir_inode) {
+		if (!no_modify)
+			do_warn(_("will reset metadata root directory\n"));
+		else
+			do_warn(_("would reset metadata root directory\n"));
+		if (mp->m_metadirip)
+			libxfs_irele(mp->m_metadirip);
+		mp->m_metadirip = NULL;
+	}
+}
+
+/*
  * Make sure that the first 3 inodes in the filesystem are the root directory,
  * the realtime bitmap, and the realtime summary, in that order.
  */
@@ -673,6 +713,16 @@ _("sb root inode value %" PRIu64 " valid but in unaligned location (expected %"P
 
 	validate_sb_ino(&mp->m_sb.sb_rootino, rootino,
 			_("root"));
+
+	if (xfs_has_metadir(mp)) {
+		/*
+		 * The metadata root directory comes after the regular root
+		 * directory.
+		 */
+		check_metadir_inode(mp, rootino);
+		rootino++;
+	}
+
 	validate_sb_ino(&mp->m_sb.sb_rbmino, rootino + 1,
 			_("realtime bitmap"));
 	validate_sb_ino(&mp->m_sb.sb_rsumino, rootino + 2,
