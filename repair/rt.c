@@ -237,6 +237,7 @@ check_rtfile_contents(
 	while (bno < filelen)  {
 		struct xfs_bmbt_irec	map;
 		struct xfs_buf		*bp;
+		unsigned int		offset = 0;
 		int			nmap = 1;
 
 		error = -libxfs_bmapi_read(ip, bno, 1, &map, &nmap, 0);
@@ -262,7 +263,19 @@ check_rtfile_contents(
 			break;
 		}
 
-		check_rtwords(rtg, filename, bno, bp->b_addr, buf);
+		if (xfs_has_rtgroups(mp)) {
+			struct xfs_rtbuf_blkinfo	*hdr = bp->b_addr;
+
+			if (hdr->rt_owner != cpu_to_be64(ip->i_ino)) {
+				do_warn(
+ _("corrupt owner in %s at dblock 0x%llx\n"),
+					filename, (unsigned long long)bno);
+			}
+
+			offset = sizeof(*hdr);
+		}
+
+		check_rtwords(rtg, filename, bno, bp->b_addr + offset, buf);
 
 		buf += mp->m_blockwsize << XFS_WORDLOG;
 		bno++;
