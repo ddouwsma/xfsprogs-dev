@@ -320,6 +320,90 @@ check_v5_feature_mismatch(
 }
 
 /*
+ * quota inodes and flags in secondary superblocks are never set by mkfs.
+ * However, they could be set in a secondary if a fs with quotas was growfs'ed
+ * since growfs copies the new primary into the secondaries.
+ *
+ * Also, the in-core inode flags now have different meaning to the on-disk
+ * flags, and so libxfs_sb_to_disk cannot directly write the
+ * sb_gquotino/sb_pquotino fields without specific sb_qflags being set.  Hence
+ * we need to zero those fields directly in the sb buffer here.
+ */
+static int
+secondary_sb_quota(
+	struct xfs_mount	*mp,
+	struct xfs_buf		*sbuf,
+	struct xfs_sb		*sb,
+	xfs_agnumber_t		i,
+	int			do_bzero)
+{
+	struct xfs_dsb		*dsb = sbuf->b_addr;
+	int			rval = 0;
+
+	if (sb->sb_inprogress == 1 && sb->sb_uquotino != NULLFSINO)  {
+		if (!no_modify)
+			sb->sb_uquotino = 0;
+		if (!do_bzero)  {
+			rval |= XR_AG_SB;
+			do_warn(
+		_("non-null user quota inode field in superblock %d\n"),
+				i);
+
+		} else
+			rval |= XR_AG_SB_SEC;
+	}
+
+	if (sb->sb_inprogress == 1 && sb->sb_gquotino != NULLFSINO)  {
+		if (!no_modify) {
+			sb->sb_gquotino = 0;
+			dsb->sb_gquotino = 0;
+		}
+		if (!do_bzero)  {
+			rval |= XR_AG_SB;
+			do_warn(
+		_("non-null group quota inode field in superblock %d\n"),
+				i);
+
+		} else
+			rval |= XR_AG_SB_SEC;
+	}
+
+	/*
+	 * Note that sb_pquotino is not considered a valid sb field for pre-v5
+	 * superblocks. If it is anything other than 0 it is considered garbage
+	 * data beyond the valid sb and explicitly zeroed above.
+	 */
+	if (xfs_has_pquotino(mp) &&
+	    sb->sb_inprogress == 1 && sb->sb_pquotino != NULLFSINO)  {
+		if (!no_modify) {
+			sb->sb_pquotino = 0;
+			dsb->sb_pquotino = 0;
+		}
+		if (!do_bzero)  {
+			rval |= XR_AG_SB;
+			do_warn(
+		_("non-null project quota inode field in superblock %d\n"),
+				i);
+
+		} else
+			rval |= XR_AG_SB_SEC;
+	}
+
+	if (sb->sb_inprogress == 1 && sb->sb_qflags)  {
+		if (!no_modify)
+			sb->sb_qflags = 0;
+		if (!do_bzero)  {
+			rval |= XR_AG_SB;
+			do_warn(_("non-null quota flags in superblock %d\n"),
+				i);
+		} else
+			rval |= XR_AG_SB_SEC;
+	}
+
+	return rval;
+}
+
+/*
  * Possible fields that may have been set at mkfs time,
  * sb_inoalignmt, sb_unit, sb_width and sb_dirblklog.
  * The quota inode fields in the secondaries should be zero.
@@ -340,7 +424,6 @@ secondary_sb_whack(
 	struct xfs_sb	*sb,
 	xfs_agnumber_t	i)
 {
-	struct xfs_dsb	*dsb = sbuf->b_addr;
 	int		do_bzero = 0;
 	int		size;
 	char		*ip;
@@ -426,77 +509,7 @@ secondary_sb_whack(
 			rval |= XR_AG_SB_SEC;
 	}
 
-	/*
-	 * quota inodes and flags in secondary superblocks are never set by
-	 * mkfs.  However, they could be set in a secondary if a fs with quotas
-	 * was growfs'ed since growfs copies the new primary into the
-	 * secondaries.
-	 *
-	 * Also, the in-core inode flags now have different meaning to the
-	 * on-disk flags, and so libxfs_sb_to_disk cannot directly write the
-	 * sb_gquotino/sb_pquotino fields without specific sb_qflags being set.
-	 * Hence we need to zero those fields directly in the sb buffer here.
-	 */
-
-	if (sb->sb_inprogress == 1 && sb->sb_uquotino != NULLFSINO)  {
-		if (!no_modify)
-			sb->sb_uquotino = 0;
-		if (!do_bzero)  {
-			rval |= XR_AG_SB;
-			do_warn(
-		_("non-null user quota inode field in superblock %d\n"),
-				i);
-
-		} else
-			rval |= XR_AG_SB_SEC;
-	}
-
-	if (sb->sb_inprogress == 1 && sb->sb_gquotino != NULLFSINO)  {
-		if (!no_modify) {
-			sb->sb_gquotino = 0;
-			dsb->sb_gquotino = 0;
-		}
-		if (!do_bzero)  {
-			rval |= XR_AG_SB;
-			do_warn(
-		_("non-null group quota inode field in superblock %d\n"),
-				i);
-
-		} else
-			rval |= XR_AG_SB_SEC;
-	}
-
-	/*
-	 * Note that sb_pquotino is not considered a valid sb field for pre-v5
-	 * superblocks. If it is anything other than 0 it is considered garbage
-	 * data beyond the valid sb and explicitly zeroed above.
-	 */
-	if (xfs_has_pquotino(mp) &&
-	    sb->sb_inprogress == 1 && sb->sb_pquotino != NULLFSINO)  {
-		if (!no_modify) {
-			sb->sb_pquotino = 0;
-			dsb->sb_pquotino = 0;
-		}
-		if (!do_bzero)  {
-			rval |= XR_AG_SB;
-			do_warn(
-		_("non-null project quota inode field in superblock %d\n"),
-				i);
-
-		} else
-			rval |= XR_AG_SB_SEC;
-	}
-
-	if (sb->sb_inprogress == 1 && sb->sb_qflags)  {
-		if (!no_modify)
-			sb->sb_qflags = 0;
-		if (!do_bzero)  {
-			rval |= XR_AG_SB;
-			do_warn(_("non-null quota flags in superblock %d\n"),
-				i);
-		} else
-			rval |= XR_AG_SB_SEC;
-	}
+	rval |= secondary_sb_quota(mp, sbuf, sb, i, do_bzero);
 
 	/*
 	 * if the secondaries agree on a stripe unit/width or inode
