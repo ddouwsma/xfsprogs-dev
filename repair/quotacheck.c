@@ -203,9 +203,7 @@ quotacheck_adjust(
 		return;
 
 	/* Quota files are not included in quota counts. */
-	if (ino == mp->m_sb.sb_uquotino ||
-	    ino == mp->m_sb.sb_gquotino ||
-	    ino == mp->m_sb.sb_pquotino)
+	if (is_any_quota_inode(ino))
 		return;
 
 	error = -libxfs_iget(mp, NULL, ino, 0, &ip);
@@ -415,20 +413,20 @@ quotacheck_verify(
 
 	switch (type) {
 	case XFS_DQTYPE_USER:
-		ino = mp->m_sb.sb_uquotino;
 		dquots = user_dquots;
 		metafile_type = XFS_METAFILE_USRQUOTA;
 		break;
 	case XFS_DQTYPE_GROUP:
-		ino = mp->m_sb.sb_gquotino;
 		dquots = group_dquots;
 		metafile_type = XFS_METAFILE_GRPQUOTA;
 		break;
 	case XFS_DQTYPE_PROJ:
-		ino = mp->m_sb.sb_pquotino;
 		dquots = proj_dquots;
 		metafile_type = XFS_METAFILE_PRJQUOTA;
 		break;
+	default:
+		ASSERT(0);
+		return;
 	}
 
 	/*
@@ -443,6 +441,7 @@ quotacheck_verify(
 	if (error)
 		do_error(_("could not alloc transaction to open quota file\n"));
 
+	ino = get_quota_inode(type);
 	error = -libxfs_trans_metafile_iget(tp, ino, metafile_type, &ip);
 	if (error) {
 		do_warn(
@@ -505,34 +504,28 @@ qc_has_quotafile(
 	struct xfs_mount	*mp,
 	xfs_dqtype_t		type)
 {
-	bool			lost;
 	xfs_ino_t		ino;
 	unsigned int		qflag;
 
 	switch (type) {
 	case XFS_DQTYPE_USER:
-		lost = lost_uquotino;
-		ino = mp->m_sb.sb_uquotino;
 		qflag = XFS_UQUOTA_CHKD;
 		break;
 	case XFS_DQTYPE_GROUP:
-		lost = lost_gquotino;
-		ino = mp->m_sb.sb_gquotino;
 		qflag = XFS_GQUOTA_CHKD;
 		break;
 	case XFS_DQTYPE_PROJ:
-		lost = lost_pquotino;
-		ino = mp->m_sb.sb_pquotino;
 		qflag = XFS_PQUOTA_CHKD;
 		break;
 	default:
 		return false;
 	}
 
-	if (lost)
+	if (lost_quota_inode(type))
 		return false;
 	if (!(mp->m_sb.sb_qflags & qflag))
 		return false;
+	ino = get_quota_inode(type);
 	if (ino == NULLFSINO || ino == 0)
 		return false;
 	return true;
@@ -625,4 +618,30 @@ quotacheck_teardown(void)
 	qc_purge(&user_dquots);
 	qc_purge(&group_dquots);
 	qc_purge(&proj_dquots);
+}
+
+void
+update_sb_quotinos(
+	struct xfs_mount	*mp,
+	struct xfs_buf		*sbp)
+{
+	bool			dirty = false;
+
+	if (mp->m_sb.sb_uquotino != get_quota_inode(XFS_DQTYPE_USER)) {
+		mp->m_sb.sb_uquotino = get_quota_inode(XFS_DQTYPE_USER);
+		dirty = true;
+	}
+
+	if (mp->m_sb.sb_gquotino != get_quota_inode(XFS_DQTYPE_GROUP)) {
+		mp->m_sb.sb_gquotino = get_quota_inode(XFS_DQTYPE_GROUP);
+		dirty = true;
+	}
+
+	if (mp->m_sb.sb_pquotino != get_quota_inode(XFS_DQTYPE_PROJ)) {
+		mp->m_sb.sb_pquotino = get_quota_inode(XFS_DQTYPE_PROJ);
+		dirty = true;
+	}
+
+	if (dirty)
+		libxfs_sb_to_disk(sbp->b_addr, &mp->m_sb);
 }

@@ -265,13 +265,13 @@ process_sf_dir2(
 		           is_rtsummary_inode(lino)) {
 			junkit = 1;
 			junkreason = _("realtime summary");
-		} else if (lino == mp->m_sb.sb_uquotino)  {
+		} else if (is_quota_inode(XFS_DQTYPE_USER, lino)) {
 			junkit = 1;
 			junkreason = _("user quota");
-		} else if (lino == mp->m_sb.sb_gquotino)  {
+		} else if (is_quota_inode(XFS_DQTYPE_GROUP, lino)) {
 			junkit = 1;
 			junkreason = _("group quota");
-		} else if (lino == mp->m_sb.sb_pquotino)  {
+		} else if (is_quota_inode(XFS_DQTYPE_PROJ, lino)) {
 			junkit = 1;
 			junkreason = _("project quota");
 		} else if (lino == mp->m_sb.sb_metadirino)  {
@@ -746,11 +746,11 @@ process_dir2_data(
 		} else if (ent_ino == mp->m_sb.sb_rsumino ||
 		           is_rtsummary_inode(ent_ino)) {
 			clearreason = _("realtime summary");
-		} else if (ent_ino == mp->m_sb.sb_uquotino) {
+		} else if (is_quota_inode(XFS_DQTYPE_USER, ent_ino)) {
 			clearreason = _("user quota");
-		} else if (ent_ino == mp->m_sb.sb_gquotino) {
+		} else if (is_quota_inode(XFS_DQTYPE_GROUP, ent_ino)) {
 			clearreason = _("group quota");
-		} else if (ent_ino == mp->m_sb.sb_pquotino) {
+		} else if (is_quota_inode(XFS_DQTYPE_PROJ, ent_ino)) {
 			clearreason = _("project quota");
 		} else if (ent_ino == mp->m_sb.sb_metadirino)  {
 			clearreason = _("metadata directory root");

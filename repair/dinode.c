@@ -1662,29 +1662,29 @@ process_check_metadata_inodes(
 		}
 		return 0;
 	}
-	if (lino == mp->m_sb.sb_uquotino)  {
+	if (is_quota_inode(XFS_DQTYPE_USER, lino))  {
 		if (*type != XR_INO_UQUOTA)  {
 			do_warn(_("user quota inode %" PRIu64 " has bad type 0x%x\n"),
 				lino, dinode_fmt(dinoc));
-			mp->m_sb.sb_uquotino = NULLFSINO;
+			clear_quota_inode(XFS_DQTYPE_USER);
 			return 1;
 		}
 		return 0;
 	}
-	if (lino == mp->m_sb.sb_gquotino)  {
+	if (is_quota_inode(XFS_DQTYPE_GROUP, lino))  {
 		if (*type != XR_INO_GQUOTA)  {
 			do_warn(_("group quota inode %" PRIu64 " has bad type 0x%x\n"),
 				lino, dinode_fmt(dinoc));
-			mp->m_sb.sb_gquotino = NULLFSINO;
+			clear_quota_inode(XFS_DQTYPE_GROUP);
 			return 1;
 		}
 		return 0;
 	}
-	if (lino == mp->m_sb.sb_pquotino)  {
+	if (is_quota_inode(XFS_DQTYPE_PROJ, lino))  {
 		if (*type != XR_INO_PQUOTA)  {
 			do_warn(_("project quota inode %" PRIu64 " has bad type 0x%x\n"),
 				lino, dinode_fmt(dinoc));
-			mp->m_sb.sb_pquotino = NULLFSINO;
+			clear_quota_inode(XFS_DQTYPE_PROJ);
 			return 1;
 		}
 		return 0;
@@ -2980,11 +2980,11 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 		else if (lino == mp->m_sb.sb_rsumino ||
 			 is_rtsummary_inode(lino))
 			type = XR_INO_RTSUM;
-		else if (lino == mp->m_sb.sb_uquotino)
+		else if (is_quota_inode(XFS_DQTYPE_USER, lino))
 			type = XR_INO_UQUOTA;
-		else if (lino == mp->m_sb.sb_gquotino)
+		else if (is_quota_inode(XFS_DQTYPE_GROUP, lino))
 			type = XR_INO_GQUOTA;
-		else if (lino == mp->m_sb.sb_pquotino)
+		else if (is_quota_inode(XFS_DQTYPE_PROJ, lino))
 			type = XR_INO_PQUOTA;
 		else
 			type = XR_INO_DATA;

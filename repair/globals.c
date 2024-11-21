@@ -73,12 +73,6 @@ int	need_rbmino;
 int	need_rsumino;
 
 int	lost_quotas;
-int	have_uquotino;
-int	have_gquotino;
-int	have_pquotino;
-int	lost_uquotino;
-int	lost_gquotino;
-int	lost_pquotino;
 
 /* configuration vars -- fs geometry dependent */
 
@@ -119,3 +113,108 @@ int		thread_count;
 
 /* If nonzero, simulate failure after this phase. */
 int		fail_after_phase;
+
+/* quota inode numbers */
+enum quotino_state {
+	QI_STATE_UNKNOWN,
+	QI_STATE_HAVE,
+	QI_STATE_LOST,
+};
+
+static xfs_ino_t quotinos[3] = { NULLFSINO, NULLFSINO, NULLFSINO };
+static enum quotino_state quotino_state[3];
+
+static inline unsigned int quotino_off(xfs_dqtype_t type)
+{
+	switch (type) {
+	case XFS_DQTYPE_USER:
+		return 0;
+	case XFS_DQTYPE_GROUP:
+		return 1;
+	case XFS_DQTYPE_PROJ:
+		return 2;
+	}
+
+	ASSERT(0);
+	return -1;
+}
+
+void
+set_quota_inode(
+	xfs_dqtype_t	type,
+	xfs_ino_t	ino)
+{
+	unsigned int	off = quotino_off(type);
+
+	quotinos[off] = ino;
+	quotino_state[off] = QI_STATE_HAVE;
+}
+
+void
+lose_quota_inode(
+	xfs_dqtype_t	type)
+{
+	unsigned int	off = quotino_off(type);
+
+	quotinos[off] = NULLFSINO;
+	quotino_state[off] = QI_STATE_LOST;
+}
+
+void
+clear_quota_inode(
+	xfs_dqtype_t	type)
+{
+	unsigned int	off = quotino_off(type);
+
+	quotinos[off] = NULLFSINO;
+	quotino_state[off] = QI_STATE_UNKNOWN;
+}
+
+xfs_ino_t
+get_quota_inode(
+	xfs_dqtype_t	type)
+{
+	unsigned int	off = quotino_off(type);
+
+	return quotinos[off];
+}
+
+bool
+is_quota_inode(
+	xfs_dqtype_t	type,
+	xfs_ino_t	ino)
+{
+	unsigned int	off = quotino_off(type);
+
+	return quotinos[off] == ino;
+}
+
+bool
+is_any_quota_inode(
+	xfs_ino_t		ino)
+{
+	unsigned int		i;
+
+	for(i = 0; i < ARRAY_SIZE(quotinos); i++)
+		if (quotinos[i] == ino)
+			return true;
+	return false;
+}
+
+bool
+lost_quota_inode(
+	xfs_dqtype_t	type)
+{
+	unsigned int	off = quotino_off(type);
+
+	return quotino_state[off] == QI_STATE_LOST;
+}
+
+bool
+has_quota_inode(
+	xfs_dqtype_t	type)
+{
+	unsigned int	off = quotino_off(type);
+
+	return quotino_state[off] == QI_STATE_HAVE;
+}

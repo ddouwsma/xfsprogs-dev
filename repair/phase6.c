@@ -3183,12 +3183,12 @@ mark_standalone_inodes(xfs_mount_t *mp)
 	if (!fs_quotas)
 		return;
 
-	if (mp->m_sb.sb_uquotino && mp->m_sb.sb_uquotino != NULLFSINO)
-		mark_inode(mp, mp->m_sb.sb_uquotino);
-	if (mp->m_sb.sb_gquotino && mp->m_sb.sb_gquotino != NULLFSINO)
-		mark_inode(mp, mp->m_sb.sb_gquotino);
-	if (mp->m_sb.sb_pquotino && mp->m_sb.sb_pquotino != NULLFSINO)
-		mark_inode(mp, mp->m_sb.sb_pquotino);
+	if (has_quota_inode(XFS_DQTYPE_USER))
+		mark_inode(mp, get_quota_inode(XFS_DQTYPE_USER));
+	if (has_quota_inode(XFS_DQTYPE_GROUP))
+		mark_inode(mp, get_quota_inode(XFS_DQTYPE_GROUP));
+	if (has_quota_inode(XFS_DQTYPE_PROJ))
+		mark_inode(mp, get_quota_inode(XFS_DQTYPE_PROJ));
 }
 
 static void

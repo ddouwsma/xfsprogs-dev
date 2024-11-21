@@ -114,12 +114,6 @@ extern int		need_rbmino;
 extern int		need_rsumino;
 
 extern int		lost_quotas;
-extern int		have_uquotino;
-extern int		have_gquotino;
-extern int		have_pquotino;
-extern int		lost_uquotino;
-extern int		lost_gquotino;
-extern int		lost_pquotino;
 
 /* configuration vars -- fs geometry dependent */
 
@@ -164,5 +158,14 @@ extern int		thread_count;
 extern int		fail_after_phase;
 
 extern struct libxfs_init x;
+
+void set_quota_inode(xfs_dqtype_t type, xfs_ino_t);
+void lose_quota_inode(xfs_dqtype_t type);
+void clear_quota_inode(xfs_dqtype_t type);
+xfs_ino_t get_quota_inode(xfs_dqtype_t type);
+bool is_quota_inode(xfs_dqtype_t type, xfs_ino_t ino);
+bool is_any_quota_inode(xfs_ino_t ino);
+bool lost_quota_inode(xfs_dqtype_t type);
+bool has_quota_inode(xfs_dqtype_t type);
 
 #endif /* _XFS_REPAIR_GLOBAL_H */

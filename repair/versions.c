@@ -104,9 +104,6 @@ parse_sb_version(
 	fs_sb_feature_bits = 0;
 	fs_ino_alignment = 0;
 	fs_has_extflgbit = 1;
-	have_uquotino = 0;
-	have_gquotino = 0;
-	have_pquotino = 0;
 
 	if (mp->m_sb.sb_versionnum & XFS_SB_VERSION_SHAREDBIT) {
 		do_warn(_("Shared Version bit set. Not supported. Ever.\n"));
@@ -166,13 +163,13 @@ _("WARNING: you have a V1 inode filesystem. It would be converted to a\n"
 		fs_quotas = 1;
 
 		if (mp->m_sb.sb_uquotino != 0 && mp->m_sb.sb_uquotino != NULLFSINO)
-			have_uquotino = 1;
+			set_quota_inode(XFS_DQTYPE_USER, mp->m_sb.sb_uquotino);
 
 		if (mp->m_sb.sb_gquotino != 0 && mp->m_sb.sb_gquotino != NULLFSINO)
-			have_gquotino = 1;
+			set_quota_inode(XFS_DQTYPE_GROUP, mp->m_sb.sb_gquotino);
 
 		if (mp->m_sb.sb_pquotino != 0 && mp->m_sb.sb_pquotino != NULLFSINO)
-			have_pquotino = 1;
+			set_quota_inode(XFS_DQTYPE_PROJ, mp->m_sb.sb_pquotino);
 	}
 
 	if (xfs_has_align(mp))  {

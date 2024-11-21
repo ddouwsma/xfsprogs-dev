@@ -23,6 +23,35 @@
 
 bool collect_rmaps;
 
+static inline void
+quotino_check_one(
+	struct xfs_mount	*mp,
+	xfs_dqtype_t		type)
+{
+	struct ino_tree_node	*irec;
+	xfs_ino_t		ino;
+
+	if (!has_quota_inode(type))
+		return;
+
+	ino = get_quota_inode(type);
+	if (!libxfs_verify_ino(mp, ino))
+		goto bad;
+
+	irec = find_inode_rec(mp, XFS_INO_TO_AGNO(mp, ino),
+			XFS_INO_TO_AGINO(mp, ino));
+	if (!irec)
+		goto bad;
+
+	if (is_inode_free(irec, ino - irec->ino_startnum))
+		goto bad;
+
+	return;
+
+bad:
+	lose_quota_inode(type);
+}
+
 /*
  * null out quota inode fields in sb if they point to non-existent inodes.
  * this isn't as redundant as it looks since it's possible that the sb field
@@ -31,57 +60,12 @@ bool collect_rmaps;
  * be cleared by process_dinode().
  */
 static void
-quotino_check(xfs_mount_t *mp)
+quotino_check(
+	struct xfs_mount	*mp)
 {
-	ino_tree_node_t *irec;
-
-	if (mp->m_sb.sb_uquotino != NULLFSINO && mp->m_sb.sb_uquotino != 0)  {
-		if (!libxfs_verify_ino(mp, mp->m_sb.sb_uquotino))
-			irec = NULL;
-		else
-			irec = find_inode_rec(mp,
-				XFS_INO_TO_AGNO(mp, mp->m_sb.sb_uquotino),
-				XFS_INO_TO_AGINO(mp, mp->m_sb.sb_uquotino));
-
-		if (irec == NULL || is_inode_free(irec,
-				mp->m_sb.sb_uquotino - irec->ino_startnum))  {
-			mp->m_sb.sb_uquotino = NULLFSINO;
-			lost_uquotino = 1;
-		} else
-			lost_uquotino = 0;
-	}
-
-	if (mp->m_sb.sb_gquotino != NULLFSINO && mp->m_sb.sb_gquotino != 0)  {
-		if (!libxfs_verify_ino(mp, mp->m_sb.sb_gquotino))
-			irec = NULL;
-		else
-			irec = find_inode_rec(mp,
-				XFS_INO_TO_AGNO(mp, mp->m_sb.sb_gquotino),
-				XFS_INO_TO_AGINO(mp, mp->m_sb.sb_gquotino));
-
-		if (irec == NULL || is_inode_free(irec,
-				mp->m_sb.sb_gquotino - irec->ino_startnum))  {
-			mp->m_sb.sb_gquotino = NULLFSINO;
-			lost_gquotino = 1;
-		} else
-			lost_gquotino = 0;
-	}
-
-	if (mp->m_sb.sb_pquotino != NULLFSINO && mp->m_sb.sb_pquotino != 0)  {
-		if (!libxfs_verify_ino(mp, mp->m_sb.sb_pquotino))
-			irec = NULL;
-		else
-			irec = find_inode_rec(mp,
-				XFS_INO_TO_AGNO(mp, mp->m_sb.sb_pquotino),
-				XFS_INO_TO_AGINO(mp, mp->m_sb.sb_pquotino));
-
-		if (irec == NULL || is_inode_free(irec,
-				mp->m_sb.sb_pquotino - irec->ino_startnum))  {
-			mp->m_sb.sb_pquotino = NULLFSINO;
-			lost_pquotino = 1;
-		} else
-			lost_pquotino = 0;
-	}
+	quotino_check_one(mp, XFS_DQTYPE_USER);
+	quotino_check_one(mp, XFS_DQTYPE_GROUP);
+	quotino_check_one(mp, XFS_DQTYPE_PROJ);
 }
 
 static void
@@ -107,14 +91,14 @@ quota_sb_check(xfs_mount_t *mp)
 	 */
 
 	if (fs_quotas &&
-	    (mp->m_sb.sb_uquotino == NULLFSINO || mp->m_sb.sb_uquotino == 0) &&
-	    (mp->m_sb.sb_gquotino == NULLFSINO || mp->m_sb.sb_gquotino == 0) &&
-	    (mp->m_sb.sb_pquotino == NULLFSINO || mp->m_sb.sb_pquotino == 0))  {
+	    !has_quota_inode(XFS_DQTYPE_USER) &&
+	    !has_quota_inode(XFS_DQTYPE_GROUP) &&
+	    !has_quota_inode(XFS_DQTYPE_PROJ))  {
 		lost_quotas = 1;
 		fs_quotas = 0;
-	} else if (libxfs_verify_ino(mp, mp->m_sb.sb_uquotino) &&
-		   libxfs_verify_ino(mp, mp->m_sb.sb_gquotino) &&
-		   libxfs_verify_ino(mp, mp->m_sb.sb_pquotino)) {
+	} else if (libxfs_verify_ino(mp, get_quota_inode(XFS_DQTYPE_USER)) &&
+		   libxfs_verify_ino(mp, get_quota_inode(XFS_DQTYPE_GROUP)) &&
+		   libxfs_verify_ino(mp, get_quota_inode(XFS_DQTYPE_PROJ))) {
 		fs_quotas = 1;
 	}
 }
