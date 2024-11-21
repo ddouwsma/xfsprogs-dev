@@ -710,6 +710,8 @@ version_string(
 		strcat(s, ",EXCHANGE");
 	if (xfs_has_parent(mp))
 		strcat(s, ",PARENT");
+	if (xfs_has_metadir(mp))
+		strcat(s, ",METADIR");
 	return s;
 }
 
