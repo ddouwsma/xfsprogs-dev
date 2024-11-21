@@ -1239,9 +1239,22 @@ log2(extent length) must be specified as the last type/number pair before the
 conversion type, and the type must be
 .BR rsumlog .
 
-To compute the rt bitmap block from summary file location, the type/number pairs
-must be specified exactly in the order
+For example, these commands tell us where to look in the rt summary file for
+the number of free rtextents of length 2^21 starting in rt bitmap block 30:
+
+.B rtconvert rbmblock 30 rsumlog 21 rsumblock
+
+.B rtconvert rbmblock 30 rsumlog 21 rsuminfo
+
+To compute the rt bitmap block from summary file location, the type/number
+pairs must be specified exactly in the order
 .BR rsumlog ", " rsuminfo ", " rsumblock .
+
+For example, this command tells us which block in the rt bitmap file is
+summarized by info word 809 in rt summary block 10 assuming that the
+maximum free extent length is 2^21 rtextents:
+
+.B rtconvert rsumlog 21 rsuminfo 809 rsumblock 10 rbmblock
 
 .TP
 .BI "sb [" agno ]

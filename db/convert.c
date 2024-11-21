@@ -26,14 +26,14 @@
 	 agino_to_bytes(XFS_INO_TO_AGINO(mp, (x))))
 #define	inoidx_to_bytes(x)	\
 	((uint64_t)(x) << mp->m_sb.sb_inodelog)
-#define rtblock_to_bytes(x)	\
-	((uint64_t)(x) << mp->m_sb.sb_blocklog)
-#define rtx_to_rtblock(x)	\
-	((uint64_t)(x) * mp->m_sb.sb_rextsize)
-#define rbmblock_to_bytes(x)	\
-	rtblock_to_bytes(rtx_to_rtblock(xfs_rbmblock_to_rtx(mp, (uint64_t)x)))
-#define rbmword_to_bytes(x)	\
-	rtblock_to_bytes(rtx_to_rtblock((uint64_t)(x) << XFS_NBWORDLOG))
+#define	rtblock_to_bytes(x)	\
+	(xfs_rtb_to_daddr(mp, (x)) << BBSHIFT)
+#define	rtx_to_bytes(x)		\
+	(((uint64_t)(x) * mp->m_sb.sb_rextsize) << mp->m_sb.sb_blocklog)
+#define	rbmblock_to_bytes(x)	\
+	rtx_to_bytes(xfs_rbmblock_to_rtx(mp, (x)))
+#define	rbmword_to_bytes(x)	\
+	rtx_to_bytes((uint64_t)(x) << XFS_NBWORDLOG)
 
 typedef enum {
 	CT_NONE = -1,
@@ -316,7 +316,7 @@ bytevalue(ctype_t ctype, cval_t *val)
 	case CT_RTBLOCK:
 		return rtblock_to_bytes(val->rtblock);
 	case CT_RTX:
-		return rtblock_to_bytes(rtx_to_rtblock(val->rtx));
+		return rtx_to_bytes(val->rtx);
 	case CT_RBMBLOCK:
 		return rbmblock_to_bytes(val->rbmblock);
 	case CT_RBMWORD:
@@ -495,6 +495,32 @@ rt_daddr_to_rsuminfo(
 	return xfs_rtsumoffs_to_infoword(mp, rsumoff);
 }
 
+/* Translate an rt device disk address to be in units of realtime extents. */
+static inline uint64_t
+rt_daddr_to_rtx(
+	struct xfs_mount	*mp,
+	xfs_daddr_t		daddr)
+{
+	return XFS_BB_TO_FSBT(mp, daddr) / mp->m_sb.sb_rextsize;
+}
+
+/*
+ * Compute the offset of an rt device disk address from the start of an
+ * rtgroup and return the result in units of realtime extents.
+ */
+static inline uint64_t
+rt_daddr_to_rtgrtx(
+	struct xfs_mount	*mp,
+	xfs_daddr_t		daddr)
+{
+	uint64_t		rtx = rt_daddr_to_rtx(mp, daddr);
+
+	if (xfs_has_rtgroups(mp))
+		return rtx % mp->m_sb.sb_rgextents;
+
+	return rtx;
+}
+
 static int
 rtconvert_f(int argc, char **argv)
 {
@@ -565,17 +591,15 @@ rtconvert_f(int argc, char **argv)
 		v = xfs_daddr_to_rtb(mp, v >> BBSHIFT);
 		break;
 	case CT_RTX:
-		v = xfs_daddr_to_rtb(mp, v >> BBSHIFT) / mp->m_sb.sb_rextsize;
+		v = rt_daddr_to_rtx(mp, v >> BBSHIFT);
 		break;
 	case CT_RBMBLOCK:
 		v = xfs_rtx_to_rbmblock(mp,
-				xfs_rtb_to_rtx(mp,
-					xfs_daddr_to_rtb(mp, v >> BBSHIFT)));
+				rt_daddr_to_rtgrtx(mp, v >> BBSHIFT));
 		break;
 	case CT_RBMWORD:
 		v = xfs_rtx_to_rbmword(mp,
-				xfs_rtb_to_rtx(mp,
-					xfs_daddr_to_rtb(mp, v >> BBSHIFT)));
+				rt_daddr_to_rtgrtx(mp, v >> BBSHIFT));
 		break;
 	case CT_RSUMBLOCK:
 		v = rt_daddr_to_rsumblock(mp, v);
