@@ -205,4 +205,16 @@ cvt_b_to_agbno(
 	return cvt_daddr_to_agbno(xfd, cvt_btobbt(byteno));
 }
 
+/* Return the number of bytes in an rtgroup. */
+static inline uint64_t
+bytes_per_rtgroup(
+	const struct xfs_fsop_geom	*fsgeo)
+{
+	if (!fsgeo->rgcount)
+		return 0;
+
+	return (uint64_t)fsgeo->rgextents * fsgeo->rtextsize *
+		fsgeo->blocksize;
+}
+
 #endif /* __LIBFROG_FSGEOM_H__ */
