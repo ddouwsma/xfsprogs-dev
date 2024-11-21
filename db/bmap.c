@@ -119,6 +119,41 @@ bmap(
 	*nexp = n;
 }
 
+static void
+print_group_bmbt(
+	bool			isrt,
+	int			whichfork,
+	const struct bmap_ext	*be)
+{
+	unsigned int		gno;
+	unsigned long long	gbno;
+
+	if (whichfork == XFS_DATA_FORK && isrt) {
+		gno = xfs_fsb_to_gno(mp, be->startblock, XG_TYPE_RTG);
+		gbno = xfs_fsb_to_gbno(mp, be->startblock, XG_TYPE_RTG);
+	} else {
+		gno = xfs_fsb_to_gno(mp, be->startblock, XG_TYPE_AG);
+		gbno = xfs_fsb_to_gbno(mp, be->startblock, XG_TYPE_AG);
+	}
+
+	dbprintf(
+ _("%s offset %lld startblock %llu (%u/%llu) count %llu flag %u\n"),
+			whichfork == XFS_DATA_FORK ? _("data") : _("attr"),
+			be->startoff, be->startblock,
+			gno, gbno,
+			be->blockcount, be->flag);
+}
+
+static void
+print_linear_bmbt(
+	const struct bmap_ext	*be)
+{
+	dbprintf(_("%s offset %lld startblock %llu count %llu flag %u\n"),
+			_("data"),
+			be->startoff, be->startblock,
+			be->blockcount, be->flag);
+}
+
 static int
 bmap_f(
 	int			argc,
@@ -135,6 +170,7 @@ bmap_f(
 	xfs_extnum_t		nex;
 	char			*p;
 	int			whichfork;
+	bool			isrt;
 
 	if (iocur_top->ino == NULLFSINO) {
 		dbprintf(_("no current inode\n"));
@@ -154,6 +190,10 @@ bmap_f(
 			return 0;
 		}
 	}
+
+	dip = iocur_top->data;
+	isrt = (dip->di_flags & cpu_to_be16(XFS_DIFLAG_REALTIME));
+
 	if (afork + dfork == 0) {
 		push_cur();
 		set_cur_inode(iocur_top->ino);
@@ -198,13 +238,15 @@ bmap_f(
 			bmap(co, eo - co + 1, whichfork, &nex, &be);
 			if (nex == 0)
 				break;
-			dbprintf(_("%s offset %lld startblock %llu (%u/%u) count "
-				 "%llu flag %u\n"),
-				whichfork == XFS_DATA_FORK ? _("data") : _("attr"),
-				be.startoff, be.startblock,
-				XFS_FSB_TO_AGNO(mp, be.startblock),
-				XFS_FSB_TO_AGBNO(mp, be.startblock),
-				be.blockcount, be.flag);
+
+			if (whichfork == XFS_DATA_FORK && isrt) {
+				if (xfs_has_rtgroups(mp))
+					print_group_bmbt(isrt, whichfork, &be);
+				else
+					print_linear_bmbt(&be);
+			} else {
+				print_group_bmbt(isrt, whichfork, &be);
+			}
 			co = be.startoff + be.blockcount;
 		}
 		co = cosave;
