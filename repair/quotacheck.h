@@ -14,5 +14,6 @@ int quotacheck_setup(struct xfs_mount *mp);
 void quotacheck_teardown(void);
 
 void update_sb_quotinos(struct xfs_mount *mp, struct xfs_buf *sbp);
+void discover_quota_inodes(struct xfs_mount *mp);
 
 #endif /* __XFS_REPAIR_QUOTACHECK_H__ */

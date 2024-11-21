@@ -509,7 +509,8 @@ secondary_sb_whack(
 			rval |= XR_AG_SB_SEC;
 	}
 
-	rval |= secondary_sb_quota(mp, sbuf, sb, i, do_bzero);
+	if (!xfs_has_metadir(mp))
+		rval |= secondary_sb_quota(mp, sbuf, sb, i, do_bzero);
 
 	/*
 	 * if the secondaries agree on a stripe unit/width or inode

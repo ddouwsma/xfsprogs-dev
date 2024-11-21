@@ -1487,7 +1487,8 @@ _("Warning:  project quota information would be cleared.\n"
 	if (!sbp)
 		do_error(_("couldn't get superblock\n"));
 
-	update_sb_quotinos(mp, sbp);
+	if (!xfs_has_metadir(mp))
+		update_sb_quotinos(mp, sbp);
 
 	if ((mp->m_sb.sb_qflags & XFS_ALL_QUOTA_CHKD) != quotacheck_results()) {
 		do_warn(_("Note - quota info will be regenerated on next "

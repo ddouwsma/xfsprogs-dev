@@ -645,3 +645,74 @@ update_sb_quotinos(
 	if (dirty)
 		libxfs_sb_to_disk(sbp->b_addr, &mp->m_sb);
 }
+
+static inline int
+mark_quota_inode(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*dp,
+	xfs_dqtype_t		type)
+{
+	struct xfs_inode	*ip;
+	int			error;
+
+	error = -libxfs_dqinode_load(tp, dp, type, &ip);
+	if (error == ENOENT)
+		return 0;
+	if (error)
+		goto out_corrupt;
+
+	set_quota_inode(type, ip->i_ino);
+	libxfs_irele(ip);
+	return 0;
+
+out_corrupt:
+	lose_quota_inode(type);
+	return error;
+}
+
+/* Mark the reachable quota metadata inodes prior to the inode scan. */
+void
+discover_quota_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_trans	*tp;
+	struct xfs_inode	*dp = NULL;
+	int			error, err2;
+
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		goto out;
+
+	error = -libxfs_dqinode_load_parent(tp, &dp);
+	if (error)
+		goto out_cancel;
+
+	error = mark_quota_inode(tp, dp, XFS_DQTYPE_USER);
+	err2 = mark_quota_inode(tp, dp, XFS_DQTYPE_GROUP);
+	if (err2 && !error)
+		error = err2;
+	error = mark_quota_inode(tp, dp, XFS_DQTYPE_PROJ);
+	if (err2 && !error)
+		error = err2;
+
+	libxfs_irele(dp);
+out_cancel:
+	libxfs_trans_cancel(tp);
+out:
+	if (error) {
+		switch (error) {
+		case EFSCORRUPTED:
+			do_warn(
+ _("corruption in metadata directory tree while discovering quota inodes\n"));
+			break;
+		case ENOENT:
+			/* Do nothing, we'll just clear qflags later. */
+			break;
+		default:
+			do_warn(
+ _("couldn't discover quota inodes, err %d\n"),
+						error);
+			break;
+		}
+	}
+}
