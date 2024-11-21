@@ -715,6 +715,8 @@ inode_next_type(void)
 				return TYP_DQBLK;
 			case XFS_METAFILE_RTBITMAP:
 				return TYP_RGBITMAP;
+			case XFS_METAFILE_RTSUMMARY:
+				return TYP_RGSUMMARY;
 			default:
 				return TYP_DATA;
 			}
