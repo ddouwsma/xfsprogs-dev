@@ -166,6 +166,7 @@ get_bmap_ext(
 
 static uint64_t		*rt_bmap;
 static size_t		rt_bmap_size;
+pthread_mutex_t		rt_lock;
 
 /* block records fit into uint64_t's units */
 #define XR_BB_UNIT	64			/* number of bits/unit */
@@ -209,6 +210,7 @@ init_rt_bmap(
 	if (mp->m_sb.sb_rextents == 0)
 		return;
 
+	pthread_mutex_init(&rt_lock, NULL);
 	rt_bmap_size = roundup(howmany(mp->m_sb.sb_rextents, (NBBY / XR_BB)),
 			       sizeof(uint64_t));
 
@@ -226,8 +228,9 @@ free_rt_bmap(xfs_mount_t *mp)
 {
 	free(rt_bmap);
 	rt_bmap = NULL;
-}
+	pthread_mutex_destroy(&rt_lock);
 
+}
 
 void
 reset_bmaps(xfs_mount_t *mp)
@@ -290,7 +293,6 @@ init_bmaps(xfs_mount_t *mp)
 		btree_init(&ag_bmap[i]);
 		pthread_mutex_init(&ag_locks[i].lock, NULL);
 	}
-	pthread_mutex_init(&rt_lock.lock, NULL);
 
 	init_rt_bmap(mp);
 	reset_bmaps(mp);
@@ -300,8 +302,6 @@ void
 free_bmaps(xfs_mount_t *mp)
 {
 	xfs_agnumber_t i;
-
-	pthread_mutex_destroy(&rt_lock.lock);
 
 	for (i = 0; i < mp->m_sb.sb_agcount; i++)
 		pthread_mutex_destroy(&ag_locks[i].lock);

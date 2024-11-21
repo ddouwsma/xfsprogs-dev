@@ -304,7 +304,7 @@ process_rt_rec(
 	bool			zap_metadata)
 {
 	xfs_fsblock_t		lastb;
-	int			bad;
+	int			bad = 0;
 
 	/*
 	 * check numeric validity of the extent
@@ -338,10 +338,12 @@ _("inode %" PRIu64 " - bad rt extent overflows - start %" PRIu64 ", "
 		return 1;
 	}
 
+	pthread_mutex_lock(&rt_lock);
 	if (check_dups)
 		bad = process_rt_rec_dups(mp, ino, irec);
 	else
 		bad = process_rt_rec_state(mp, ino, zap_metadata, irec);
+	pthread_mutex_unlock(&rt_lock);
 	if (bad)
 		return bad;
 
@@ -451,10 +453,8 @@ _("zero length extent (off = %" PRIu64 ", fsbno = %" PRIu64 ") in ino %" PRIu64 
 		}
 
 		if (type == XR_INO_RTDATA && whichfork == XFS_DATA_FORK) {
-			pthread_mutex_lock(&rt_lock.lock);
 			error2 = process_rt_rec(mp, &irec, ino, tot, check_dups,
 					zap_metadata);
-			pthread_mutex_unlock(&rt_lock.lock);
 			if (error2)
 				return error2;
 
