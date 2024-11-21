@@ -159,6 +159,12 @@
 #define xfs_dir_replace			libxfs_dir_replace
 
 #define xfs_dqblk_repair		libxfs_dqblk_repair
+#define xfs_dqinode_load		libxfs_dqinode_load
+#define xfs_dqinode_load_parent		libxfs_dqinode_load_parent
+#define xfs_dqinode_mkdir_parent	libxfs_dqinode_mkdir_parent
+#define xfs_dqinode_metadir_create	libxfs_dqinode_metadir_create
+#define xfs_dqinode_metadir_link	libxfs_dqinode_metadir_link
+#define xfs_dqinode_path		libxfs_dqinode_path
 #define xfs_dquot_from_disk_ts		libxfs_dquot_from_disk_ts
 #define xfs_dquot_verify		libxfs_dquot_verify
 

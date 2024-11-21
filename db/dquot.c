@@ -81,6 +81,41 @@ dquot_help(void)
 {
 }
 
+static xfs_ino_t
+dqtype_to_inode(
+	struct xfs_mount	*mp,
+	xfs_dqtype_t		type)
+{
+	struct xfs_trans	*tp;
+	struct xfs_inode	*dp = NULL;
+	struct xfs_inode	*ip;
+	xfs_ino_t		ret = NULLFSINO;
+	int			error;
+
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		return NULLFSINO;
+
+	if (xfs_has_metadir(mp)) {
+		error = -libxfs_dqinode_load_parent(tp, &dp);
+		if (error)
+			goto out_cancel;
+	}
+
+	error = -libxfs_dqinode_load(tp, dp, type, &ip);
+	if (error)
+		goto out_dp;
+
+	ret = ip->i_ino;
+	libxfs_irele(ip);
+out_dp:
+	if (dp)
+		libxfs_irele(dp);
+out_cancel:
+	libxfs_trans_cancel(tp);
+	return ret;
+}
+
 static int
 dquot_f(
 	int		argc,
@@ -88,8 +123,7 @@ dquot_f(
 {
 	bmap_ext_t	bm;
 	int		c;
-	int		dogrp;
-	int		doprj;
+	xfs_dqtype_t	type = XFS_DQTYPE_USER;
 	xfs_dqid_t	id;
 	xfs_ino_t	ino;
 	xfs_extnum_t	nex;
@@ -97,38 +131,33 @@ dquot_f(
 	int		perblock;
 	xfs_fileoff_t	qbno;
 	int		qoff;
-	char		*s;
+	const char	*s;
 
-	dogrp = doprj = optind = 0;
+	optind = 0;
 	while ((c = getopt(argc, argv, "gpu")) != EOF) {
 		switch (c) {
 		case 'g':
-			dogrp = 1;
-			doprj = 0;
+			type = XFS_DQTYPE_GROUP;
 			break;
 		case 'p':
-			doprj = 1;
-			dogrp = 0;
+			type = XFS_DQTYPE_PROJ;
 			break;
 		case 'u':
-			dogrp = doprj = 0;
+			type = XFS_DQTYPE_USER;
 			break;
 		default:
 			dbprintf(_("bad option for dquot command\n"));
 			return 0;
 		}
 	}
-	s = doprj ? _("project") : dogrp ? _("group") : _("user");
+
+	s = libxfs_dqinode_path(type);
 	if (optind != argc - 1) {
 		dbprintf(_("dquot command requires one %s id argument\n"), s);
 		return 0;
 	}
-	ino = mp->m_sb.sb_uquotino;
-	if (doprj)
-		ino = mp->m_sb.sb_pquotino;
-	else if (dogrp)
-		ino = mp->m_sb.sb_gquotino;
 
+	ino = dqtype_to_inode(mp, type);
 	if (ino == 0 || ino == NULLFSINO) {
 		dbprintf(_("no %s quota inode present\n"), s);
 		return 0;
