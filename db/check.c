@@ -831,6 +831,12 @@ blockget_f(
 		dbprefix = oldprefix;
 		return 0;
 	}
+
+	if (xfs_has_metadir(mp)) {
+		dbprefix = oldprefix;
+		return 0;
+	}
+
 	check_rootdir();
 	/*
 	 * Check that there are no blocks either
