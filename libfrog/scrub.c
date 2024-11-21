@@ -154,8 +154,20 @@ const struct xfrog_scrub_descr xfrog_scrubbers[XFS_SCRUB_TYPE_NR] = {
 		.descr	= "directory tree structure",
 		.group	= XFROG_SCRUB_GROUP_INODE,
 	},
+	[XFS_SCRUB_TYPE_METAPATH] = {
+		.name	= "metapath",
+		.descr	= "metadata directory paths",
+		.group	= XFROG_SCRUB_GROUP_METAPATH,
+	},
 };
-#undef DEP
+
+const struct xfrog_scrub_descr xfrog_metapaths[XFS_SCRUB_METAPATH_NR] = {
+	[XFS_SCRUB_METAPATH_PROBE] = {
+		.name	= "probe",
+		.descr	= "metapath",
+		.group	= XFROG_SCRUB_GROUP_NONE,
+	},
+};
 
 /* Invoke the scrub ioctl.  Returns zero or negative error code. */
 int
