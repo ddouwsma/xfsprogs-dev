@@ -406,6 +406,12 @@ const ftattr_t	ftattrtab[] = {
 	{ FLDT_UUID, "uuid", fp_uuid, NULL, SI(bitsz(uuid_t)), 0, NULL, NULL },
 	{ FLDT_PARENT_REC, "parent", NULL, (char *)parent_flds,
 	  SI(bitsz(struct xfs_parent_rec)), 0, NULL, parent_flds },
+
+	{ FLDT_RTWORD, "rtword", fp_num, "%#x", SI(bitsz(xfs_rtword_t)),
+	  0, NULL, NULL },
+	{ FLDT_RGBITMAP, "rgbitmap", NULL, (char *)rgbitmap_flds, btblock_size,
+	  FTARG_SIZE, NULL, rgbitmap_flds },
+
 	{ FLDT_ZZZ, NULL }
 };
 

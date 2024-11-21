@@ -705,16 +705,32 @@ inode_next_type(void)
 	case S_IFLNK:
 		return TYP_SYMLINK;
 	case S_IFREG:
-		if (iocur_top->ino == mp->m_sb.sb_rbmino)
-			return TYP_RTBITMAP;
-		else if (iocur_top->ino == mp->m_sb.sb_rsumino)
-			return TYP_RTSUMMARY;
-		else if (iocur_top->ino == mp->m_sb.sb_uquotino ||
-			 iocur_top->ino == mp->m_sb.sb_gquotino ||
-			 iocur_top->ino == mp->m_sb.sb_pquotino)
+		if (xfs_has_rtgroups(mp)) {
+			struct xfs_dinode	*dic = iocur_top->data;
+
+			switch (be16_to_cpu(dic->di_metatype)) {
+			case XFS_METAFILE_USRQUOTA:
+			case XFS_METAFILE_GRPQUOTA:
+			case XFS_METAFILE_PRJQUOTA:
+				return TYP_DQBLK;
+			case XFS_METAFILE_RTBITMAP:
+				return TYP_RGBITMAP;
+			default:
+				return TYP_DATA;
+			}
+		} else {
+			if (iocur_top->ino == mp->m_sb.sb_rbmino)
+				return TYP_RTBITMAP;
+			if (iocur_top->ino == mp->m_sb.sb_rsumino)
+				return TYP_RTSUMMARY;
+		}
+
+		if (iocur_top->ino == mp->m_sb.sb_uquotino ||
+		    iocur_top->ino == mp->m_sb.sb_gquotino ||
+		    iocur_top->ino == mp->m_sb.sb_pquotino)
 			return TYP_DQBLK;
-		else
-			return TYP_DATA;
+
+		return TYP_DATA;
 	default:
 		return TYP_NONE;
 	}
