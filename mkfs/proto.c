@@ -6,6 +6,8 @@
 
 #include "libxfs.h"
 #include <sys/stat.h>
+#include <sys/xattr.h>
+#include <linux/xattr.h>
 #include "libfrog/convert.h"
 #include "proto.h"
 
@@ -357,6 +359,97 @@ writefile(
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		fail(_("error committing isize transaction"), error);
+}
+
+static void
+writeattr(
+	struct xfs_inode	*ip,
+	const char		*fname,
+	int			fd,
+	const char		*attrname,
+	char			*valuebuf,
+	size_t			valuelen)
+{
+	struct xfs_da_args	args = {
+		.dp		= ip,
+		.geo		= ip->i_mount->m_attr_geo,
+		.owner		= ip->i_ino,
+		.whichfork	= XFS_ATTR_FORK,
+		.op_flags	= XFS_DA_OP_OKNOENT,
+		.value		= valuebuf,
+	};
+	ssize_t			ret;
+	int			error;
+
+	ret = fgetxattr(fd, attrname, valuebuf, valuelen);
+	if (ret < 0) {
+		if (errno == EOPNOTSUPP)
+			return;
+		fail(_("error collecting xattr value"), errno);
+	}
+	if (ret == 0)
+		return;
+
+	if (!strncmp(attrname, XATTR_TRUSTED_PREFIX, XATTR_TRUSTED_PREFIX_LEN)) {
+		args.name = (unsigned char *)attrname + XATTR_TRUSTED_PREFIX_LEN;
+		args.attr_filter = LIBXFS_ATTR_ROOT;
+	} else if (!strncmp(attrname, XATTR_SECURITY_PREFIX, XATTR_SECURITY_PREFIX_LEN)) {
+		args.name = (unsigned char *)attrname + XATTR_SECURITY_PREFIX_LEN;
+		args.attr_filter = LIBXFS_ATTR_SECURE;
+	} else if (!strncmp(attrname, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) {
+		args.name = (unsigned char *)attrname + XATTR_USER_PREFIX_LEN;
+		args.attr_filter = 0;
+	} else {
+		args.name = (unsigned char *)attrname;
+		args.attr_filter = 0;
+	}
+	args.namelen = strlen((char *)args.name);
+
+	args.valuelen = ret;
+	libxfs_attr_sethash(&args);
+
+	error = -libxfs_attr_set(&args, XFS_ATTRUPDATE_UPSERT, false);
+	if (error)
+		fail(_("setting xattr value"), error);
+}
+
+static void
+writeattrs(
+	struct xfs_inode	*ip,
+	const char		*fname,
+	int			fd)
+{
+	char			*namebuf, *p, *end;
+	char			*valuebuf = NULL;
+	ssize_t			ret;
+
+	namebuf = malloc(XATTR_LIST_MAX);
+	if (!namebuf)
+		fail(_("error allocating xattr name buffer"), errno);
+
+	ret = flistxattr(fd, namebuf, XATTR_LIST_MAX);
+	if (ret < 0) {
+		if (errno == EOPNOTSUPP)
+			goto out_namebuf;
+		fail(_("error collecting xattr names"), errno);
+	}
+
+	p = namebuf;
+	end = namebuf + ret;
+	for (p = namebuf; p < end; p += strlen(p) + 1) {
+		if (!valuebuf) {
+			valuebuf = malloc(ATTR_MAX_VALUELEN);
+			if (!valuebuf)
+				fail(_("error allocating xattr value buffer"),
+						errno);
+		}
+
+		writeattr(ip, fname, fd, p, valuebuf, ATTR_MAX_VALUELEN);
+	}
+
+	free(valuebuf);
+out_namebuf:
+	free(namebuf);
 }
 
 static int
@@ -833,6 +926,7 @@ parseproto(
 	libxfs_parent_finish(mp, ppargs);
 	if (fmt == IF_REGULAR) {
 		writefile(ip, fname, fd);
+		writeattrs(ip, fname, fd);
 		close(fd);
 	}
 	libxfs_irele(ip);
