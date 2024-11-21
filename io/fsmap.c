@@ -14,6 +14,7 @@
 
 static cmdinfo_t	fsmap_cmd;
 static dev_t		xfs_data_dev;
+static dev_t		xfs_rt_dev;
 
 static void
 fsmap_help(void)
@@ -170,7 +171,7 @@ dump_map_verbose(
 	unsigned long long	i;
 	struct fsmap		*p;
 	int			agno;
-	off_t			agoff, bperag;
+	off_t			agoff, bperag, bperrtg;
 	int			foff_w, boff_w, aoff_w, tot_w, agno_w, own_w;
 	int			nr_w, dev_w;
 	char			rbuf[40], bbuf[40], abuf[40], obuf[40];
@@ -185,6 +186,7 @@ dump_map_verbose(
 	tot_w = MINTOT_WIDTH;
 	bperag = (off_t)fsgeo->agblocks *
 		  (off_t)fsgeo->blocksize;
+	bperrtg = bytes_per_rtgroup(fsgeo);
 	sunit = (fsgeo->sunit * fsgeo->blocksize);
 	swidth = (fsgeo->swidth * fsgeo->blocksize);
 
@@ -239,6 +241,13 @@ dump_map_verbose(
 		if (p->fmr_device == xfs_data_dev) {
 			agno = p->fmr_physical / bperag;
 			agoff = p->fmr_physical - (agno * bperag);
+			snprintf(abuf, sizeof(abuf),
+				"(%lld..%lld)",
+				(long long)BTOBBT(agoff),
+				(long long)BTOBBT(agoff + p->fmr_length - 1));
+		} else if (p->fmr_device == xfs_rt_dev && fsgeo->rgcount > 0) {
+			agno = p->fmr_physical / bperrtg;
+			agoff = p->fmr_physical % bperrtg;
 			snprintf(abuf, sizeof(abuf),
 				"(%lld..%lld)",
 				(long long)BTOBBT(agoff),
@@ -308,6 +317,16 @@ dump_map_verbose(
 		if (p->fmr_device == xfs_data_dev) {
 			agno = p->fmr_physical / bperag;
 			agoff = p->fmr_physical - (agno * bperag);
+			snprintf(abuf, sizeof(abuf),
+				"(%lld..%lld)",
+				(long long)BTOBBT(agoff),
+				(long long)BTOBBT(agoff + p->fmr_length - 1));
+			snprintf(gbuf, sizeof(gbuf),
+				"%lld",
+				(long long)agno);
+		} else if (p->fmr_device == xfs_rt_dev && fsgeo->rgcount > 0) {
+			agno = p->fmr_physical / bperrtg;
+			agoff = p->fmr_physical % bperrtg;
 			snprintf(abuf, sizeof(abuf),
 				"(%lld..%lld)",
 				(long long)BTOBBT(agoff),
@@ -501,6 +520,7 @@ fsmap_f(
 	}
 	fs = fs_table_lookup(file->name, FS_MOUNT_POINT);
 	xfs_data_dev = fs ? fs->fs_datadev : 0;
+	xfs_rt_dev = fs ? fs->fs_rtdev : 0;
 
 	head->fmh_count = map_size;
 	do {
