@@ -150,6 +150,7 @@ enum {
 	M_INOBTCNT,
 	M_BIGTIME,
 	M_AUTOFSCK,
+	M_METADIR,
 	M_MAX_OPTS,
 };
 
@@ -812,6 +813,7 @@ static struct opt_params mopts = {
 		[M_INOBTCNT] = "inobtcount",
 		[M_BIGTIME] = "bigtime",
 		[M_AUTOFSCK] = "autofsck",
+		[M_METADIR] = "metadir",
 		[M_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -856,6 +858,12 @@ static struct opt_params mopts = {
 		  .defaultval = 1,
 		},
 		{ .index = M_AUTOFSCK,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = M_METADIR,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
@@ -913,6 +921,7 @@ struct sb_feat_args {
 	bool	reflink;		/* XFS_SB_FEAT_RO_COMPAT_REFLINK */
 	bool	inobtcnt;		/* XFS_SB_FEAT_RO_COMPAT_INOBTCNT */
 	bool	bigtime;		/* XFS_SB_FEAT_INCOMPAT_BIGTIME */
+	bool	metadir;		/* XFS_SB_FEAT_INCOMPAT_METADIR */
 	bool	nodalign;
 	bool	nortalign;
 	bool	nrext64;
@@ -1048,7 +1057,8 @@ usage( void )
 /* blocksize */		[-b size=num]\n\
 /* config file */	[-c options=xxx]\n\
 /* metadata */		[-m crc=0|1,finobt=0|1,uuid=xxx,rmapbt=0|1,reflink=0|1,\n\
-			    inobtcount=0|1,bigtime=0|1,autofsck=xxx]\n\
+			    inobtcount=0|1,bigtime=0|1,autofsck=xxx,\n\
+			    metadir=0|1]\n\
 /* data subvol */	[-d agcount=n,agsize=n,file,name=xxx,size=num,\n\
 			    (sunit=value,swidth=value|su=num,sw=num|noalign),\n\
 			    sectsize=num,concurrency=num]\n\
@@ -1883,6 +1893,9 @@ meta_opts_parser(
 				illegal(value, "m autofsck");
 		}
 		break;
+	case M_METADIR:
+		cli->sb_feat.metadir = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2465,6 +2478,14 @@ _("autofsck not supported without CRC support\n"));
 			usage();
 		}
 		cli->autofsck = FSPROP_AUTOFSCK_UNSET;
+
+		if (cli->sb_feat.metadir &&
+		    cli_opt_set(&mopts, M_METADIR)) {
+			fprintf(stderr,
+_("metadata directory not supported without CRC support\n"));
+			usage();
+		}
+		cli->sb_feat.metadir = false;
 	}
 
 	if (!cli->sb_feat.finobt) {
@@ -3568,7 +3589,8 @@ sb_set_features(
 	 * the sb_bad_features2 field. To avoid older kernels mounting
 	 * filesystems they shouldn't, set both field to the same value.
 	 */
-	sbp->sb_bad_features2 = sbp->sb_features2;
+	if (!fp->metadir)
+		sbp->sb_bad_features2 = sbp->sb_features2;
 
 	if (!fp->crcs_enabled)
 		return;
@@ -3618,6 +3640,8 @@ sb_set_features(
 		 */
 		sbp->sb_versionnum |= XFS_SB_VERSION_ATTRBIT;
 	}
+	if (fp->metadir)
+		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_METADIR;
 }
 
 /*
@@ -4053,6 +4077,7 @@ finish_superblock_setup(
 	platform_uuid_copy(&sbp->sb_meta_uuid, &cfg->uuid);
 	sbp->sb_logstart = cfg->logstart;
 	sbp->sb_rootino = sbp->sb_rbmino = sbp->sb_rsumino = NULLFSINO;
+	sbp->sb_metadirino = NULLFSINO;
 	sbp->sb_agcount = (xfs_agnumber_t)cfg->agcount;
 	sbp->sb_rbmblocks = cfg->rtbmblocks;
 	sbp->sb_logblocks = (xfs_extlen_t)cfg->logblocks;
@@ -4279,6 +4304,8 @@ rewrite_secondary_superblocks(
 	}
 	dsb = buf->b_addr;
 	dsb->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
+	if (xfs_has_metadir(mp))
+		dsb->sb_metadirino = cpu_to_be64(mp->m_sb.sb_metadirino);
 	libxfs_buf_mark_dirty(buf);
 	libxfs_buf_relse(buf);
 
@@ -4297,6 +4324,8 @@ rewrite_secondary_superblocks(
 	}
 	dsb = buf->b_addr;
 	dsb->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
+	if (xfs_has_metadir(mp))
+		dsb->sb_metadirino = cpu_to_be64(mp->m_sb.sb_metadirino);
 	libxfs_buf_mark_dirty(buf);
 	libxfs_buf_relse(buf);
 }
