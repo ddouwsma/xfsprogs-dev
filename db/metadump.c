@@ -2072,7 +2072,11 @@ process_bmbt_reclist(
 	xfs_agblock_t		agbno;
 	int			rval = 1;
 
-	if (btype == TYP_DATA)
+	/*
+	 * Ignore regular file data except for metadata inodes, where it is by
+	 * definition metadata.
+	 */
+	if (btype == TYP_DATA && !is_metadata_ino(dip))
 		return 1;
 
 	convert_extent(&rp[numrecs - 1], &o, &s, &c, &f);
