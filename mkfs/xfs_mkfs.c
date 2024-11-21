@@ -2649,12 +2649,6 @@ _("cowextsize not supported without reflink support\n"));
 		cli->sb_feat.exchrange = true;
 	}
 
-	if (cli->sb_feat.qflags && cli->xi->rt.name) {
-		fprintf(stderr,
-_("persistent quota flags not supported with realtime volumes\n"));
-				usage();
-	}
-
 	/*
 	 * Persistent quota flags requires metadir support because older
 	 * kernels (or current kernels with old filesystems) will reset qflags
