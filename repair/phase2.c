@@ -557,8 +557,10 @@ phase2(
 		 */
 		ino_rec = set_inode_used_alloc(mp, 0,
 				XFS_INO_TO_AGINO(mp, sb->sb_rootino));
-		for (j = 1; j < inuse; j++)
+		for (j = 1; j < inuse; j++) {
 			set_inode_used(ino_rec, j);
+			set_inode_is_meta(ino_rec, j);
+		}
 
 		for (j = inuse; j < XFS_INODES_PER_CHUNK; j++)
 			set_inode_free(ino_rec, j);
@@ -594,6 +596,7 @@ phase2(
 				else
 					do_warn(_("would correct\n"));
 			}
+			set_inode_is_meta(ino_rec, j);
 			j++;
 		}
 
@@ -605,6 +608,7 @@ phase2(
 			else
 				do_warn(_("would correct\n"));
 		}
+		set_inode_is_meta(ino_rec, j);
 		j++;
 
 		if (is_inode_free(ino_rec, j))  {
@@ -615,6 +619,7 @@ phase2(
 			else
 				do_warn(_("would correct\n"));
 		}
+		set_inode_is_meta(ino_rec, j);
 		j++;
 	}
 
