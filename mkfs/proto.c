@@ -1008,8 +1008,8 @@ fail:
 }
 
 /*
- * Free the whole realtime area using transactions.
- * Do one transaction per bitmap block.
+ * Free the whole realtime area using transactions.  Each transaction may clear
+ * up to 32 rtbitmap blocks.
  */
 static void
 rtfreesp_init(
@@ -1017,8 +1017,8 @@ rtfreesp_init(
 {
 	struct xfs_mount	*mp = rtg_mount(rtg);
 	struct xfs_trans	*tp;
-	xfs_rtxnum_t		rtx;
-	xfs_rtxnum_t		ertx;
+	const xfs_rtxnum_t	max_rtx = mp->m_rtx_per_rbmblock * 32;
+	xfs_rtxnum_t		start_rtx = 0;
 	int			error;
 
 	/*
@@ -1034,37 +1034,56 @@ rtfreesp_init(
 	if (error)
 		fail(_("Initialization of rtsummary inode failed"), error);
 
+	if (!mp->m_sb.sb_rbmblocks)
+		return;
+
 	/*
 	 * Then free the blocks into the allocator, one bitmap block at a time.
 	 */
-	for (rtx = 0; rtx < mp->m_sb.sb_rextents; rtx = ertx) {
+	while (start_rtx < rtg->rtg_extents) {
+		xfs_rtxlen_t	nr = min(rtg->rtg_extents - start_rtx, max_rtx);
+
+		/*
+		 * The rt superblock, if present, must not be marked free.
+		 * This may be the only rtx in the entire volume.
+		 */
+		if (xfs_has_rtsb(mp) && rtg_rgno(rtg) == 0 && start_rtx == 0) {
+			start_rtx++;
+			nr--;
+
+			if (start_rtx == rtg->rtg_extents)
+				break;
+		}
+
 		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 				0, 0, 0, &tp);
 		if (error)
 			res_failed(error);
 
 		libxfs_trans_ijoin(tp, rtg->rtg_inodes[XFS_RTGI_BITMAP], 0);
-		ertx = min(mp->m_sb.sb_rextents,
-			   rtx + NBBY * mp->m_sb.sb_blocksize);
-
-		error = -libxfs_rtfree_extent(tp, rtg, rtx,
-				(xfs_rtxlen_t)(ertx - rtx));
+		error = -libxfs_rtfree_extent(tp, rtg, start_rtx, nr);
 		if (error) {
-			fail(_("Error initializing the realtime space"),
-				error);
+			fprintf(stderr,
+ _("Error initializing the realtime free space near rgno %u rtx %lld-%lld (max %lld): %s\n"),
+					rtg_rgno(rtg),
+					(unsigned long long)start_rtx,
+					(unsigned long long)start_rtx + nr - 1,
+					(unsigned long long)rtg->rtg_extents,
+					strerror(error));
+			exit(1);
 		}
+
 		error = -libxfs_trans_commit(tp);
 		if (error)
 			fail(_("Initialization of the realtime space failed"),
 					error);
+
+		start_rtx += nr;
 	}
 }
 
-/*
- * Allocate the realtime bitmap and summary inodes, and fill in data if any.
- */
 static void
-rtinit(
+rtinit_nogroups(
 	struct xfs_mount	*mp)
 {
 	struct xfs_rtgroup	*rtg = NULL;
@@ -1077,6 +1096,43 @@ rtinit(
 
 		rtfreesp_init(rtg);
 	}
+}
+
+static void
+rtinit_groups(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg = NULL;
+	unsigned int		i;
+	int			error;
+
+	error = -libxfs_rtginode_mkdir_parent(mp);
+	if (error)
+		fail(_("rtgroup directory allocation failed"), error);
+
+	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
+		for (i = 0; i < XFS_RTGI_MAX; i++) {
+			error = -libxfs_rtginode_create(rtg, i, true);
+			if (error)
+				fail(_("rt group inode creation failed"),
+						error);
+		}
+
+		rtfreesp_init(rtg);
+	}
+}
+
+/*
+ * Allocate the realtime bitmap and summary inodes, and fill in data if any.
+ */
+static void
+rtinit(
+	struct xfs_mount	*mp)
+{
+	if (xfs_has_rtgroups(mp))
+		rtinit_groups(mp);
+	else
+		rtinit_nogroups(mp);
 }
 
 static off_t
