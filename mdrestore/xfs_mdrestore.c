@@ -28,7 +28,8 @@ struct mdrestore_ops {
 	void (*show_info)(union mdrestore_headers *header, const char *md_file);
 	void (*restore)(union mdrestore_headers *header, FILE *md_fp,
 			const struct mdrestore_dev *ddev,
-			const struct mdrestore_dev *logdev);
+			const struct mdrestore_dev *logdev,
+			const struct mdrestore_dev *rtdev);
 };
 
 static struct mdrestore {
@@ -37,6 +38,7 @@ static struct mdrestore {
 	bool			show_info;
 	bool			progress_since_warning;
 	bool			external_log;
+	bool			realtime_data;
 } mdrestore;
 
 static void
@@ -212,7 +214,8 @@ restore_v1(
 	union mdrestore_headers		*h,
 	FILE				*md_fp,
 	const struct mdrestore_dev	*ddev,
-	const struct mdrestore_dev	*logdev)
+	const struct mdrestore_dev	*logdev,
+	const struct mdrestore_dev	*rtdev)
 {
 	struct xfs_metablock	*metablock;	/* header + index + blocks */
 	__be64			*block_index;
@@ -336,8 +339,9 @@ read_header_v2(
 	if (!mdrestore.external_log && (compat & XFS_MD2_COMPAT_EXTERNALLOG))
 		fatal("External Log device is required\n");
 
-	if (h->v2.xmh_incompat_flags & cpu_to_be32(XFS_MD2_INCOMPAT_RTDEVICE))
-		fatal("Realtime device not yet supported\n");
+	if ((h->v2.xmh_incompat_flags & cpu_to_be32(XFS_MD2_INCOMPAT_RTDEVICE)) &&
+	    !mdrestore.realtime_data)
+		fatal("Realtime device is required\n");
 }
 
 static void
@@ -346,14 +350,17 @@ show_info_v2(
 	const char		*md_file)
 {
 	uint32_t		compat_flags;
+	uint32_t		incompat_flags;
 
 	compat_flags = be32_to_cpu(h->v2.xmh_compat_flags);
+	incompat_flags = be32_to_cpu(h->v2.xmh_incompat_flags);
 
-	printf("%s: %sobfuscated, %s log, external log contents are %sdumped, %s metadata blocks,\n",
+	printf("%s: %sobfuscated, %s log, external log contents are %sdumped, rt device contents are %sdumped, %s metadata blocks,\n",
 		md_file,
 		compat_flags & XFS_MD2_COMPAT_OBFUSCATED ? "":"not ",
 		compat_flags & XFS_MD2_COMPAT_DIRTYLOG ? "dirty":"clean",
 		compat_flags & XFS_MD2_COMPAT_EXTERNALLOG ? "":"not ",
+		incompat_flags & XFS_MD2_INCOMPAT_RTDEVICE ? "":"not ",
 		compat_flags & XFS_MD2_COMPAT_FULLBLOCKS ? "full":"zeroed");
 }
 
@@ -390,7 +397,8 @@ restore_v2(
 	union mdrestore_headers		*h,
 	FILE				*md_fp,
 	const struct mdrestore_dev	*ddev,
-	const struct mdrestore_dev	*logdev)
+	const struct mdrestore_dev	*logdev,
+	const struct mdrestore_dev	*rtdev)
 {
 	struct xfs_sb		sb;
 	struct xfs_meta_extent	xme;
@@ -431,6 +439,11 @@ restore_v2(
 		verify_device_size(logdev, sb.sb_logblocks, sb.sb_blocksize);
 	}
 
+	if (sb.sb_rblocks > 0) {
+		ASSERT(mdrestore.realtime_data == true);
+		verify_device_size(rtdev, sb.sb_rblocks, sb.sb_blocksize);
+	}
+
 	if (pwrite(ddev->fd, block_buffer, len, 0) < 0)
 		fatal("error writing primary superblock: %s\n",
 			strerror(errno));
@@ -458,6 +471,10 @@ restore_v2(
 		case XME_ADDR_LOG_DEVICE:
 			device = "log";
 			fd = logdev->fd;
+			break;
+		case XME_ADDR_RT_DEVICE:
+			device = "rt";
+			fd = rtdev->fd;
 			break;
 		default:
 			fatal("Invalid device found in metadump\n");
@@ -488,7 +505,7 @@ static struct mdrestore_ops mdrestore_ops_v2 = {
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: %s [-V] [-g] [-i] [-l logdev] source target\n",
+	fprintf(stderr, "Usage: %s [-V] [-g] [-i] [-l logdev] [-r rtdev] source target\n",
 		progname);
 	exit(1);
 }
@@ -501,18 +518,21 @@ main(
 	union mdrestore_headers	headers;
 	DEFINE_MDRESTORE_DEV(ddev);
 	DEFINE_MDRESTORE_DEV(logdev);
+	DEFINE_MDRESTORE_DEV(rtdev);
 	FILE			*src_f;
 	char			*logdev_path = NULL;
+	char			*rtdev_path = NULL;
 	int			c;
 
 	mdrestore.show_progress = false;
 	mdrestore.show_info = false;
 	mdrestore.progress_since_warning = false;
 	mdrestore.external_log = false;
+	mdrestore.realtime_data = false;
 
 	progname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, "gil:V")) != EOF) {
+	while ((c = getopt(argc, argv, "gil:r:V")) != EOF) {
 		switch (c) {
 			case 'g':
 				mdrestore.show_progress = true;
@@ -523,6 +543,10 @@ main(
 			case 'l':
 				logdev_path = optarg;
 				mdrestore.external_log = true;
+				break;
+			case 'r':
+				rtdev_path = optarg;
+				mdrestore.realtime_data = true;
 				break;
 			case 'V':
 				printf("%s version %s\n", progname, VERSION);
@@ -592,10 +616,15 @@ main(
 	if (mdrestore.external_log)
 		open_device(&logdev, logdev_path);
 
-	mdrestore.mdrops->restore(&headers, src_f, &ddev, &logdev);
+	/* check and open realtime device */
+	if (mdrestore.realtime_data)
+		open_device(&rtdev, rtdev_path);
+
+	mdrestore.mdrops->restore(&headers, src_f, &ddev, &logdev, &rtdev);
 
 	close_device(&ddev);
 	close_device(&logdev);
+	close_device(&rtdev);
 
 	if (src_f != stdin)
 		fclose(src_f);
