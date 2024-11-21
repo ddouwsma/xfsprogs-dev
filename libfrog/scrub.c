@@ -187,6 +187,26 @@ const struct xfrog_scrub_descr xfrog_metapaths[XFS_SCRUB_METAPATH_NR] = {
 		.descr	= "rtgroup summary",
 		.group	= XFROG_SCRUB_GROUP_RTGROUP,
 	},
+	[XFS_SCRUB_METAPATH_QUOTADIR] = {
+		.name	= "quotadir",
+		.descr	= "quota file metadir",
+		.group	= XFROG_SCRUB_GROUP_FS,
+	},
+	[XFS_SCRUB_METAPATH_USRQUOTA] = {
+		.name	= "usrquota",
+		.descr	= "user quota file",
+		.group	= XFROG_SCRUB_GROUP_FS,
+	},
+	[XFS_SCRUB_METAPATH_GRPQUOTA] = {
+		.name	= "grpquota",
+		.descr	= "group quota file",
+		.group	= XFROG_SCRUB_GROUP_FS,
+	},
+	[XFS_SCRUB_METAPATH_PRJQUOTA] = {
+		.name	= "prjquota",
+		.descr	= "project quota file",
+		.group	= XFROG_SCRUB_GROUP_FS,
+	},
 };
 
 /* Invoke the scrub ioctl.  Returns zero or negative error code. */
