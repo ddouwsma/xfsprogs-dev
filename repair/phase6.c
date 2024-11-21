@@ -474,6 +474,22 @@ reset_sbroot_ino(
 	libxfs_inode_init(tp, &args, ip);
 }
 
+/*
+ * Mark a newly allocated inode as metadata in the incore bitmap.  Callers
+ * must have already called mark_ino_inuse to ensure there is an incore record.
+ */
+static void
+mark_ino_metadata(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino)
+{
+	struct ino_tree_node	*irec =
+		find_inode_rec(mp, XFS_INO_TO_AGNO(mp, ino),
+				   XFS_INO_TO_AGINO(mp, ino));
+
+	set_inode_is_meta(irec, get_inode_offset(mp, ino, irec));
+}
+
 /* Load a realtime freespace metadata inode from disk and reset it. */
 static int
 ensure_rtino(
@@ -693,6 +709,7 @@ mk_metadir(
 
 	libxfs_trans_ijoin(tp, mp->m_metadirip, 0);
 	libxfs_metafile_set_iflag(tp, mp->m_metadirip, XFS_METAFILE_DIR);
+	mark_ino_metadata(mp, mp->m_metadirip->i_ino);
 
 	error = -libxfs_trans_commit(tp);
 	if (error)
