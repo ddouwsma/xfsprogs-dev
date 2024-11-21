@@ -550,14 +550,10 @@ _("couldn't iget realtime %s inode -- error - %d\n"),
 
 	switch (type) {
 	case XFS_RTGI_BITMAP:
-		ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
-		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-		error = 0;
+		error = -libxfs_rtbitmap_create(rtg, ip, tp, false);
 		break;
 	case XFS_RTGI_SUMMARY:
-		ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
-		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-		error = 0;
+		error = -libxfs_rtsummary_create(rtg, ip, tp, false);
 		break;
 	default:
 		error = EINVAL;

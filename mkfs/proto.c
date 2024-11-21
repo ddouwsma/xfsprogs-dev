@@ -948,7 +948,10 @@ static void
 create_sb_metadata_file(
 	struct xfs_rtgroup	*rtg,
 	enum xfs_rtg_inodes	type,
-	void			(*create)(struct xfs_inode *ip))
+	int			(*create)(struct xfs_rtgroup *rtg,
+					  struct xfs_inode *ip,
+					  struct xfs_trans *tp,
+					  bool init))
 {
 	struct xfs_mount	*mp = rtg_mount(rtg);
 	struct xfs_icreate_args	args = {
@@ -972,9 +975,23 @@ create_sb_metadata_file(
 	if (error)
 		goto fail;
 
-	create(ip);
+	error = create(rtg, ip, tp, true);
+	if (error < 0)
+		error = -error;
+	if (error)
+		goto fail;
 
-	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	switch (type) {
+	case XFS_RTGI_BITMAP:
+		mp->m_sb.sb_rbmino = ip->i_ino;
+		break;
+	case XFS_RTGI_SUMMARY:
+		mp->m_sb.sb_rsumino = ip->i_ino;
+		break;
+	default:
+		error = EFSCORRUPTED;
+		goto fail;
+	}
 	libxfs_log_sb(tp);
 
 	error = -libxfs_trans_commit(tp);
@@ -988,30 +1005,6 @@ fail:
 		libxfs_irele(ip);
 	if (error)
 		fail(_("Realtime inode allocation failed"), error);
-}
-
-static void
-rtbitmap_create(
-	struct xfs_inode	*ip)
-{
-	struct xfs_mount	*mp = ip->i_mount;
-
-	ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
-	ip->i_diflags |= XFS_DIFLAG_NEWRTBM;
-	inode_set_atime(VFS_I(ip), 0, 0);
-
-	mp->m_sb.sb_rbmino = ip->i_ino;
-}
-
-static void
-rtsummary_create(
-	struct xfs_inode	*ip)
-{
-	struct xfs_mount	*mp = ip->i_mount;
-
-	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
-
-	mp->m_sb.sb_rsumino = ip->i_ino;
 }
 
 /*
@@ -1078,9 +1071,9 @@ rtinit(
 
 	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		create_sb_metadata_file(rtg, XFS_RTGI_BITMAP,
-				rtbitmap_create);
+				libxfs_rtbitmap_create);
 		create_sb_metadata_file(rtg, XFS_RTGI_SUMMARY,
-				rtsummary_create);
+				libxfs_rtsummary_create);
 
 		rtfreesp_init(rtg);
 	}
