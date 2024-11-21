@@ -433,7 +433,7 @@ static xfs_daddr_t
 xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb)
 {
 	if (XFS_IS_REALTIME_INODE(ip))
-		 return XFS_FSB_TO_BB(ip->i_mount, fsb);
+		 return xfs_rtb_to_daddr(ip->i_mount, fsb);
 	return XFS_FSB_TO_DADDR(ip->i_mount, (fsb));
 }
 
