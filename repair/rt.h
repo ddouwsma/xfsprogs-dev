@@ -33,4 +33,7 @@ static inline bool is_rtsummary_inode(xfs_ino_t ino)
 void mark_rtgroup_inodes_bad(struct xfs_mount *mp, enum xfs_rtg_inodes type);
 bool rtgroup_inodes_were_bad(enum xfs_rtg_inodes type);
 
+void check_rtsb(struct xfs_mount *mp);
+void rewrite_rtsb(struct xfs_mount *mp);
+
 #endif /* _XFS_REPAIR_RT_H_ */

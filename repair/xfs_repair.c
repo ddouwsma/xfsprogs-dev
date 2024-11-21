@@ -1518,6 +1518,10 @@ _("Note - stripe unit (%d) and width (%d) were copied from a backup superblock.\
 				XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
 	}
 
+	/* Always rewrite the realtime superblock */
+	if (xfs_has_rtsb(mp) && xfs_has_realtime(mp))
+		rewrite_rtsb(mp);
+
 	/*
 	 * Done. Flush all cached buffers and inodes first to ensure all
 	 * verifiers are run (where we discover the max metadata LSN), reformat

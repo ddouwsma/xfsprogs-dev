@@ -562,3 +562,57 @@ free_rtgroup_inodes(void)
 	for (i = 0; i < XFS_RTGI_MAX; i++)
 		bitmap_free(&rtg_inodes[i]);
 }
+
+void
+check_rtsb(
+	struct xfs_mount	*mp)
+{
+	struct xfs_buf		*bp;
+	int			error;
+
+	error = -libxfs_buf_read_uncached(mp->m_rtdev_targp, XFS_RTSB_DADDR,
+			XFS_FSB_TO_BB(mp, 1), 0, &bp, &xfs_rtsb_buf_ops);
+	if (!error) {
+		libxfs_buf_relse(bp);
+		return;
+	}
+
+	if (no_modify) {
+		do_warn(_("would rewrite realtime superblock\n"));
+		return;
+	}
+
+	/*
+	 * Rewrite the rt superblock so that an update to the primary fs
+	 * superblock will not get confused by the non-matching rtsb.
+	 */
+	do_warn(_("will rewrite realtime superblock\n"));
+	rewrite_rtsb(mp);
+}
+
+void
+rewrite_rtsb(
+	struct xfs_mount	*mp)
+{
+	struct xfs_buf		*rtsb_bp;
+	struct xfs_buf		*sb_bp = libxfs_getsb(mp);
+	int			error;
+
+	if (!sb_bp)
+		do_error(
+ _("couldn't grab primary sb to update realtime sb\n"));
+
+	error = -libxfs_buf_get_uncached(mp->m_rtdev_targp,
+			XFS_FSB_TO_BB(mp, 1), XFS_RTSB_DADDR, &rtsb_bp);
+	if (error)
+		do_error(
+ _("couldn't grab realtime superblock\n"));
+
+	rtsb_bp->b_maps[0].bm_bn = XFS_RTSB_DADDR;
+	rtsb_bp->b_ops = &xfs_rtsb_buf_ops;
+
+	libxfs_update_rtsb(rtsb_bp, sb_bp);
+	libxfs_buf_mark_dirty(rtsb_bp);
+	libxfs_buf_relse(rtsb_bp);
+	libxfs_buf_relse(sb_bp);
+}

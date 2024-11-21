@@ -221,6 +221,15 @@ set_rtbmap(
 }
 
 static void
+rtsb_init(
+	struct xfs_mount	*mp)
+{
+	/* The first rtx of the realtime device contains the super */
+	if (xfs_has_rtsb(mp) && rt_bmap)
+		set_rtbmap(0, XR_E_INUSE_FS);
+}
+
+static void
 reset_rt_bmap(void)
 {
 	if (rt_bmap)
@@ -245,6 +254,8 @@ init_rt_bmap(
 			mp->m_sb.sb_rextents);
 		return;
 	}
+
+	rtsb_init(mp);
 }
 
 static void
@@ -332,6 +343,7 @@ reset_bmaps(
 
 	if (xfs_has_rtgroups(mp)) {
 		reset_rtg_bmaps(mp);
+		rtsb_init(mp);
 	} else {
 		reset_rt_bmap();
 	}
