@@ -71,6 +71,26 @@ quotino_check(
 static void
 quota_sb_check(xfs_mount_t *mp)
 {
+	if (xfs_has_metadir(mp)) {
+		/*
+		 * Metadir filesystems try to preserve the quota accounting
+		 * and enforcement flags so that users don't have to remember
+		 * to supply quota mount options.  Phase 1 discovered the
+		 * QUOTABIT flag (fs_quotas) and phase 2 discovered the quota
+		 * inodes from the metadir for us.
+		 *
+		 * If QUOTABIT wasn't set but we found quota inodes, signal
+		 * phase 5 to add the feature bit for us.  We do not ever
+		 * downgrade the filesystem.
+		 */
+		if (!fs_quotas &&
+		    (has_quota_inode(XFS_DQTYPE_USER) ||
+		     has_quota_inode(XFS_DQTYPE_GROUP) ||
+		     has_quota_inode(XFS_DQTYPE_PROJ)))
+			fs_quotas = 1;
+		return;
+	}
+
 	/*
 	 * if the sb says we have quotas and we lost both,
 	 * signal a superblock downgrade.  that will cause

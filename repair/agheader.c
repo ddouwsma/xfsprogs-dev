@@ -642,7 +642,8 @@ verify_set_agheader(xfs_mount_t *mp, struct xfs_buf *sbuf, xfs_sb_t *sb,
 			sb->sb_fdblocks = 0;
 			sb->sb_frextents = 0;
 
-			sb->sb_qflags = 0;
+			if (!xfs_has_metadir(mp))
+				sb->sb_qflags = 0;
 		}
 
 		rval |= XR_AG_SB;

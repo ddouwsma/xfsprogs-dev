@@ -233,6 +233,9 @@ find_secondary_sb(xfs_sb_t *rsb)
         if (!retval)
                 retval = __find_secondary_sb(rsb, XFS_AG_MIN_BYTES, BSIZE);
 
+	if (retval && xfs_sb_version_hasmetadir(rsb))
+		do_warn(_("quota accounting and enforcement flags lost\n"));
+
 	return retval;
 }
 
