@@ -172,6 +172,21 @@ const struct xfrog_scrub_descr xfrog_metapaths[XFS_SCRUB_METAPATH_NR] = {
 		.descr	= "metapath",
 		.group	= XFROG_SCRUB_GROUP_NONE,
 	},
+	[XFS_SCRUB_METAPATH_RTDIR] = {
+		.name	= "rtdir",
+		.descr	= "realtime group metadir",
+		.group	= XFROG_SCRUB_GROUP_FS,
+	},
+	[XFS_SCRUB_METAPATH_RTBITMAP] = {
+		.name	= "rtbitmap",
+		.descr	= "rtgroup bitmap",
+		.group	= XFROG_SCRUB_GROUP_RTGROUP,
+	},
+	[XFS_SCRUB_METAPATH_RTSUMMARY] = {
+		.name	= "rtsummary",
+		.descr	= "rtgroup summary",
+		.group	= XFROG_SCRUB_GROUP_RTGROUP,
+	},
 };
 
 /* Invoke the scrub ioctl.  Returns zero or negative error code. */
