@@ -44,6 +44,9 @@ struct media_verify_state {
 	struct read_verify_pool	*rvp_realtime;
 	struct bitmap		*d_bad;		/* bytes */
 	struct bitmap		*r_bad;		/* bytes */
+	bool			d_trunc:1;
+	bool			r_trunc:1;
+	bool			l_trunc:1;
 };
 
 /* Find the fd for a given device identifier. */
@@ -544,6 +547,13 @@ report_all_media_errors(
 {
 	int				ret;
 
+	if (vs->d_trunc)
+		str_corrupt(ctx, ctx->mntpoint, _("data device truncated"));
+	if (vs->l_trunc)
+		str_corrupt(ctx, ctx->mntpoint, _("log device truncated"));
+	if (vs->r_trunc)
+		str_corrupt(ctx, ctx->mntpoint, _("rt device truncated"));
+
 	ret = report_disk_ioerrs(ctx, ctx->datadev, vs);
 	if (ret) {
 		str_liberror(ctx, ret, _("walking datadev io errors"));
@@ -662,6 +672,18 @@ remember_ioerr(
 	struct media_verify_state	*vs = arg;
 	struct bitmap			*tree;
 	int				ret;
+
+	if (!length) {
+		dev_t			dev = disk_to_dev(ctx, disk);
+
+		if (dev == ctx->fsinfo.fs_datadev)
+			vs->d_trunc = true;
+		else if (dev == ctx->fsinfo.fs_rtdev)
+			vs->r_trunc = true;
+		else if (dev == ctx->fsinfo.fs_logdev)
+			vs->l_trunc = true;
+		return;
+	}
 
 	tree = bitmap_for_disk(ctx, disk, vs);
 	if (!tree) {

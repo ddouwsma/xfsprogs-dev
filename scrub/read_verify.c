@@ -245,6 +245,14 @@ read_verify(
 					read_error);
 			rvp->ioerr_fn(rvp->ctx, rvp->disk, rv->io_start, sz,
 					read_error, rv->io_end_arg);
+		} else if (sz == 0) {
+			/* No bytes at all?  Did we hit the end of the disk? */
+			dbg_printf("EOF %d @ %"PRIu64" %zu err %d\n",
+					rvp->disk->d_fd, rv->io_start, sz,
+					read_error);
+			rvp->ioerr_fn(rvp->ctx, rvp->disk, rv->io_start, sz,
+					read_error, rv->io_end_arg);
+			break;
 		} else if (sz < len) {
 			/*
 			 * A short direct read suggests that we might have hit
