@@ -728,6 +728,7 @@ main(
 	int			error;
 
 	hist_init(&ctx.datadev_hist);
+	hist_init(&ctx.rtdev_hist);
 
 	fprintf(stdout, "EXPERIMENTAL xfs_scrub program in use! Use at your own risk!\n");
 	fflush(stdout);
@@ -960,6 +961,7 @@ out_unicrash:
 	unicrash_unload();
 
 	hist_free(&ctx.datadev_hist);
+	hist_free(&ctx.rtdev_hist);
 
 	/*
 	 * If we're being run as a service, the return code must fit the LSB
