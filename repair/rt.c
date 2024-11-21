@@ -14,31 +14,9 @@
 #include "err_protos.h"
 #include "rt.h"
 
-void
-rtinit(xfs_mount_t *mp)
-{
-	unsigned long long	wordcnt;
-
-	if (mp->m_sb.sb_rblocks == 0)
-		return;
-
-	/*
-	 * Allocate buffers for formatting the collected rt free space
-	 * information.  The rtbitmap buffer must be large enough to compare
-	 * against any unused bytes in the last block of the file.
-	 */
-	wordcnt = XFS_FSB_TO_B(mp, mp->m_sb.sb_rbmblocks) >> XFS_WORDLOG;
-	btmcompute = calloc(wordcnt, sizeof(union xfs_rtword_raw));
-	if (!btmcompute)
-		do_error(
-	_("couldn't allocate memory for incore realtime bitmap.\n"));
-
-	wordcnt = XFS_FSB_TO_B(mp, mp->m_rsumblocks) >> XFS_WORDLOG;
-	sumcompute = calloc(wordcnt, sizeof(union xfs_suminfo_raw));
-	if (!sumcompute)
-		do_error(
-	_("couldn't allocate memory for incore realtime summary info.\n"));
-}
+/* Computed rt bitmap/summary data */
+static union xfs_rtword_raw	*btmcompute;
+static union xfs_suminfo_raw	*sumcompute;
 
 static inline void
 set_rtword(
@@ -64,58 +42,66 @@ inc_sumcount(
  * generate the real-time bitmap and summary info based on the
  * incore realtime extent map.
  */
-int
+void
 generate_rtinfo(
-	struct xfs_mount	*mp,
-	union xfs_rtword_raw	*words,
-	union xfs_suminfo_raw	*sumcompute)
+	struct xfs_mount	*mp)
 {
-	xfs_rtxnum_t	extno;
-	xfs_rtxnum_t	start_ext;
-	int		bitsperblock;
-	int		bmbno;
-	xfs_rtword_t	freebit;
-	xfs_rtword_t	bits;
-	int		start_bmbno;
-	int		i;
-	int		offs;
-	int		log;
-	int		len;
-	int		in_extent;
+	unsigned int		bitsperblock =
+		mp->m_blockwsize << XFS_NBWORDLOG;
+	xfs_rtxnum_t		extno = 0;
+	xfs_rtxnum_t		start_ext = 0;
+	int			bmbno = 0;
+	int			start_bmbno = 0;
+	bool			in_extent = false;
+	unsigned long long	wordcnt;
+	union xfs_rtword_raw	*words;
+
+	wordcnt = XFS_FSB_TO_B(mp, mp->m_sb.sb_rbmblocks) >> XFS_WORDLOG;
+	btmcompute = calloc(wordcnt, sizeof(union xfs_rtword_raw));
+	if (!btmcompute)
+		do_error(
+_("couldn't allocate memory for incore realtime bitmap.\n"));
+	words = btmcompute;
+
+	wordcnt = XFS_FSB_TO_B(mp, mp->m_rsumblocks) >> XFS_WORDLOG;
+	sumcompute = calloc(wordcnt, sizeof(union xfs_suminfo_raw));
+	if (!sumcompute)
+		do_error(
+_("couldn't allocate memory for incore realtime summary info.\n"));
 
 	ASSERT(mp->m_rbmip == NULL);
 
-	bitsperblock = mp->m_blockwsize << XFS_NBWORDLOG;
-	extno = start_ext = 0;
-	bmbno = in_extent = start_bmbno = 0;
-
 	/*
-	 * slower but simple, don't play around with trying to set
-	 * things one word at a time, just set bit as required.
-	 * Have to * track start and end (size) of each range of
-	 * free extents to set the summary info properly.
+	 * Slower but simple, don't play around with trying to set things one
+	 * word at a time, just set bit as required.  Have to track start and
+	 * end (size) of each range of free extents to set the summary info
+	 * properly.
 	 */
 	while (extno < mp->m_sb.sb_rextents)  {
-		freebit = 1;
+		xfs_rtword_t		freebit = 1;
+		xfs_rtword_t		bits = 0;
+		int			i;
+
 		set_rtword(mp, words, 0);
-		bits = 0;
 		for (i = 0; i < sizeof(xfs_rtword_t) * NBBY &&
 				extno < mp->m_sb.sb_rextents; i++, extno++)  {
 			if (get_rtbmap(extno) == XR_E_FREE)  {
 				sb_frextents++;
 				bits |= freebit;
 
-				if (in_extent == 0) {
+				if (!in_extent) {
 					start_ext = extno;
 					start_bmbno = bmbno;
-					in_extent = 1;
+					in_extent = true;
 				}
-			} else if (in_extent == 1) {
-				len = (int) (extno - start_ext);
-				log = libxfs_highbit64(len);
-				offs = xfs_rtsumoffs(mp, log, start_bmbno);
+			} else if (in_extent) {
+				uint64_t	len = extno - start_ext;
+				xfs_rtsumoff_t	offs;
+
+				offs = xfs_rtsumoffs(mp, libxfs_highbit64(len),
+						start_bmbno);
 				inc_sumcount(mp, sumcompute, offs);
-				in_extent = 0;
+				in_extent = false;
 			}
 
 			freebit <<= 1;
@@ -126,10 +112,12 @@ generate_rtinfo(
 		if (extno % bitsperblock == 0)
 			bmbno++;
 	}
-	if (in_extent == 1) {
-		len = (int) (extno - start_ext);
-		log = libxfs_highbit64(len);
-		offs = xfs_rtsumoffs(mp, log, start_bmbno);
+
+	if (in_extent) {
+		uint64_t	len = extno - start_ext;
+		xfs_rtsumoff_t	offs;
+
+		offs = xfs_rtsumoffs(mp, libxfs_highbit64(len), start_bmbno);
 		inc_sumcount(mp, sumcompute, offs);
 	}
 
@@ -137,8 +125,6 @@ generate_rtinfo(
 		do_warn(_("sb_frextents %" PRIu64 ", counted %" PRIu64 "\n"),
 				mp->m_sb.sb_frextents, sb_frextents);
 	}
-
-	return(0);
 }
 
 static void
@@ -244,4 +230,50 @@ check_rtsummary(
 		return;
 
 	check_rtfile_contents(mp, XFS_METAFILE_RTSUMMARY, mp->m_rsumblocks);
+}
+
+void
+fill_rtbitmap(
+	struct xfs_mount	*mp)
+{
+	struct xfs_inode	*ip;
+	int			error;
+
+	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rbmino,
+			XFS_METAFILE_RTBITMAP, &ip);
+	if (error)
+		do_error(
+_("couldn't iget realtime bitmap inode, error %d\n"), error);
+
+	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_sb.sb_rbmblocks,
+			btmcompute);
+	if (error)
+		do_error(
+_("couldn't re-initialize realtime bitmap inode, error %d\n"), error);
+
+	libxfs_irele(ip);
+}
+
+void
+fill_rtsummary(
+	struct xfs_mount	*mp)
+{
+	struct xfs_inode	*ip;
+	int			error;
+
+	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rsumino,
+			XFS_METAFILE_RTSUMMARY, &ip);
+	if (error)
+		do_error(
+_("couldn't iget realtime summary inode, error %d\n"), error);
+
+	mp->m_rsumip = ip;
+	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_rsumblocks,
+			sumcompute);
+	mp->m_rsumip = NULL;
+	if (error)
+		do_error(
+_("couldn't re-initialize realtime summary inode, error %d\n"), error);
+
+	libxfs_irele(ip);
 }

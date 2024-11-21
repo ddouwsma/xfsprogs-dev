@@ -19,6 +19,7 @@
 #include "progress.h"
 #include "versions.h"
 #include "repair/pptr.h"
+#include "repair/rt.h"
 
 static xfs_ino_t		orphanage_ino;
 
@@ -553,52 +554,6 @@ mk_rbmino(
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_error(_("%s: commit failed, error %d\n"), __func__, error);
-	libxfs_irele(ip);
-}
-
-static void
-fill_rbmino(
-	struct xfs_mount	*mp)
-{
-	struct xfs_inode	*ip;
-	int			error;
-
-	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rbmino,
-			XFS_METAFILE_RTBITMAP, &ip);
-	if (error)
-		do_error(
-_("couldn't iget realtime bitmap inode, error %d\n"), error);
-
-	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_sb.sb_rbmblocks,
-			btmcompute);
-	if (error)
-		do_error(
-_("couldn't re-initialize realtime bitmap inode, error %d\n"), error);
-
-	libxfs_irele(ip);
-}
-
-static void
-fill_rsumino(
-	struct xfs_mount	*mp)
-{
-	struct xfs_inode	*ip;
-	int			error;
-
-	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rsumino,
-			XFS_METAFILE_RTSUMMARY, &ip);
-	if (error)
-		do_error(
-_("couldn't iget realtime summary inode, error %d\n"), error);
-
-	mp->m_rsumip = ip;
-	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_rsumblocks,
-			sumcompute);
-	mp->m_rsumip = NULL;
-	if (error)
-		do_error(
-_("couldn't re-initialize realtime summary inode, error %d\n"), error);
-
 	libxfs_irele(ip);
 }
 
@@ -3335,8 +3290,8 @@ phase6(xfs_mount_t *mp)
 	if (!no_modify)  {
 		do_log(
 _("        - resetting contents of realtime bitmap and summary inodes\n"));
-		fill_rbmino(mp);
-		fill_rsumino(mp);
+		fill_rtbitmap(mp);
+		fill_rtsummary(mp);
 	}
 
 	mark_standalone_inodes(mp);
