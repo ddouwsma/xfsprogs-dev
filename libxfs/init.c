@@ -619,6 +619,27 @@ libxfs_compute_all_maxlevels(
 
 }
 
+/* Mount the metadata files under the metadata directory tree. */
+STATIC void
+libxfs_mount_setup_metadir(
+	struct xfs_mount	*mp)
+{
+	int			error;
+
+	/* Ignore filesystems that are under construction. */
+	if (mp->m_sb.sb_inprogress)
+		return;
+
+	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_metadirino,
+			XFS_METAFILE_DIR, &mp->m_metadirip);
+	if (error) {
+		fprintf(stderr,
+ _("%s: Failed to load metadir root directory, error %d\n"),
+					progname, error);
+		return;
+	}
+}
+
 /*
  * precalculate the low space thresholds for dynamic speculative preallocation.
  */
@@ -800,6 +821,9 @@ libxfs_mount(
 	}
 	xfs_set_perag_data_loaded(mp);
 
+	if (xfs_has_metadir(mp))
+		libxfs_mount_setup_metadir(mp);
+
 	return mp;
 out_da:
 	xfs_da_unmount(mp);
@@ -918,6 +942,8 @@ libxfs_umount(
 	int			error;
 
 	libxfs_rtmount_destroy(mp);
+	if (mp->m_metadirip)
+		libxfs_irele(mp->m_metadirip);
 
 	/*
 	 * Purge the buffer cache to write all dirty buffers to disk and free
