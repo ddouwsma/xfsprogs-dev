@@ -180,10 +180,5 @@ _("WARNING: you have a V1 inode filesystem. It would be converted to a\n"
 		fs_ino_alignment = mp->m_sb.sb_inoalignmt;
 	}
 
-	/*
-	 * calculate maximum file offset for this geometry
-	 */
-	fs_max_file_offset = 0x7fffffffffffffffLL >> mp->m_sb.sb_blocklog;
-
-	return(0);
+	return 0;
 }

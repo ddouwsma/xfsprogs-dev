@@ -185,7 +185,7 @@ pf_read_bmbt_reclist(
 
 		if (((i > 0) && (op + cp > irec.br_startoff)) ||
 				(irec.br_blockcount == 0) ||
-				(irec.br_startoff >= fs_max_file_offset))
+				(irec.br_startoff + irec.br_blockcount - 1 >= XFS_MAX_FILEOFF))
 			goto out_free;
 
 		if (!libxfs_verify_fsbno(mp, irec.br_startblock) ||

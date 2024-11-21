@@ -124,7 +124,6 @@ extern int		inodes_per_block;
 extern unsigned int	glob_agcount;
 extern int		chunks_pblock;	/* # of 64-ino chunks per allocation */
 extern int		max_symlink_blocks;
-extern int64_t		fs_max_file_offset;
 
 /* realtime info */
 

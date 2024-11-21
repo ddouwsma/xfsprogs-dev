@@ -83,7 +83,6 @@ int		inodes_per_block;
 unsigned int	glob_agcount;
 int		chunks_pblock;	/* # of 64-ino chunks per allocation */
 int		max_symlink_blocks;
-int64_t		fs_max_file_offset;
 
 /* realtime info */
 
