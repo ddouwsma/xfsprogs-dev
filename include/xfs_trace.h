@@ -79,7 +79,7 @@
 #define trace_xfs_btree_free_block(...)		((void) 0)
 #define trace_xfs_btree_alloc_block(...)	((void) 0)
 
-#define trace_xfs_free_extent(a,b,c,d,e,f,g)	((void) 0)
+#define trace_xfs_free_extent(...)		((void) 0)
 #define trace_xfs_agf(a,b,c,d)			((void) 0)
 #define trace_xfs_read_agf(a,b)			((void) 0)
 #define trace_xfs_alloc_read_agf(a,b)		((void) 0)
