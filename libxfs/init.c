@@ -32,6 +32,7 @@
 #include "xfs_ondisk.h"
 
 #include "libxfs.h"		/* for now */
+#include "xfs_rtgroup.h"
 
 #ifndef HAVE_LIBURCU_ATOMIC64
 pthread_mutex_t	atomic64_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -670,6 +671,7 @@ libxfs_mount(
 {
 	struct xfs_buf		*bp;
 	struct xfs_sb		*sbp;
+	struct xfs_rtgroup	*rtg = NULL;
 	xfs_daddr_t		d;
 	int			i;
 	int			error;
@@ -824,6 +826,19 @@ libxfs_mount(
 	if (xfs_has_metadir(mp))
 		libxfs_mount_setup_metadir(mp);
 
+	error = libxfs_initialize_rtgroups(mp, 0, sbp->sb_rgcount,
+			sbp->sb_rextents);
+	if (error) {
+		fprintf(stderr, _("%s: rtgroup init failed\n"),
+			progname);
+		exit(1);
+	}
+
+	while ((rtg = xfs_rtgroup_next(mp, rtg)))
+		rtg->rtg_extents = xfs_rtgroup_extents(mp, rtg_rgno(rtg));
+
+	xfs_set_rtgroup_data_loaded(mp);
+
 	return mp;
 out_da:
 	xfs_da_unmount(mp);
@@ -957,6 +972,8 @@ libxfs_umount(
 	 * Only try to free the per-AG structures if we set them up in the
 	 * first place.
 	 */
+	if (xfs_is_rtgroup_data_loaded(mp))
+		libxfs_free_rtgroups(mp, 0, mp->m_sb.sb_rgcount);
 	if (xfs_is_perag_data_loaded(mp))
 		libxfs_free_perag_range(mp, 0, mp->m_sb.sb_agcount);
 

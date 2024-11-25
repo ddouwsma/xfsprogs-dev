@@ -3592,6 +3592,14 @@ sb_set_features(
 	if (!fp->metadir)
 		sbp->sb_bad_features2 = sbp->sb_features2;
 
+	/*
+	 * This will be overriden later for real rtgroup file systems.  For
+	 * !rtgroups filesystems, we pretend that there's one huge group, just
+	 * like __xfs_sb_from_disk does.
+	 */
+	sbp->sb_rgcount = 1;
+	sbp->sb_rgextents = 0;
+
 	if (!fp->crcs_enabled)
 		return;
 

@@ -15,7 +15,6 @@
 #include "bmap.h"
 #include "output.h"
 #include "init.h"
-#include "block.h"
 
 void
 fa_agblock(

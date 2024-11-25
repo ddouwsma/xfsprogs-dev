@@ -356,6 +356,13 @@
 #define trace_xfs_exchmaps_overhead(...)	((void) 0)
 #define trace_xfs_exchmaps_update_inode_size(...) ((void) 0)
 
+/* set c = c to avoid unused var warnings */
+#define trace_xfs_rtgroup_get(a,b)		((a) = (a))
+#define trace_xfs_rtgroup_hold(a,b)		((a) = (a))
+#define trace_xfs_rtgroup_put(a,b)		((a) = (a))
+#define trace_xfs_rtgroup_grab(a,b)		((a) = (a))
+#define trace_xfs_rtgroup_rele(a,b)		((a) = (a))
+
 #define trace_xfs_fs_mark_healthy(a,b)		((void) 0)
 
 #define trace_xlog_intent_recovery_failed(...)	((void) 0)

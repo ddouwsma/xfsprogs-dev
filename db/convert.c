@@ -8,7 +8,6 @@
 #include "command.h"
 #include "output.h"
 #include "init.h"
-#include "block.h"
 
 #define	M(A)	(1 << CT_ ## A)
 #define	agblock_to_bytes(x)	\

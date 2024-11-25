@@ -168,6 +168,7 @@
 #define xfs_free_extent			libxfs_free_extent
 #define xfs_free_extent_later		libxfs_free_extent_later
 #define xfs_free_perag_range		libxfs_free_perag_range
+#define xfs_free_rtgroups		libxfs_free_rtgroups
 #define xfs_fs_geometry			libxfs_fs_geometry
 #define xfs_gbno_to_fsb			libxfs_gbno_to_fsb
 #define xfs_get_initial_prid		libxfs_get_initial_prid
@@ -189,6 +190,7 @@
 
 #define xfs_initialize_perag		libxfs_initialize_perag
 #define xfs_initialize_perag_data	libxfs_initialize_perag_data
+#define xfs_initialize_rtgroups		libxfs_initialize_rtgroups
 #define xfs_init_local_fork		libxfs_init_local_fork
 
 #define xfs_inobt_init_cursor		libxfs_inobt_init_cursor
@@ -275,6 +277,8 @@
 #define xfs_rtbitmap_getword		libxfs_rtbitmap_getword
 #define xfs_rtbitmap_setword		libxfs_rtbitmap_setword
 #define xfs_rtbitmap_wordcount		libxfs_rtbitmap_wordcount
+
+#define xfs_rtgroup_alloc		libxfs_rtgroup_alloc
 
 #define xfs_suminfo_add			libxfs_suminfo_add
 #define xfs_suminfo_get			libxfs_suminfo_get
