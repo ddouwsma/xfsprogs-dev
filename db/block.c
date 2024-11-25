@@ -423,7 +423,7 @@ rtextent_f(
 		return 0;
 	}
 
-	rtbno = xfs_rtx_to_rtb(mp, rtx);
+	rtbno = xfs_rtbxlen_to_blen(mp, rtx);
 	ASSERT(typtab[TYP_DATA].typnm == TYP_DATA);
 	set_rt_cur(&typtab[TYP_DATA], xfs_rtb_to_daddr(mp, rtbno),
 			mp->m_sb.sb_rextsize * blkbb, DB_RING_ADD, NULL);
