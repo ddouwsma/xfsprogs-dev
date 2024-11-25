@@ -360,6 +360,16 @@
 
 #define trace_xlog_intent_recovery_failed(...)	((void) 0)
 
+#define trace_xfs_metadir_cancel(...)		((void) 0)
+#define trace_xfs_metadir_commit(...)		((void) 0)
+#define trace_xfs_metadir_create(...)		((void) 0)
+#define trace_xfs_metadir_link(...)		((void) 0)
+#define trace_xfs_metadir_lookup(...)		((void) 0)
+#define trace_xfs_metadir_start_create(...)	((void) 0)
+#define trace_xfs_metadir_start_link(...)	((void) 0)
+#define trace_xfs_metadir_teardown(...)		((void) 0)
+#define trace_xfs_metadir_try_create(...)	((void) 0)
+
 #define trace_xfs_iunlink_update_bucket(...)	((void) 0)
 #define trace_xfs_iunlink_update_dinode(...)	((void) 0)
 #define trace_xfs_iunlink(...)			((void) 0)

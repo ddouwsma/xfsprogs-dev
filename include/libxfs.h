@@ -96,6 +96,7 @@ struct iomap;
 #include "xfs_parent.h"
 #include "xfs_ag_resv.h"
 #include "xfs_metafile.h"
+#include "xfs_metadir.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))

@@ -55,6 +55,7 @@ HFILES = \
 	xfs_inode_buf.h \
 	xfs_inode_fork.h \
 	xfs_inode_util.h \
+	xfs_metadir.h \
 	xfs_metafile.h \
 	xfs_parent.h \
 	xfs_quota_defs.h \
@@ -114,6 +115,8 @@ CFILES = buf_mem.c \
 	xfs_inode_fork.c \
 	xfs_inode_util.c \
 	xfs_ialloc_btree.c \
+	xfs_metadir.c \
+	xfs_metafile.c \
 	xfs_log_rlimit.c \
 	xfs_parent.c \
 	xfs_refcount.c \
