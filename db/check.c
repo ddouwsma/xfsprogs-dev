@@ -2823,7 +2823,7 @@ process_inode(
 		return;
 	}
 	if (dip->di_version == 1) {
-		nlink = be16_to_cpu(dip->di_onlink);
+		nlink = be16_to_cpu(dip->di_metatype);
 		prid = 0;
 	} else {
 		nlink = be32_to_cpu(dip->di_nlink);

@@ -896,7 +896,7 @@ next_readbuf:
 			set_inode_disk_nlinks(ino_rec, irec_offset,
 				dino->di_version > 1
 					? be32_to_cpu(dino->di_nlink)
-					: be16_to_cpu(dino->di_onlink));
+					: be16_to_cpu(dino->di_metatype));
 
 		} else  {
 			set_inode_free(ino_rec, irec_offset);

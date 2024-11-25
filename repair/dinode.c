@@ -2231,20 +2231,22 @@ process_check_inode_nlink_version(
 	int			dirty = 0;
 
 	/*
-	 * if it's a version 2 inode, it should have a zero
+	 * if it's a version 2 non-metadir inode, it should have a zero
 	 * onlink field, so clear it.
 	 */
-	if (dino->di_version > 1 && dino->di_onlink != 0) {
+	if (dino->di_version > 1 &&
+	    !(dino->di_flags2 & cpu_to_be64(XFS_DIFLAG2_METADATA)) &&
+	    dino->di_metatype != 0) {
 		if (!no_modify) {
 			do_warn(
 _("clearing obsolete nlink field in version 2 inode %" PRIu64 ", was %d, now 0\n"),
-				lino, be16_to_cpu(dino->di_onlink));
-			dino->di_onlink = 0;
+				lino, be16_to_cpu(dino->di_metatype));
+			dino->di_metatype = 0;
 			dirty = 1;
 		} else  {
 			do_warn(
 _("would clear obsolete nlink field in version 2 inode %" PRIu64 ", currently %d\n"),
-				lino, be16_to_cpu(dino->di_onlink));
+				lino, be16_to_cpu(dino->di_metatype));
 		}
 	}
 	return dirty;

@@ -230,6 +230,7 @@ typedef struct xfs_inode {
 		uint16_t	i_flushiter;	/* incremented on flush */
 	};
 	uint8_t			i_forkoff;	/* attr fork offset >> 3 */
+	enum xfs_metafile_type	i_metatype;	/* XFS_METAFILE_* */
 	uint16_t		i_diflags;	/* XFS_DIFLAG_... */
 	uint64_t		i_diflags2;	/* XFS_DIFLAG2_... */
 	struct timespec64	i_crtime;	/* time created */
@@ -394,6 +395,11 @@ static inline bool xfs_inode_has_bigrtalloc(struct xfs_inode *ip)
 static inline bool xfs_is_always_cow_inode(struct xfs_inode *ip)
 {
 	return false;
+}
+
+static inline bool xfs_is_metadir_inode(const struct xfs_inode *ip)
+{
+	return ip->i_diflags2 & XFS_DIFLAG2_METADATA;
 }
 
 extern void	libxfs_trans_inode_alloc_buf (struct xfs_trans *,
