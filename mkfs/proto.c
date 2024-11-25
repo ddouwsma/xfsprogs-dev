@@ -946,9 +946,11 @@ parse_proto(
 /* Create a sb-rooted metadata file. */
 static void
 create_sb_metadata_file(
-	struct xfs_mount	*mp,
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type,
 	void			(*create)(struct xfs_inode *ip))
 {
+	struct xfs_mount	*mp = rtg_mount(rtg);
 	struct xfs_icreate_args	args = {
 		.mode		= S_IFREG,
 		.flags		= XFS_ICREATE_UNLINKABLE,
@@ -978,6 +980,8 @@ create_sb_metadata_file(
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		goto fail;
+	rtg->rtg_inodes[type] = ip;
+	return;
 
 fail:
 	if (ip)
@@ -997,8 +1001,6 @@ rtbitmap_create(
 	inode_set_atime(VFS_I(ip), 0, 0);
 
 	mp->m_sb.sb_rbmino = ip->i_ino;
-	mp->m_rbmip = ip;
-	ihold(VFS_I(ip));
 }
 
 static void
@@ -1010,8 +1012,6 @@ rtsummary_create(
 	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
 
 	mp->m_sb.sb_rsumino = ip->i_ino;
-	mp->m_rsumip = ip;
-	ihold(VFS_I(ip));
 }
 
 /*
@@ -1020,8 +1020,9 @@ rtsummary_create(
  */
 static void
 rtfreesp_init(
-	struct xfs_mount	*mp)
+	struct xfs_rtgroup	*rtg)
 {
+	struct xfs_mount	*mp = rtg_mount(rtg);
 	struct xfs_trans	*tp;
 	xfs_rtxnum_t		rtx;
 	xfs_rtxnum_t		ertx;
@@ -1030,12 +1031,12 @@ rtfreesp_init(
 	/*
 	 * First zero the realtime bitmap and summary files.
 	 */
-	error = -libxfs_rtfile_initialize_blocks(mp->m_rbmip, 0,
+	error = -libxfs_rtfile_initialize_blocks(rtg, XFS_RTGI_BITMAP, 0,
 			mp->m_sb.sb_rbmblocks, NULL);
 	if (error)
 		fail(_("Initialization of rtbitmap inode failed"), error);
 
-	error = -libxfs_rtfile_initialize_blocks(mp->m_rsumip, 0,
+	error = -libxfs_rtfile_initialize_blocks(rtg, XFS_RTGI_SUMMARY, 0,
 			mp->m_rsumblocks, NULL);
 	if (error)
 		fail(_("Initialization of rtsummary inode failed"), error);
@@ -1049,11 +1050,11 @@ rtfreesp_init(
 		if (error)
 			res_failed(error);
 
-		libxfs_trans_ijoin(tp, mp->m_rbmip, 0);
+		libxfs_trans_ijoin(tp, rtg->rtg_inodes[XFS_RTGI_BITMAP], 0);
 		ertx = min(mp->m_sb.sb_rextents,
 			   rtx + NBBY * mp->m_sb.sb_blocksize);
 
-		error = -libxfs_rtfree_extent(tp, rtx,
+		error = -libxfs_rtfree_extent(tp, rtg, rtx,
 				(xfs_rtxlen_t)(ertx - rtx));
 		if (error) {
 			fail(_("Error initializing the realtime space"),
@@ -1073,10 +1074,16 @@ static void
 rtinit(
 	struct xfs_mount	*mp)
 {
-	create_sb_metadata_file(mp, rtbitmap_create);
-	create_sb_metadata_file(mp, rtsummary_create);
+	struct xfs_rtgroup	*rtg = NULL;
 
-	rtfreesp_init(mp);
+	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
+		create_sb_metadata_file(rtg, XFS_RTGI_BITMAP,
+				rtbitmap_create);
+		create_sb_metadata_file(rtg, XFS_RTGI_SUMMARY,
+				rtsummary_create);
+
+		rtfreesp_init(rtg);
+	}
 }
 
 static off_t

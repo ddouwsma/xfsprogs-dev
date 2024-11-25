@@ -326,7 +326,6 @@ rtmount_init(
 	mp->m_rsumlevels = mp->m_sb.sb_rextslog + 1;
 	mp->m_rsumblocks = xfs_rtsummary_blockcount(mp, mp->m_rsumlevels,
 			mp->m_sb.sb_rbmblocks);
-	mp->m_rbmip = mp->m_rsumip = NULL;
 
 	/*
 	 * Allow debugger to be run without the realtime device present.
@@ -855,13 +854,9 @@ libxfs_rtmount_destroy(
 	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		for (i = 0; i < XFS_RTGI_MAX; i++)
 			libxfs_rtginode_irele(&rtg->rtg_inodes[i]);
+		kvfree(rtg->rtg_rsum_cache);
 	}
 	libxfs_rtginode_irele(&mp->m_rtdirip);
-	if (mp->m_rsumip)
-		libxfs_irele(mp->m_rsumip);
-	if (mp->m_rbmip)
-		libxfs_irele(mp->m_rbmip);
-	mp->m_rsumip = mp->m_rbmip = NULL;
 }
 
 /* Flush a device and report on writes that didn't make it to stable storage. */

@@ -491,98 +491,85 @@ mark_ino_metadata(
 	set_inode_is_meta(irec, get_inode_offset(mp, ino, irec));
 }
 
-/* Load a realtime freespace metadata inode from disk and reset it. */
-static int
-ensure_rtino(
-	struct xfs_trans		*tp,
-	enum xfs_metafile_type		metafile_type,
-	struct xfs_inode		**ipp)
-{
-	struct xfs_mount		*mp = tp->t_mountp;
-	xfs_ino_t			ino;
-	int				error;
-
-	switch (metafile_type) {
-	case XFS_METAFILE_RTBITMAP:
-		ino = mp->m_sb.sb_rbmino;
-		break;
-	case XFS_METAFILE_RTSUMMARY:
-		ino = mp->m_sb.sb_rsumino;
-		break;
-	default:
-		ASSERT(0);
-		return -EFSCORRUPTED;
-	}
-
-	/*
-	 * Don't use metafile iget here because we're resetting sb-rooted
-	 * inodes that live at fixed inumbers, but these inodes could be in
-	 * an arbitrary state.
-	 */
-	error = -libxfs_iget(mp, tp, ino, 0, ipp);
-	if (error)
-		return error;
-
-	reset_sbroot_ino(tp, S_IFREG, *ipp);
-	if (xfs_has_metadir(mp))
-		libxfs_metafile_set_iflag(tp, *ipp, metafile_type);
-	return 0;
-}
-
+/* (Re)create a missing sb-rooted rt freespace inode. */
 static void
-mk_rbmino(
-	struct xfs_mount	*mp)
+mk_rtino(
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type)
 {
+	struct xfs_mount	*mp = rtg_mount(rtg);
+	struct xfs_inode	*ip = rtg->rtg_inodes[type];
 	struct xfs_trans	*tp;
-	struct xfs_inode	*ip;
+	enum xfs_metafile_type	metafile_type =
+		libxfs_rtginode_metafile_type(type);
 	int			error;
 
 	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
 	if (error)
 		res_failed(error);
 
-	/* Reset the realtime bitmap inode. */
-	error = ensure_rtino(tp, XFS_METAFILE_RTBITMAP, &ip);
-	if (error) {
-		do_error(
-		_("couldn't iget realtime bitmap inode -- error - %d\n"),
-			error);
+	if (!ip) {
+		xfs_ino_t	rootino = mp->m_sb.sb_rootino;
+		xfs_ino_t	ino = NULLFSINO;
+
+		if (xfs_has_metadir(mp))
+			rootino++;
+
+		switch (type) {
+		case XFS_RTGI_BITMAP:
+			mp->m_sb.sb_rbmino = rootino + 1;
+			ino = mp->m_sb.sb_rbmino;
+			break;
+		case XFS_RTGI_SUMMARY:
+			mp->m_sb.sb_rsumino = rootino + 2;
+			ino = mp->m_sb.sb_rsumino;
+			break;
+		default:
+			break;
+		}
+
+		/*
+		 * Don't use metafile iget here because we're resetting
+		 * sb-rooted inodes that live at fixed inumbers, but these
+		 * inodes could be in an arbitrary state.
+		 */
+		error = -libxfs_iget(mp, tp, ino, 0, &ip);
+		if (error) {
+			do_error(
+_("couldn't iget realtime %s inode -- error - %d\n"),
+					libxfs_rtginode_name(type),
+					error);
+		}
+
+		rtg->rtg_inodes[type] = ip;
 	}
 
-	ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
-	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	reset_sbroot_ino(tp, S_IFREG, ip);
+	if (xfs_has_metadir(mp))
+		libxfs_metafile_set_iflag(tp, ip, metafile_type);
+
+	switch (type) {
+	case XFS_RTGI_BITMAP:
+		ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
+		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+		error = 0;
+		break;
+	case XFS_RTGI_SUMMARY:
+		ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
+		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+		error = 0;
+		break;
+	default:
+		error = EINVAL;
+	}
+
+	if (error)
+		do_error(_("%s inode re-initialization failed for rtgroup %u\n"),
+			libxfs_rtginode_name(type), rtg_rgno(rtg));
+
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_error(_("%s: commit failed, error %d\n"), __func__, error);
-	libxfs_irele(ip);
-}
-
-static void
-mk_rsumino(
-	struct xfs_mount	*mp)
-{
-	struct xfs_trans	*tp;
-	struct xfs_inode	*ip;
-	int			error;
-
-	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_ichange, 10, 0, 0, &tp);
-	if (error)
-		res_failed(error);
-
-	/* Reset the rt summary inode. */
-	error = ensure_rtino(tp, XFS_METAFILE_RTSUMMARY, &ip);
-	if (error) {
-		do_error(
-		_("couldn't iget realtime summary inode -- error - %d\n"),
-			error);
-	}
-
-	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
-	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-	error = -libxfs_trans_commit(tp);
-	if (error)
-		do_error(_("%s: commit failed, error %d\n"), __func__, error);
-	libxfs_irele(ip);
 }
 
 /* Initialize a root directory. */
@@ -3219,6 +3206,43 @@ traverse_ags(
 	do_inode_prefetch(mp, ag_stride, traverse_function, false, true);
 }
 
+static void
+reset_rt_sb_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+
+	if (no_modify) {
+		if (need_rbmino)
+			do_warn(_("would reinitialize realtime bitmap inode\n"));
+		if (need_rsumino)
+			do_warn(_("would reinitialize realtime summary inode\n"));
+		return;
+	}
+
+	rtg = libxfs_rtgroup_grab(mp, 0);
+
+	if (need_rbmino)  {
+		do_warn(_("reinitializing realtime bitmap inode\n"));
+		mk_rtino(rtg, XFS_RTGI_BITMAP);
+		need_rbmino = 0;
+	}
+
+	if (need_rsumino)  {
+		do_warn(_("reinitializing realtime summary inode\n"));
+		mk_rtino(rtg, XFS_RTGI_SUMMARY);
+		need_rsumino = 0;
+	}
+
+	do_log(
+_("        - resetting contents of realtime bitmap and summary inodes\n"));
+
+	fill_rtbitmap(rtg);
+	fill_rtsummary(rtg);
+
+	libxfs_rtgroup_rele(rtg);
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
@@ -3267,32 +3291,7 @@ phase6(xfs_mount_t *mp)
 		do_warn(_("would reinitialize metadata root directory\n"));
 	}
 
-	if (need_rbmino)  {
-		if (!no_modify)  {
-			do_warn(_("reinitializing realtime bitmap inode\n"));
-			mk_rbmino(mp);
-			need_rbmino = 0;
-		} else  {
-			do_warn(_("would reinitialize realtime bitmap inode\n"));
-		}
-	}
-
-	if (need_rsumino)  {
-		if (!no_modify)  {
-			do_warn(_("reinitializing realtime summary inode\n"));
-			mk_rsumino(mp);
-			need_rsumino = 0;
-		} else  {
-			do_warn(_("would reinitialize realtime summary inode\n"));
-		}
-	}
-
-	if (!no_modify)  {
-		do_log(
-_("        - resetting contents of realtime bitmap and summary inodes\n"));
-		fill_rtbitmap(mp);
-		fill_rtsummary(mp);
-	}
+	reset_rt_sb_inodes(mp);
 
 	mark_standalone_inodes(mp);
 

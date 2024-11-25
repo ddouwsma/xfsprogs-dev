@@ -274,12 +274,22 @@
 #define xfs_rmap_query_all		libxfs_rmap_query_all
 #define xfs_rmap_query_range		libxfs_rmap_query_range
 
+#define xfs_rtbitmap_create		libxfs_rtbitmap_create
 #define xfs_rtbitmap_getword		libxfs_rtbitmap_getword
 #define xfs_rtbitmap_setword		libxfs_rtbitmap_setword
 #define xfs_rtbitmap_wordcount		libxfs_rtbitmap_wordcount
+#define xfs_rtginode_create		libxfs_rtginode_create
 #define xfs_rtginode_irele		libxfs_rtginode_irele
+#define xfs_rtginode_load		libxfs_rtginode_load
+#define xfs_rtginode_load_parent	libxfs_rtginode_load_parent
+#define xfs_rtginode_metafile_type	libxfs_rtginode_metafile_type
+#define xfs_rtginode_mkdir_parent	libxfs_rtginode_mkdir_parent
+#define xfs_rtginode_name		libxfs_rtginode_name
+#define xfs_rtsummary_create		libxfs_rtsummary_create
 
 #define xfs_rtgroup_alloc		libxfs_rtgroup_alloc
+#define xfs_rtgroup_grab		libxfs_rtgroup_grab
+#define xfs_rtgroup_rele		libxfs_rtgroup_rele
 
 #define xfs_suminfo_add			libxfs_suminfo_add
 #define xfs_suminfo_get			libxfs_suminfo_get

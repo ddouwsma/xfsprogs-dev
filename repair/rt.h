@@ -10,7 +10,7 @@ void generate_rtinfo(struct xfs_mount *mp);
 void check_rtbitmap(struct xfs_mount *mp);
 void check_rtsummary(struct xfs_mount *mp);
 
-void fill_rtbitmap(struct xfs_mount *mp);
-void fill_rtsummary(struct xfs_mount *mp);
+void fill_rtbitmap(struct xfs_rtgroup *rtg);
+void fill_rtsummary(struct xfs_rtgroup *rtg);
 
 #endif /* _XFS_REPAIR_RT_H_ */

@@ -69,8 +69,6 @@ _("couldn't allocate memory for incore realtime bitmap.\n"));
 		do_error(
 _("couldn't allocate memory for incore realtime summary info.\n"));
 
-	ASSERT(mp->m_rbmip == NULL);
-
 	/*
 	 * Slower but simple, don't play around with trying to set things one
 	 * word at a time, just set bit as required.  Have to track start and
@@ -234,46 +232,26 @@ check_rtsummary(
 
 void
 fill_rtbitmap(
-	struct xfs_mount	*mp)
+	struct xfs_rtgroup	*rtg)
 {
-	struct xfs_inode	*ip;
 	int			error;
 
-	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rbmino,
-			XFS_METAFILE_RTBITMAP, &ip);
-	if (error)
-		do_error(
-_("couldn't iget realtime bitmap inode, error %d\n"), error);
-
-	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_sb.sb_rbmblocks,
-			btmcompute);
+	error = -libxfs_rtfile_initialize_blocks(rtg, XFS_RTGI_BITMAP,
+			0, rtg_mount(rtg)->m_sb.sb_rbmblocks, btmcompute);
 	if (error)
 		do_error(
 _("couldn't re-initialize realtime bitmap inode, error %d\n"), error);
-
-	libxfs_irele(ip);
 }
 
 void
 fill_rtsummary(
-	struct xfs_mount	*mp)
+	struct xfs_rtgroup	*rtg)
 {
-	struct xfs_inode	*ip;
 	int			error;
 
-	error = -libxfs_metafile_iget(mp, mp->m_sb.sb_rsumino,
-			XFS_METAFILE_RTSUMMARY, &ip);
-	if (error)
-		do_error(
-_("couldn't iget realtime summary inode, error %d\n"), error);
-
-	mp->m_rsumip = ip;
-	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_rsumblocks,
-			sumcompute);
-	mp->m_rsumip = NULL;
+	error = -libxfs_rtfile_initialize_blocks(rtg, XFS_RTGI_SUMMARY,
+			0, rtg_mount(rtg)->m_rsumblocks, sumcompute);
 	if (error)
 		do_error(
 _("couldn't re-initialize realtime summary inode, error %d\n"), error);
-
-	libxfs_irele(ip);
 }
