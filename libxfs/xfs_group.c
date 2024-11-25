@@ -160,6 +160,9 @@ xfs_group_free(
 	XFS_IS_CORRUPT(mp, atomic_read(&xg->xg_ref) != 0);
 
 	xfs_defer_drain_free(&xg->xg_intents_drain);
+#ifdef __KERNEL__
+	kfree(xg->xg_busy_extents);
+#endif
 
 	if (uninit)
 		uninit(xg);
@@ -184,6 +187,9 @@ xfs_group_insert(
 	xg->xg_type = type;
 
 #ifdef __KERNEL__
+	xg->xg_busy_extents = xfs_extent_busy_alloc();
+	if (!xg->xg_busy_extents)
+		return -ENOMEM;
 	spin_lock_init(&xg->xg_state_lock);
 	xfs_hooks_init(&xg->xg_rmap_update_hooks);
 #endif
@@ -195,9 +201,14 @@ xfs_group_insert(
 	error = xa_insert(&mp->m_groups[type].xa, index, xg, GFP_KERNEL);
 	if (error) {
 		WARN_ON_ONCE(error == -EBUSY);
-		xfs_defer_drain_free(&xg->xg_intents_drain);
-		return error;
+		goto out_drain;
 	}
 
 	return 0;
+out_drain:
+	xfs_defer_drain_free(&xg->xg_intents_drain);
+#ifdef __KERNEL__
+	kfree(xg->xg_busy_extents);
+#endif
+	return error;
 }

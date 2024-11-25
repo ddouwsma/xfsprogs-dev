@@ -467,11 +467,11 @@ xfs_buf_readahead(
 
 #define xfs_extent_busy_reuse(...)			((void) 0)
 /* avoid unused variable warning */
-#define xfs_extent_busy_insert(tp,pag,bno,len,flags)({ 	\
-	struct xfs_perag *__foo = pag;			\
+#define xfs_extent_busy_insert(tp,xg,bno,len,flags)({ 	\
+	struct xfs_group *__foo = xg;			\
 	__foo = __foo; /* no set-but-unused warning */	\
 })
-#define xfs_extent_busy_trim(args,bno,len,busy_gen) 	({	\
+#define xfs_extent_busy_trim(group,minlen,maxlen,bno,len,busy_gen) 	({	\
 	unsigned __foo = *(busy_gen);				\
 	*(busy_gen) = __foo;					\
 	false;							\
