@@ -137,7 +137,7 @@ xfs_inobt_complain_bad_rec(
 
 	xfs_warn(mp,
 		"%sbt record corruption in AG %d detected at %pS!",
-		cur->bc_ops->name, pag_agno(cur->bc_ag.pag), fa);
+		cur->bc_ops->name, cur->bc_group->xg_gno, fa);
 	xfs_warn(mp,
 "start inode 0x%x, count 0x%x, free 0x%x freemask 0x%llx, holemask 0x%x",
 		irec->ir_startino, irec->ir_count, irec->ir_freecount,
@@ -165,7 +165,7 @@ xfs_inobt_get_rec(
 		return error;
 
 	xfs_inobt_btrec_to_irec(mp, rec, irec);
-	fa = xfs_inobt_check_irec(cur->bc_ag.pag, irec);
+	fa = xfs_inobt_check_irec(to_perag(cur->bc_group), irec);
 	if (fa)
 		return xfs_inobt_complain_bad_rec(cur, fa, irec);
 
@@ -270,8 +270,10 @@ xfs_check_agi_freecount(
 			}
 		} while (i == 1);
 
-		if (!xfs_is_shutdown(cur->bc_mp))
-			ASSERT(freecount == cur->bc_ag.pag->pagi_freecount);
+		if (!xfs_is_shutdown(cur->bc_mp)) {
+			ASSERT(freecount ==
+				to_perag(cur->bc_group)->pagi_freecount);
+		}
 	}
 	return 0;
 }
@@ -2875,7 +2877,7 @@ xfs_ialloc_count_inodes_rec(
 	xfs_failaddr_t			fa;
 
 	xfs_inobt_btrec_to_irec(cur->bc_mp, rec, &irec);
-	fa = xfs_inobt_check_irec(cur->bc_ag.pag, &irec);
+	fa = xfs_inobt_check_irec(to_perag(cur->bc_group), &irec);
 	if (fa)
 		return xfs_inobt_complain_bad_rec(cur, fa, &irec);
 

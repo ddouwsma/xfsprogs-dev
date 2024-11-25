@@ -223,7 +223,7 @@ __xfs_btree_check_agblock(
 	struct xfs_buf		*bp)
 {
 	struct xfs_mount	*mp = cur->bc_mp;
-	struct xfs_perag	*pag = cur->bc_ag.pag;
+	struct xfs_perag	*pag = to_perag(cur->bc_group);
 	xfs_failaddr_t		fa;
 	xfs_agblock_t		agbno;
 
@@ -329,7 +329,7 @@ __xfs_btree_check_ptr(
 			return -EFSCORRUPTED;
 		break;
 	case XFS_BTREE_TYPE_AG:
-		if (!xfs_verify_agbno(cur->bc_ag.pag,
+		if (!xfs_verify_agbno(to_perag(cur->bc_group),
 				be32_to_cpu((&ptr->s)[index])))
 			return -EFSCORRUPTED;
 		break;
@@ -370,7 +370,7 @@ xfs_btree_check_ptr(
 		case XFS_BTREE_TYPE_AG:
 			xfs_err(cur->bc_mp,
 "AG %u: Corrupt %sbt pointer at level %d index %d.",
-				pag_agno(cur->bc_ag.pag), cur->bc_ops->name,
+				cur->bc_group->xg_gno, cur->bc_ops->name,
 				level, index);
 			break;
 		}
@@ -521,20 +521,8 @@ xfs_btree_del_cursor(
 	ASSERT(!xfs_btree_is_bmap(cur->bc_ops) || cur->bc_bmap.allocated == 0 ||
 	       xfs_is_shutdown(cur->bc_mp) || error != 0);
 
-	switch (cur->bc_ops->type) {
-	case XFS_BTREE_TYPE_AG:
-		if (cur->bc_ag.pag)
-			xfs_perag_put(cur->bc_ag.pag);
-		break;
-	case XFS_BTREE_TYPE_INODE:
-		/* nothing to do */
-		break;
-	case XFS_BTREE_TYPE_MEM:
-		if (cur->bc_mem.pag)
-			xfs_perag_put(cur->bc_mem.pag);
-		break;
-	}
-
+	if (cur->bc_group)
+		xfs_group_put(cur->bc_group);
 	kmem_cache_free(cur->bc_cache, cur);
 }
 
@@ -1015,21 +1003,22 @@ xfs_btree_readahead_agblock(
 	struct xfs_btree_block	*block)
 {
 	struct xfs_mount	*mp = cur->bc_mp;
+	struct xfs_perag	*pag = to_perag(cur->bc_group);
 	xfs_agblock_t		left = be32_to_cpu(block->bb_u.s.bb_leftsib);
 	xfs_agblock_t		right = be32_to_cpu(block->bb_u.s.bb_rightsib);
 	int			rval = 0;
 
 	if ((lr & XFS_BTCUR_LEFTRA) && left != NULLAGBLOCK) {
 		xfs_buf_readahead(mp->m_ddev_targp,
-				xfs_agbno_to_daddr(cur->bc_ag.pag, left),
-				mp->m_bsize, cur->bc_ops->buf_ops);
+				xfs_agbno_to_daddr(pag, left), mp->m_bsize,
+				cur->bc_ops->buf_ops);
 		rval++;
 	}
 
 	if ((lr & XFS_BTCUR_RIGHTRA) && right != NULLAGBLOCK) {
 		xfs_buf_readahead(mp->m_ddev_targp,
-				xfs_agbno_to_daddr(cur->bc_ag.pag, right),
-				mp->m_bsize, cur->bc_ops->buf_ops);
+				xfs_agbno_to_daddr(pag, right), mp->m_bsize,
+				cur->bc_ops->buf_ops);
 		rval++;
 	}
 
@@ -1088,7 +1077,7 @@ xfs_btree_ptr_to_daddr(
 
 	switch (cur->bc_ops->type) {
 	case XFS_BTREE_TYPE_AG:
-		*daddr = xfs_agbno_to_daddr(cur->bc_ag.pag,
+		*daddr = xfs_agbno_to_daddr(to_perag(cur->bc_group),
 				be32_to_cpu(ptr->s));
 		break;
 	case XFS_BTREE_TYPE_INODE:
@@ -1310,7 +1299,7 @@ xfs_btree_owner(
 	case XFS_BTREE_TYPE_INODE:
 		return cur->bc_ino.ip->i_ino;
 	case XFS_BTREE_TYPE_AG:
-		return pag_agno(cur->bc_ag.pag);
+		return cur->bc_group->xg_gno;
 	default:
 		ASSERT(0);
 		return 0;

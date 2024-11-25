@@ -202,7 +202,7 @@ get_bno_rec(
 	struct xfs_btree_cur	*cur,
 	struct extent_tree_node	*prev_value)
 {
-	xfs_agnumber_t		agno = pag_agno(cur->bc_ag.pag);
+	xfs_agnumber_t		agno = cur->bc_group->xg_gno;
 
 	if (xfs_btree_is_bno(cur->bc_ops)) {
 		if (!prev_value)
@@ -376,7 +376,7 @@ get_ino_rec(
 	struct xfs_btree_cur	*cur,
 	struct ino_tree_node	*prev_value)
 {
-	xfs_agnumber_t		agno = pag_agno(cur->bc_ag.pag);
+	xfs_agnumber_t		agno = cur->bc_group->xg_gno;
 
 	if (xfs_btree_is_ino(cur->bc_ops)) {
 		if (!prev_value)
@@ -614,7 +614,7 @@ get_rmapbt_records(
 		if (ret == 0)
 			do_error(
  _("ran out of records while rebuilding AG %u rmap btree\n"),
-					pag_agno(cur->bc_ag.pag));
+					cur->bc_group->xg_gno);
 
 		block_rec = libxfs_btree_rec_addr(cur, idx, block);
 		cur->bc_ops->init_rec_from_cur(cur, block_rec);
