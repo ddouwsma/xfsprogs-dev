@@ -323,9 +323,7 @@ rtmount_init(
 			progname);
 		return -1;
 	}
-	mp->m_rsumlevels = mp->m_sb.sb_rextslog + 1;
-	mp->m_rsumblocks = xfs_rtsummary_blockcount(mp, mp->m_rsumlevels,
-			mp->m_sb.sb_rbmblocks);
+	mp->m_rsumblocks = xfs_rtsummary_blockcount(mp, &mp->m_rsumlevels);
 
 	/*
 	 * Allow debugger to be run without the realtime device present.
