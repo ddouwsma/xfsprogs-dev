@@ -814,7 +814,7 @@ rmap_shareable(
 		return false;
 
 	/* Metadata in files are never shareable */
-	if (libxfs_internal_inum(mp, rmap->rm_owner))
+	if (libxfs_is_sb_inum(mp, rmap->rm_owner))
 		return false;
 
 	/* Metadata and unwritten file blocks are not shareable. */

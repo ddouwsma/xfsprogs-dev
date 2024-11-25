@@ -199,7 +199,7 @@
 #define xfs_inode_validate_cowextsize	libxfs_inode_validate_cowextsize
 #define xfs_inode_validate_extsize	libxfs_inode_validate_extsize
 
-#define xfs_internal_inum		libxfs_internal_inum
+#define xfs_is_sb_inum			libxfs_is_sb_inum
 
 #define xfs_iread_extents		libxfs_iread_extents
 #define xfs_irele			libxfs_irele
