@@ -846,8 +846,17 @@ out_da:
 }
 
 void
-libxfs_rtmount_destroy(xfs_mount_t *mp)
+libxfs_rtmount_destroy(
+	struct xfs_mount	*mp)
 {
+	struct xfs_rtgroup	*rtg = NULL;
+	unsigned int		i;
+
+	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
+		for (i = 0; i < XFS_RTGI_MAX; i++)
+			libxfs_rtginode_irele(&rtg->rtg_inodes[i]);
+	}
+	libxfs_rtginode_irele(&mp->m_rtdirip);
 	if (mp->m_rsumip)
 		libxfs_irele(mp->m_rsumip);
 	if (mp->m_rbmip)

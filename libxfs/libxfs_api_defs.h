@@ -277,6 +277,7 @@
 #define xfs_rtbitmap_getword		libxfs_rtbitmap_getword
 #define xfs_rtbitmap_setword		libxfs_rtbitmap_setword
 #define xfs_rtbitmap_wordcount		libxfs_rtbitmap_wordcount
+#define xfs_rtginode_irele		libxfs_rtginode_irele
 
 #define xfs_rtgroup_alloc		libxfs_rtgroup_alloc
 
