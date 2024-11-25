@@ -117,7 +117,7 @@ dump_unlinked(
 	bool			verbose)
 {
 	struct xfs_buf		*agi_bp;
-	xfs_agnumber_t		agno = pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(pag);
 	int			error;
 
 	error = -libxfs_ialloc_read_agi(pag, NULL, 0, &agi_bp);

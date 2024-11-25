@@ -74,11 +74,10 @@ bulkload_add_extent(
 	xfs_agblock_t		agbno,
 	xfs_extlen_t		len)
 {
-	struct xfs_mount	*mp = bkl->sc->mp;
 	struct xfs_alloc_arg	args = {
 		.tp		= NULL, /* no autoreap */
 		.oinfo		= bkl->oinfo,
-		.fsbno		= XFS_AGB_TO_FSB(mp, pag->pag_agno, agbno),
+		.fsbno		= xfs_agbno_to_fsb(pag, agbno),
 		.len		= len,
 		.resv		= XFS_AG_RESV_NONE,
 	};
@@ -194,7 +193,7 @@ free:
 	 * Use EFIs to free the reservations.  We don't need to use EFIs here
 	 * like the kernel, but we'll do it to keep the code matched.
 	 */
-	fsbno = XFS_AGB_TO_FSB(sc->mp, resv->pag->pag_agno, free_agbno);
+	fsbno = xfs_agbno_to_fsb(resv->pag, free_agbno);
 	error = -libxfs_free_extent_later(sc->tp, fsbno, free_aglen,
 			&bkl->oinfo, XFS_AG_RESV_NONE,
 			XFS_FREE_EXTENT_SKIP_DISCARD);
@@ -290,7 +289,6 @@ bulkload_claim_block(
 	union xfs_btree_ptr	*ptr)
 {
 	struct bulkload_resv	*resv;
-	struct xfs_mount	*mp = cur->bc_mp;
 	xfs_agblock_t		agbno;
 
 	/*
@@ -316,8 +314,7 @@ bulkload_claim_block(
 		list_move_tail(&resv->list, &bkl->resv_list);
 
 	if (cur->bc_ops->ptr_len == XFS_BTREE_LONG_PTR_LEN)
-		ptr->l = cpu_to_be64(XFS_AGB_TO_FSB(mp, resv->pag->pag_agno,
-								agbno));
+		ptr->l = cpu_to_be64(xfs_agbno_to_fsb(resv->pag, agbno));
 	else
 		ptr->s = cpu_to_be32(agbno);
 	return 0;

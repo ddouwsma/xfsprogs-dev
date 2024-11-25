@@ -129,7 +129,6 @@ xrep_bmap_walk_rmap(
 	void				*priv)
 {
 	struct xrep_bmap		*rb = priv;
-	struct xfs_mount		*mp = cur->bc_mp;
 	xfs_fsblock_t			fsbno;
 	int				error;
 
@@ -155,8 +154,7 @@ xrep_bmap_walk_rmap(
 	    !(rec->rm_flags & XFS_RMAP_ATTR_FORK))
 		return 0;
 
-	fsbno = XFS_AGB_TO_FSB(mp, cur->bc_ag.pag->pag_agno,
-			rec->rm_startblock);
+	fsbno = xfs_agbno_to_fsb(cur->bc_ag.pag, rec->rm_startblock);
 
 	if (rec->rm_flags & XFS_RMAP_BMBT_BLOCK) {
 		rb->old_bmbt_block_count += rec->rm_blockcount;

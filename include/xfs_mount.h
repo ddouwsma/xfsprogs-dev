@@ -24,6 +24,10 @@ enum {
 	XFS_LOWSP_MAX,
 };
 
+struct xfs_groups {
+	struct xarray		xa;
+};
+
 /*
  * Define a user-level mount structure with all we need
  * in order to make use of the numerous XFS_* macros.
@@ -91,7 +95,7 @@ typedef struct xfs_mount {
 	xfs_extlen_t		m_ag_prealloc_blocks; /* reserved ag blocks */
 	uint			m_alloc_set_aside; /* space we can't use */
 	uint			m_ag_max_usable; /* max space per AG */
-	struct xarray		m_perags;
+	struct xfs_groups	m_groups[XG_TYPE_MAX];
 	uint64_t		m_features;	/* active filesystem features */
 	uint64_t		m_low_space[XFS_LOWSP_MAX];
 	uint64_t		m_rtxblkmask;	/* rt extent block mask */

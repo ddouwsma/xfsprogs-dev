@@ -66,7 +66,7 @@ print_agresv_info(
 {
 	struct xfs_buf	*bp;
 	struct xfs_agf	*agf;
-	xfs_agnumber_t	agno = pag->pag_agno;
+	xfs_agnumber_t	agno = pag_agno(pag);
 	xfs_extlen_t	ask = 0;
 	xfs_extlen_t	used = 0;
 	xfs_extlen_t	free = 0;

@@ -366,4 +366,11 @@
 #define trace_xfs_iunlink_reload_next(...)	((void) 0)
 #define trace_xfs_iunlink_remove(...)		((void) 0)
 
+#define trace_xfs_group_get(...)		((void) 0)
+#define trace_xfs_group_grab_next_tag(...)	((void) 0)
+#define trace_xfs_group_grab(...)		((void) 0)
+#define trace_xfs_group_hold(...)		((void) 0)
+#define trace_xfs_group_put(...)		((void) 0)
+#define trace_xfs_group_rele(...)		((void) 0)
+
 #endif /* __TRACE_H__ */

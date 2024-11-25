@@ -65,9 +65,10 @@ xfs_iunlink_log_dinode(
 		goto out;
 	}
 
-	trace_xfs_iunlink_update_dinode(mp, iup->pag->pag_agno,
-			XFS_INO_TO_AGINO(mp, ip->i_ino),
-			be32_to_cpu(dip->di_next_unlinked), iup->next_agino);
+	trace_xfs_iunlink_update_dinode(mp, pag_agno(iup->pag),
+					XFS_INO_TO_AGINO(mp, ip->i_ino),
+					be32_to_cpu(dip->di_next_unlinked),
+					iup->next_agino);
 
 	dip->di_next_unlinked = cpu_to_be32(iup->next_agino);
 	offset = ip->i_imap.im_boffset +
@@ -137,14 +138,14 @@ xfs_iunlink_reload_next(
 	xfs_agino_t		next_agino)
 {
 	struct xfs_perag	*pag = agibp->b_pag;
-	struct xfs_mount	*mp = pag->pag_mount;
+	struct xfs_mount	*mp = pag_mount(pag);
 	struct xfs_inode	*next_ip = NULL;
 	xfs_ino_t		ino;
 	int			error;
 
 	ASSERT(next_agino != NULLAGINO);
 
-	ino = XFS_AGINO_TO_INO(mp, pag->pag_agno, next_agino);
+	ino = XFS_AGINO_TO_INO(mp, pag_agno(pag), next_agino);
 	error = libxfs_iget(mp, tp, ino, XFS_IGET_UNTRUSTED, &next_ip);
 	if (error)
 		return error;

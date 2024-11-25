@@ -304,13 +304,13 @@ check_fs_free_space(
 		if (error)
 			do_error(
 	_("Cannot read AGI %u for upgrade check, err=%d.\n"),
-					pag->pag_agno, error);
+					pag_agno(pag), error);
 
 		error = -libxfs_alloc_read_agf(pag, tp, 0, &agf_bp);
 		if (error)
 			do_error(
 	_("Cannot read AGF %u for upgrade check, err=%d.\n"),
-					pag->pag_agno, error);
+					pag_agno(pag), error);
 		agf = agf_bp->b_addr;
 		agblocks = be32_to_cpu(agf->agf_length);
 
@@ -326,13 +326,13 @@ check_fs_free_space(
 		if (error == ENOSPC) {
 			printf(
 	_("Not enough free space would remain in AG %u for metadata.\n"),
-					pag->pag_agno);
+					pag_agno(pag));
 			exit(1);
 		}
 		if (error)
 			do_error(
 	_("Error %d while checking AG %u space reservation.\n"),
-					error, pag->pag_agno);
+					error, pag_agno(pag));
 
 		/*
 		 * Would the post-upgrade filesystem have enough free space in
@@ -345,7 +345,7 @@ check_fs_free_space(
 		if (!check_free_space(mp, avail, agblocks)) {
 			printf(
 	_("AG %u will be low on space after upgrade.\n"),
-					pag->pag_agno);
+					pag_agno(pag));
 			exit(1);
 		}
 		libxfs_trans_cancel(tp);

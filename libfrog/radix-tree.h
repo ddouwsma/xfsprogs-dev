@@ -72,6 +72,8 @@ struct xarray {
 	struct radix_tree_root	r;
 };
 
+typedef unsigned xa_mark_t;
+
 static inline void xa_init(struct xarray *xa)
 {
 	INIT_RADIX_TREE(&xa->r, GFP_KERNEL);
@@ -96,6 +98,13 @@ static inline int xa_insert(struct xarray *xa, unsigned long index, void *entry,
 	if (error == -EEXIST)
 		return -EBUSY;
 	return error;
+}
+
+static inline void *xa_find(struct xarray *xa, unsigned long *indexp,
+			unsigned long max, xa_mark_t filter)
+{
+	/* not implemented */
+	return NULL;
 }
 
 #endif /* __LIBFROG_RADIX_TREE_H__ */

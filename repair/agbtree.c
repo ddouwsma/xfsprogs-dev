@@ -166,8 +166,7 @@ finish_rebuild(
 		if (resv->used == resv->len)
 			continue;
 
-		fsbno = XFS_AGB_TO_FSB(mp, resv->pag->pag_agno,
-				resv->agbno + resv->used);
+		fsbno = xfs_agbno_to_fsb(resv->pag, resv->agbno + resv->used);
 		error = bitmap_set(lost_blocks, fsbno, resv->len - resv->used);
 		if (error)
 			do_error(
@@ -203,7 +202,7 @@ get_bno_rec(
 	struct xfs_btree_cur	*cur,
 	struct extent_tree_node	*prev_value)
 {
-	xfs_agnumber_t		agno = cur->bc_ag.pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(cur->bc_ag.pag);
 
 	if (xfs_btree_is_bno(cur->bc_ops)) {
 		if (!prev_value)
@@ -254,7 +253,7 @@ init_freespace_cursors(
 	struct bt_rebuild	*btr_bno,
 	struct bt_rebuild	*btr_cnt)
 {
-	xfs_agnumber_t		agno = pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(pag);
 	unsigned int		agfl_goal;
 	int			error;
 
@@ -377,7 +376,7 @@ get_ino_rec(
 	struct xfs_btree_cur	*cur,
 	struct ino_tree_node	*prev_value)
 {
-	xfs_agnumber_t		agno = cur->bc_ag.pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(cur->bc_ag.pag);
 
 	if (xfs_btree_is_ino(cur->bc_ops)) {
 		if (!prev_value)
@@ -482,7 +481,7 @@ init_ino_cursors(
 	struct bt_rebuild	*btr_fino)
 {
 	struct ino_tree_node	*ino_rec;
-	xfs_agnumber_t		agno = pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(pag);
 	unsigned int		ino_recs = 0;
 	unsigned int		fino_recs = 0;
 	bool			finobt;
@@ -615,7 +614,7 @@ get_rmapbt_records(
 		if (ret == 0)
 			do_error(
  _("ran out of records while rebuilding AG %u rmap btree\n"),
-					cur->bc_ag.pag->pag_agno);
+					pag_agno(cur->bc_ag.pag));
 
 		block_rec = libxfs_btree_rec_addr(cur, idx, block);
 		cur->bc_ops->init_rec_from_cur(cur, block_rec);
@@ -632,7 +631,7 @@ init_rmapbt_cursor(
 	unsigned int		est_agfreeblocks,
 	struct bt_rebuild	*btr)
 {
-	xfs_agnumber_t		agno = pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(pag);
 	int			error;
 
 	if (!xfs_has_rmapbt(sc->mp))
@@ -715,7 +714,7 @@ init_refc_cursor(
 	unsigned int		est_agfreeblocks,
 	struct bt_rebuild	*btr)
 {
-	xfs_agnumber_t		agno = pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(pag);
 	int			error;
 
 	if (!xfs_has_reflink(sc->mp))
@@ -769,7 +768,7 @@ estimate_allocbt_blocks(
 	unsigned int		nr_extents)
 {
 	/* Account for space consumed by both free space btrees */
-	return libxfs_allocbt_calc_size(pag->pag_mount, nr_extents) * 2;
+	return libxfs_allocbt_calc_size(pag_mount(pag), nr_extents) * 2;
 }
 
 static xfs_extlen_t
@@ -777,7 +776,7 @@ estimate_inobt_blocks(
 	struct xfs_perag	*pag)
 {
 	struct ino_tree_node	*ino_rec;
-	xfs_agnumber_t		agno = pag->pag_agno;
+	xfs_agnumber_t		agno = pag_agno(pag);
 	unsigned int		ino_recs = 0;
 	unsigned int		fino_recs = 0;
 	xfs_extlen_t		ret;
@@ -807,9 +806,9 @@ estimate_inobt_blocks(
 			fino_recs++;
 	}
 
-	ret = libxfs_iallocbt_calc_size(pag->pag_mount, ino_recs);
-	if (xfs_has_finobt(pag->pag_mount))
-		ret += libxfs_iallocbt_calc_size(pag->pag_mount, fino_recs);
+	ret = libxfs_iallocbt_calc_size(pag_mount(pag), ino_recs);
+	if (xfs_has_finobt(pag_mount(pag)))
+		ret += libxfs_iallocbt_calc_size(pag_mount(pag), fino_recs);
 	return ret;
 
 }
