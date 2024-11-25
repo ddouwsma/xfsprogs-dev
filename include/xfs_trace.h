@@ -81,10 +81,10 @@
 
 #define trace_xfs_free_extent(...)		((void) 0)
 #define trace_xfs_agf(a,b,c,d)			((void) 0)
-#define trace_xfs_read_agf(a,b)			((void) 0)
-#define trace_xfs_alloc_read_agf(a,b)		((void) 0)
-#define trace_xfs_read_agi(a,b)			((void) 0)
-#define trace_xfs_ialloc_read_agi(a,b)		((void) 0)
+#define trace_xfs_read_agf(...)			((void) 0)
+#define trace_xfs_alloc_read_agf(...)		((void) 0)
+#define trace_xfs_read_agi(...)			((void) 0)
+#define trace_xfs_ialloc_read_agi(...)		((void) 0)
 #define trace_xfs_irec_merge_pre(...)		((void) 0)
 #define trace_xfs_irec_merge_post(...)		((void) 0)
 
