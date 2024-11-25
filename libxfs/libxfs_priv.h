@@ -465,7 +465,7 @@ xfs_buf_readahead(
 #define XFS_EXTENT_BUSY_DISCARDED	0x01	/* undergoing a discard op. */
 #define XFS_EXTENT_BUSY_SKIP_DISCARD	0x02	/* do not discard */
 
-#define xfs_extent_busy_reuse(mp,ag,bno,len,user)	((void) 0)
+#define xfs_extent_busy_reuse(...)			((void) 0)
 /* avoid unused variable warning */
 #define xfs_extent_busy_insert(tp,pag,bno,len,flags)({ 	\
 	struct xfs_perag *__foo = pag;			\
