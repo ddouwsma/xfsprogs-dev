@@ -11,6 +11,7 @@ struct xfs_inode;
 struct xfs_buftarg;
 struct xfs_da_geometry;
 struct libxfs_init;
+struct xfs_group;
 
 typedef void (*buf_writeback_fn)(struct xfs_buf *bp);
 
@@ -328,12 +329,12 @@ struct xfs_defer_drain { /* empty */ };
 #define xfs_defer_drain_init(dr)		((void)0)
 #define xfs_defer_drain_free(dr)		((void)0)
 
-#define xfs_perag_intent_get(mp, agno) \
-	xfs_perag_get((mp), XFS_FSB_TO_AGNO((mp), (agno)))
-#define xfs_perag_intent_put(pag)		xfs_perag_put(pag)
+#define xfs_group_intent_get(mp, fsbno, type) \
+	xfs_group_get_by_fsb((mp), (fsbno), (type))
+#define xfs_group_intent_put(xg)		xfs_group_put(xg)
 
-static inline void xfs_perag_intent_hold(struct xfs_perag *pag) {}
-static inline void xfs_perag_intent_rele(struct xfs_perag *pag) {}
+static inline void xfs_group_intent_hold(struct xfs_group *xg) {}
+static inline void xfs_group_intent_rele(struct xfs_group *xg) {}
 
 static inline void libxfs_buftarg_drain(struct xfs_buftarg *btp)
 {
