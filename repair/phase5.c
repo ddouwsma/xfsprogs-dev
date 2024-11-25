@@ -632,7 +632,7 @@ void
 phase5(xfs_mount_t *mp)
 {
 	struct bitmap		*lost_blocks = NULL;
-	struct xfs_perag	*pag;
+	struct xfs_perag	*pag = NULL;
 	xfs_agnumber_t		agno;
 	int			error;
 
@@ -679,7 +679,7 @@ phase5(xfs_mount_t *mp)
 	if (error)
 		do_error(_("cannot alloc lost block bitmap\n"));
 
-	for_each_perag(mp, agno, pag)
+	while ((pag = xfs_perag_next(mp, pag)))
 		phase5_func(mp, pag, lost_blocks);
 
 	print_final_rpt();

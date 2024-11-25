@@ -218,12 +218,11 @@ STATIC int
 xrep_bmap_find_mappings(
 	struct xrep_bmap	*rb)
 {
-	struct xfs_perag	*pag;
-	xfs_agnumber_t		agno;
+	struct xfs_perag	*pag = NULL;
 	int			error;
 
 	/* Iterate the rmaps for extents. */
-	for_each_perag(rb->sc->mp, agno, pag) {
+	while ((pag = xfs_perag_next(rb->sc->mp, pag))) {
 		error = xrep_bmap_scan_ag(rb, pag);
 		if (error) {
 			libxfs_perag_put(pag);

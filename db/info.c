@@ -104,8 +104,7 @@ agresv_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_perag	*pag;
-	xfs_agnumber_t		agno;
+	struct xfs_perag	*pag = NULL;
 	int			i;
 
 	if (argc > 1) {
@@ -134,7 +133,7 @@ agresv_f(
 		return 0;
 	}
 
-	for_each_perag(mp, agno, pag)
+	while ((pag = xfs_perag_next(mp, pag)))
 		print_agresv_info(pag);
 
 	return 0;

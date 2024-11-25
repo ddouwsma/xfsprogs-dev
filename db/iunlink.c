@@ -144,7 +144,7 @@ dump_iunlinked_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_perag	*pag;
+	struct xfs_perag	*pag = NULL;
 	xfs_agnumber_t		agno = NULLAGNUMBER;
 	unsigned int		bucket = -1U;
 	bool			quiet = false;
@@ -189,7 +189,7 @@ dump_iunlinked_f(
 		return 0;
 	}
 
-	for_each_perag(mp, agno, pag)
+	while ((pag = xfs_perag_next(mp, pag)))
 		dump_unlinked(pag, bucket, quiet, verbose);
 
 	return 0;

@@ -274,12 +274,11 @@ check_fs_free_space(
 	const struct check_state	*old,
 	struct xfs_sb			*new_sb)
 {
-	struct xfs_perag		*pag;
-	xfs_agnumber_t			agno;
+	struct xfs_perag		*pag = NULL;
 	int				error;
 
 	/* Make sure we have enough space for per-AG reservations. */
-	for_each_perag(mp, agno, pag) {
+	while ((pag = xfs_perag_next(mp, pag))) {
 		struct xfs_trans	*tp;
 		struct xfs_agf		*agf;
 		struct xfs_buf		*agi_bp, *agf_bp;
@@ -365,7 +364,7 @@ check_fs_free_space(
 	 * uninitialized so that we don't trip over stale cached counters
 	 * after the upgrade/
 	 */
-	for_each_perag(mp, agno, pag) {
+	while ((pag = xfs_perag_next(mp, pag))) {
 		libxfs_ag_resv_free(pag);
 		clear_bit(XFS_AGSTATE_AGF_INIT, &pag->pag_opstate);
 		clear_bit(XFS_AGSTATE_AGI_INIT, &pag->pag_opstate);
