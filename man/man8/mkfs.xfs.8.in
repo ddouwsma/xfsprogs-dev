@@ -902,6 +902,18 @@ When CRCs are enabled (the default), the ftype functionality is always
 enabled, and cannot be turned off.
 .IP
 In other words, this option is only tunable on the deprecated V4 format.
+.TP
+.BI parent= value
+This feature creates back references from child files to parent directories
+so that online repair can reconstruct broken directory files.
+The value is either 0 to disable the feature, or 1 to create parent pointers.
+
+By default,
+.B mkfs.xfs
+will not create parent pointers.
+This feature is only available for filesystems created with the (default)
+.B \-m crc=1
+option set.
 .RE
 .PP
 .PD 0
