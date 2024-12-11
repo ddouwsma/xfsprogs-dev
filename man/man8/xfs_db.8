@@ -345,7 +345,7 @@ command. This must be done before another
 command can be given, presumably with different arguments than the previous one.
 .TP
 .BI "blockget [\-npvs] [\-b " bno "] ... [\-i " ino "] ..."
-Get block usage and check filesystem consistency.
+Get block usage.
 The information is saved for use by a subsequent
 .BR blockuse ", " ncheck ", or " blocktrash
 command.
@@ -563,11 +563,6 @@ maximally loaded.
 shows only the worst case scenario, which is when the btree blocks are
 half full.
 .RE
-.TP
-.B check
-See the
-.B blockget
-command.
 .TP
 .BI "convert " "type number" " [" "type number" "] ... " type
 Convert from one address form to another.
@@ -2635,8 +2630,7 @@ The block data is displayed in two columns: Hexadecimal format
 and printable ASCII chars.
 .SH DIAGNOSTICS
 Many messages can come from the
-.B check
-.RB ( blockget )
+.B blockget
 command.
 If the filesystem is completely corrupt, a core dump might
 be produced instead of the message
@@ -2646,7 +2640,7 @@ be produced instead of the message
 .RE
 .PP
 If the filesystem is very large (has many files) then
-.B check
+.B blockget
 might run out of memory. In this case the message
 .RS
 .B out of memory
