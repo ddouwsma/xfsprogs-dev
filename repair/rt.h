@@ -13,4 +13,24 @@ void check_rtsummary(struct xfs_mount *mp);
 void fill_rtbitmap(struct xfs_rtgroup *rtg);
 void fill_rtsummary(struct xfs_rtgroup *rtg);
 
+void discover_rtgroup_inodes(struct xfs_mount *mp);
+void unload_rtgroup_inodes(struct xfs_mount *mp);
+
+void init_rtgroup_inodes(void);
+void free_rtgroup_inodes(void);
+
+bool is_rtgroup_inode(xfs_ino_t ino, enum xfs_rtg_inodes type);
+
+static inline bool is_rtbitmap_inode(xfs_ino_t ino)
+{
+	return is_rtgroup_inode(ino, XFS_RTGI_BITMAP);
+}
+static inline bool is_rtsummary_inode(xfs_ino_t ino)
+{
+	return is_rtgroup_inode(ino, XFS_RTGI_SUMMARY);
+}
+
+void mark_rtgroup_inodes_bad(struct xfs_mount *mp, enum xfs_rtg_inodes type);
+bool rtgroup_inodes_were_bad(enum xfs_rtg_inodes type);
+
 #endif /* _XFS_REPAIR_RT_H_ */

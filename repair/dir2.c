@@ -15,6 +15,7 @@
 #include "da_util.h"
 #include "prefetch.h"
 #include "progress.h"
+#include "rt.h"
 
 /*
  * Known bad inode list.  These are seen when the leaf and node
@@ -256,10 +257,12 @@ process_sf_dir2(
 			 * bother checking if the child inode is free or not.
 			 */
 			junkit = 0;
-		} else if (lino == mp->m_sb.sb_rbmino)  {
+		} else if (lino == mp->m_sb.sb_rbmino ||
+		           is_rtbitmap_inode(lino)) {
 			junkit = 1;
 			junkreason = _("realtime bitmap");
-		} else if (lino == mp->m_sb.sb_rsumino)  {
+		} else if (lino == mp->m_sb.sb_rsumino ||
+		           is_rtsummary_inode(lino)) {
 			junkit = 1;
 			junkreason = _("realtime summary");
 		} else if (lino == mp->m_sb.sb_uquotino)  {
@@ -737,9 +740,11 @@ process_dir2_data(
 			 * bother checking if the child inode is free or not.
 			 */
 			clearino = 0;
-		} else if (ent_ino == mp->m_sb.sb_rbmino) {
+		} else if (ent_ino == mp->m_sb.sb_rbmino ||
+		           is_rtbitmap_inode(ent_ino)) {
 			clearreason = _("realtime bitmap");
-		} else if (ent_ino == mp->m_sb.sb_rsumino) {
+		} else if (ent_ino == mp->m_sb.sb_rsumino ||
+		           is_rtsummary_inode(ent_ino)) {
 			clearreason = _("realtime summary");
 		} else if (ent_ino == mp->m_sb.sb_uquotino) {
 			clearreason = _("user quota");

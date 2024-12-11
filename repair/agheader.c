@@ -319,12 +319,6 @@ check_v5_feature_mismatch(
 	return XR_AG_SB_SEC;
 }
 
-static inline bool xfs_sb_version_hasmetadir(const struct xfs_sb *sbp)
-{
-	return xfs_sb_is_v5(sbp) &&
-		(sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_METADIR);
-}
-
 /*
  * Possible fields that may have been set at mkfs time,
  * sb_inoalignmt, sb_unit, sb_width and sb_dirblklog.
@@ -364,7 +358,7 @@ secondary_sb_whack(
 	 * size is the size of data which is valid for this sb.
 	 */
 	if (xfs_sb_version_hasmetadir(sb))
-		size = offsetofend(struct xfs_dsb, sb_metadirino);
+		size = offsetofend(struct xfs_dsb, sb_pad);
 	else if (xfs_sb_version_hasmetauuid(sb))
 		size = offsetofend(struct xfs_dsb, sb_meta_uuid);
 	else if (xfs_sb_version_hascrc(sb))

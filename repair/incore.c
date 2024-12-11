@@ -29,28 +29,42 @@ struct bmap {
 	struct btree_root	*root;
 };
 static struct bmap	*ag_bmaps;
+static struct bmap	*rtg_bmaps;
 
-void
-lock_ag(
-	xfs_agnumber_t		agno)
+static inline struct bmap *bmap_for_group(xfs_agnumber_t gno, bool isrt)
 {
-	pthread_mutex_lock(&ag_bmaps[agno].lock);
+	if (isrt)
+		return &rtg_bmaps[gno];
+	return &ag_bmaps[gno];
 }
 
 void
-unlock_ag(
-	xfs_agnumber_t		agno)
+lock_group(
+	xfs_agnumber_t		gno,
+	bool			isrt)
 {
-	pthread_mutex_unlock(&ag_bmaps[agno].lock);
+	pthread_mutex_lock(&bmap_for_group(gno, isrt)->lock);
 }
 
-static void
-update_bmap(
-	struct btree_root	*bmap,
-	unsigned long		offset,
+void
+unlock_group(
+	xfs_agnumber_t		gno,
+	bool			isrt)
+{
+	pthread_mutex_unlock(&bmap_for_group(gno, isrt)->lock);
+}
+
+
+void
+set_bmap_ext(
+	xfs_agnumber_t		gno,
+	xfs_agblock_t		offset,
 	xfs_extlen_t		blen,
-	void			*new_state)
+	int			state,
+	bool			isrt)
 {
+	struct btree_root	*bmap = bmap_for_group(gno, isrt)->root;
+	void			*new_state = &states[state];
 	unsigned long		end = offset + blen;
 	int			*cur_state;
 	unsigned long		cur_key;
@@ -140,24 +154,15 @@ update_bmap(
 	btree_insert(bmap, end, prev_state);
 }
 
-void
-set_bmap_ext(
-	xfs_agnumber_t		agno,
-	xfs_agblock_t		agbno,
-	xfs_extlen_t		blen,
-	int			state)
-{
-	update_bmap(ag_bmaps[agno].root, agbno, blen, &states[state]);
-}
-
 int
 get_bmap_ext(
-	xfs_agnumber_t		agno,
+	xfs_agnumber_t		gno,
 	xfs_agblock_t		agbno,
 	xfs_agblock_t		maxbno,
-	xfs_extlen_t		*blen)
+	xfs_extlen_t		*blen,
+	bool			isrt)
 {
-	struct btree_root	*bmap = ag_bmaps[agno].root;
+	struct btree_root	*bmap = bmap_for_group(gno, isrt)->root;
 	int			*statep;
 	unsigned long		key;
 
@@ -248,15 +253,15 @@ free_rt_bmap(xfs_mount_t *mp)
 	free(rt_bmap);
 	rt_bmap = NULL;
 	pthread_mutex_destroy(&rt_lock);
-
 }
 
-void
-reset_bmaps(xfs_mount_t *mp)
+static void
+reset_ag_bmaps(
+	struct xfs_mount	*mp)
 {
-	xfs_agnumber_t	agno;
-	xfs_agblock_t	ag_size;
-	int		ag_hdr_block;
+	int			ag_hdr_block;
+	xfs_agnumber_t		agno;
+	xfs_agblock_t		ag_size;
 
 	ag_hdr_block = howmany(4 * mp->m_sb.sb_sectsize, mp->m_sb.sb_blocksize);
 	ag_size = mp->m_sb.sb_agblocks;
@@ -286,14 +291,50 @@ reset_bmaps(xfs_mount_t *mp)
 		btree_insert(bmap, ag_hdr_block, &states[XR_E_UNKNOWN]);
 		btree_insert(bmap, ag_size, &states[XR_E_BAD_STATE]);
 	}
+}
+
+static void
+reset_rtg_bmaps(
+	struct xfs_mount	*mp)
+{
+	xfs_rgnumber_t		rgno;
+
+	for (rgno = 0 ; rgno < mp->m_sb.sb_rgcount; rgno++) {
+		struct btree_root	*bmap = rtg_bmaps[rgno].root;
+		uint64_t		rblocks;
+
+		btree_clear(bmap);
+		if (rgno == 0 && xfs_has_rtsb(mp)) {
+			btree_insert(bmap, 0, &states[XR_E_INUSE_FS]);
+			btree_insert(bmap, mp->m_sb.sb_rextsize,
+					&states[XR_E_FREE]);
+		} else {
+			btree_insert(bmap, 0, &states[XR_E_FREE]);
+		}
+
+		rblocks = xfs_rtbxlen_to_blen(mp,
+				libxfs_rtgroup_extents(mp, rgno));
+		btree_insert(bmap, rblocks, &states[XR_E_BAD_STATE]);
+	}
+}
+
+void
+reset_bmaps(
+	struct xfs_mount	*mp)
+{
+	reset_ag_bmaps(mp);
 
 	if (mp->m_sb.sb_logstart != 0) {
 		set_bmap_ext(XFS_FSB_TO_AGNO(mp, mp->m_sb.sb_logstart),
 			     XFS_FSB_TO_AGBNO(mp, mp->m_sb.sb_logstart),
-			     mp->m_sb.sb_logblocks, XR_E_INUSE_FS);
+			     mp->m_sb.sb_logblocks, XR_E_INUSE_FS, false);
 	}
 
-	reset_rt_bmap();
+	if (xfs_has_rtgroups(mp)) {
+		reset_rtg_bmaps(mp);
+	} else {
+		reset_rt_bmap();
+	}
 }
 
 static struct bmap *
@@ -334,11 +375,18 @@ void
 init_bmaps(
 	struct xfs_mount	*mp)
 {
-	ag_bmaps = alloc_bmaps(mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount);
+	ag_bmaps = alloc_bmaps(mp->m_sb.sb_agcount);
 	if (!ag_bmaps)
 		do_error(_("couldn't allocate block map btree roots\n"));
 
-	init_rt_bmap(mp);
+	if (xfs_has_rtgroups(mp)) {
+		rtg_bmaps = alloc_bmaps(mp->m_sb.sb_rgcount);
+		if (!rtg_bmaps)
+			do_error(_("couldn't allocate block map btree roots\n"));
+	} else {
+		init_rt_bmap(mp);
+	}
+
 	reset_bmaps(mp);
 }
 
@@ -346,8 +394,13 @@ void
 free_bmaps(
 	struct xfs_mount	*mp)
 {
-	destroy_bmaps(ag_bmaps, mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount);
+	destroy_bmaps(ag_bmaps, mp->m_sb.sb_agcount);
 	ag_bmaps = NULL;
 
-	free_rt_bmap(mp);
+	if (xfs_has_rtgroups(mp)) {
+		destroy_bmaps(rtg_bmaps, mp->m_sb.sb_rgcount);
+		rtg_bmaps = NULL;
+	} else {
+		free_rt_bmap(mp);
+	}
 }

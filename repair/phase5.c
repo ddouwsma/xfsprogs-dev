@@ -72,7 +72,7 @@ mk_incore_fstree(
 	 * largest extent.
 	 */
 	for (agbno = 0; agbno < ag_end; agbno += blen) {
-		bstate = get_bmap_ext(agno, agbno, ag_end, &blen);
+		bstate = get_bmap_ext(agno, agbno, ag_end, &blen, false);
 		if (bstate < XR_E_INUSE)  {
 			free_blocks += blen;
 			if (in_extent == 0)  {

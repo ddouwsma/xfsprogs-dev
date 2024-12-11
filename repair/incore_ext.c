@@ -593,7 +593,6 @@ release_rt_extent_tree()
 void
 free_rt_dup_extent_tree(xfs_mount_t *mp)
 {
-	ASSERT(mp->m_sb.sb_rblocks != 0);
 	free(rt_ext_tree_ptr);
 	rt_ext_tree_ptr = NULL;
 }
@@ -726,8 +725,8 @@ static avl64ops_t avl64_extent_tree_ops = {
 void
 incore_ext_init(xfs_mount_t *mp)
 {
-	int i;
 	xfs_agnumber_t agcount = mp->m_sb.sb_agcount;
+	int i;
 
 	pthread_mutex_init(&rt_ext_tree_lock, NULL);
 

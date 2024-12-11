@@ -14,6 +14,7 @@
 #include "incore.h"
 #include "progress.h"
 #include "scan.h"
+#include "rt.h"
 
 /* workaround craziness in the xlog routines */
 int xlog_recover_do_trans(struct xlog *log, struct xlog_recover *t, int p)
@@ -544,16 +545,14 @@ phase2(
 		struct xfs_sb	*sb = &mp->m_sb;
 
 		if (xfs_has_metadir(mp))
-			ASSERT(sb->sb_metadirino == sb->sb_rootino + 1 &&
-			       sb->sb_rbmino  == sb->sb_rootino + 2 &&
-			       sb->sb_rsumino == sb->sb_rootino + 3);
+			ASSERT(sb->sb_metadirino == sb->sb_rootino + 1);
 		else
 			ASSERT(sb->sb_rbmino  == sb->sb_rootino + 1 &&
 			       sb->sb_rsumino == sb->sb_rootino + 2);
 		do_warn(_("root inode chunk not found\n"));
 
 		/*
-		 * mark the first 3-4 inodes used, the rest are free
+		 * mark the first 2-3 inodes used, the rest are free
 		 */
 		ino_rec = set_inode_used_alloc(mp, 0,
 				XFS_INO_TO_AGINO(mp, sb->sb_rootino));
@@ -569,7 +568,7 @@ phase2(
 		 * also mark blocks
 		 */
 		set_bmap_ext(0, XFS_INO_TO_AGBNO(mp, sb->sb_rootino),
-			     M_IGEO(mp)->ialloc_blks, XR_E_INO);
+			     M_IGEO(mp)->ialloc_blks, XR_E_INO, false);
 	} else  {
 		do_log(_("        - found root inode chunk\n"));
 		j = 0;
@@ -600,28 +599,32 @@ phase2(
 			j++;
 		}
 
-		if (is_inode_free(ino_rec, j))  {
-			do_warn(_("realtime bitmap inode marked free, "));
-			set_inode_used(ino_rec, j);
-			if (!no_modify)
-				do_warn(_("correcting\n"));
-			else
-				do_warn(_("would correct\n"));
-		}
-		set_inode_is_meta(ino_rec, j);
-		j++;
+		if (!xfs_has_rtgroups(mp)) {
+			if (is_inode_free(ino_rec, j))  {
+				do_warn(_("realtime bitmap inode marked free, "));
+				set_inode_used(ino_rec, j);
+				if (!no_modify)
+					do_warn(_("correcting\n"));
+				else
+					do_warn(_("would correct\n"));
+			}
+			set_inode_is_meta(ino_rec, j);
+			j++;
 
-		if (is_inode_free(ino_rec, j))  {
-			do_warn(_("realtime summary inode marked free, "));
-			set_inode_used(ino_rec, j);
-			if (!no_modify)
-				do_warn(_("correcting\n"));
-			else
-				do_warn(_("would correct\n"));
+			if (is_inode_free(ino_rec, j))  {
+				do_warn(_("realtime summary inode marked free, "));
+				set_inode_used(ino_rec, j);
+				if (!no_modify)
+					do_warn(_("correcting\n"));
+				else
+					do_warn(_("would correct\n"));
+			}
+			set_inode_is_meta(ino_rec, j);
+			j++;
 		}
-		set_inode_is_meta(ino_rec, j);
-		j++;
 	}
+
+	discover_rtgroup_inodes(mp);
 
 	/*
 	 * Upgrade the filesystem now that we've done a preliminary check of

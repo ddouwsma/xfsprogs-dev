@@ -568,6 +568,122 @@ _("couldn't iget realtime %s inode -- error - %d\n"),
 		do_error(_("%s: commit failed, error %d\n"), __func__, error);
 }
 
+/* Mark a newly allocated inode in use in the incore bitmap. */
+static void
+mark_ino_inuse(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	int			mode,
+	xfs_ino_t		parent)
+{
+	struct ino_tree_node	*irec;
+	int			ino_offset;
+	int			i;
+
+	irec = find_inode_rec(mp, XFS_INO_TO_AGNO(mp, ino),
+			XFS_INO_TO_AGINO(mp, ino));
+
+	if (irec == NULL) {
+		/*
+		 * This inode is allocated from a newly created inode
+		 * chunk and therefore did not exist when inode chunks
+		 * were processed in phase3. Add this group of inodes to
+		 * the entry avl tree as if they were discovered in phase3.
+		 */
+		irec = set_inode_free_alloc(mp,
+				XFS_INO_TO_AGNO(mp, ino),
+				XFS_INO_TO_AGINO(mp, ino));
+		alloc_ex_data(irec);
+
+		for (i = 0; i < XFS_INODES_PER_CHUNK; i++)
+			set_inode_free(irec, i);
+	}
+
+	ino_offset = get_inode_offset(mp, ino, irec);
+
+	/*
+	 * Mark the inode allocated so it is not skipped in phase 7.  We'll
+	 * find it with the directory traverser soon, so we don't need to
+	 * mark it reached.
+	 */
+	set_inode_used(irec, ino_offset);
+	set_inode_ftype(irec, ino_offset, libxfs_mode_to_ftype(mode));
+	set_inode_parent(irec, ino_offset, parent);
+	if (S_ISDIR(mode))
+		set_inode_isadir(irec, ino_offset);
+}
+
+static bool
+ensure_rtgroup_file(
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+	struct xfs_inode	*ip = rtg->rtg_inodes[type];
+	const char		*name = libxfs_rtginode_name(type);
+	int			error;
+
+	if (!xfs_rtginode_enabled(rtg, type))
+		return false;
+
+	if (no_modify) {
+		if (rtgroup_inodes_were_bad(type))
+			do_warn(_("would reset rtgroup %u %s inode\n"),
+				rtg_rgno(rtg), name);
+		return false;
+	}
+
+	if (rtgroup_inodes_were_bad(type)) {
+		/*
+		 * The inode was bad or missing, state that we'll make a new
+		 * one even though we always create a new one.
+		 */
+		do_warn(_("resetting rtgroup %u %s inode\n"),
+			rtg_rgno(rtg), name);
+	}
+
+	error = -libxfs_rtginode_create(rtg, type, false);
+	if (error)
+		do_error(
+_("Couldn't create rtgroup %u %s inode, error %d\n"),
+			rtg_rgno(rtg), name, error);
+
+	ip = rtg->rtg_inodes[type];
+
+	/* Mark the inode in use. */
+	mark_ino_inuse(mp, ip->i_ino, S_IFREG, mp->m_rtdirip->i_ino);
+	mark_ino_metadata(mp, ip->i_ino);
+	return true;
+}
+
+static void
+ensure_rtgroup_bitmap(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+
+	if (!xfs_has_rtgroups(mp))
+		return;
+	if (!ensure_rtgroup_file(rtg, XFS_RTGI_BITMAP))
+		return;
+
+	fill_rtbitmap(rtg);
+}
+
+static void
+ensure_rtgroup_summary(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+
+	if (!xfs_has_rtgroups(mp))
+		return;
+	if (!ensure_rtgroup_file(rtg, XFS_RTGI_SUMMARY))
+		return;
+
+	fill_rtsummary(rtg);
+}
+
 /* Initialize a root directory. */
 static int
 init_fs_root_dir(
@@ -631,6 +747,8 @@ mk_metadir(
 {
 	struct xfs_trans	*tp;
 	int			error;
+
+	libxfs_rtginode_irele(&mp->m_rtdirip);
 
 	error = init_fs_root_dir(mp, mp->m_sb.sb_metadirino, 0,
 			&mp->m_metadirip);
@@ -3057,8 +3175,10 @@ mark_inode(
 static void
 mark_standalone_inodes(xfs_mount_t *mp)
 {
-	mark_inode(mp, mp->m_sb.sb_rbmino);
-	mark_inode(mp, mp->m_sb.sb_rsumino);
+	if (!xfs_has_rtgroups(mp)) {
+		mark_inode(mp, mp->m_sb.sb_rbmino);
+		mark_inode(mp, mp->m_sb.sb_rsumino);
+	}
 
 	if (!fs_quotas)
 		return;
@@ -3239,6 +3359,49 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 	libxfs_rtgroup_rele(rtg);
 }
 
+static void
+reset_rt_metadir_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg = NULL;
+	int			error;
+
+	/*
+	 * Release the rtgroup inodes so that we can rebuild everything from
+	 * observations.
+	 */
+	if (!no_modify)
+		unload_rtgroup_inodes(mp);
+
+	if (mp->m_sb.sb_rgcount > 0) {
+		if (!no_modify) {
+			error = -libxfs_rtginode_mkdir_parent(mp);
+			if (error)
+				do_error(_("failed to create realtime metadir (%d)\n"),
+					error);
+		}
+		mark_ino_inuse(mp, mp->m_rtdirip->i_ino, S_IFDIR,
+				mp->m_metadirip->i_ino);
+		mark_ino_metadata(mp, mp->m_rtdirip->i_ino);
+	}
+
+	/*
+	 * This isn't the whole story, but it keeps the message that we've had
+	 * for years and which is expected in xfstests and more.
+	 */
+	if (!no_modify)
+		do_log(
+_("        - resetting contents of realtime bitmap and summary inodes\n"));
+
+	if (mp->m_sb.sb_rgcount == 0)
+		return;
+
+	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
+		ensure_rtgroup_bitmap(rtg);
+		ensure_rtgroup_summary(rtg);
+	}
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
@@ -3287,7 +3450,10 @@ phase6(xfs_mount_t *mp)
 		do_warn(_("would reinitialize metadata root directory\n"));
 	}
 
-	reset_rt_sb_inodes(mp);
+	if (xfs_has_rtgroups(mp))
+		reset_rt_metadir_inodes(mp);
+	else
+		reset_rt_sb_inodes(mp);
 
 	mark_standalone_inodes(mp);
 

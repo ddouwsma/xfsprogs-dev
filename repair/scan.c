@@ -724,10 +724,11 @@ _("%s freespace btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 			}
 
 			for ( ; b < end; b += blen)  {
-				state = get_bmap_ext(agno, b, end, &blen);
+				state = get_bmap_ext(agno, b, end, &blen, false);
 				switch (state) {
 				case XR_E_UNKNOWN:
-					set_bmap_ext(agno, b, blen, XR_E_FREE1);
+					set_bmap_ext(agno, b, blen, XR_E_FREE1,
+							false);
 					break;
 				case XR_E_FREE1:
 					/*
@@ -737,7 +738,7 @@ _("%s freespace btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 					if (magic == XFS_ABTC_MAGIC ||
 					    magic == XFS_ABTC_CRC_MAGIC) {
 						set_bmap_ext(agno, b, blen,
-							     XR_E_FREE);
+							     XR_E_FREE, false);
 						break;
 					}
 					fallthrough;
@@ -841,27 +842,27 @@ process_rmap_rec(
 		switch (owner) {
 		case XFS_RMAP_OWN_FS:
 		case XFS_RMAP_OWN_LOG:
-			set_bmap_ext(agno, b, blen, XR_E_INUSE_FS1);
+			set_bmap_ext(agno, b, blen, XR_E_INUSE_FS1, false);
 			break;
 		case XFS_RMAP_OWN_AG:
 		case XFS_RMAP_OWN_INOBT:
-			set_bmap_ext(agno, b, blen, XR_E_FS_MAP1);
+			set_bmap_ext(agno, b, blen, XR_E_FS_MAP1, false);
 			break;
 		case XFS_RMAP_OWN_INODES:
-			set_bmap_ext(agno, b, blen, XR_E_INO1);
+			set_bmap_ext(agno, b, blen, XR_E_INO1, false);
 			break;
 		case XFS_RMAP_OWN_REFC:
-			set_bmap_ext(agno, b, blen, XR_E_REFC);
+			set_bmap_ext(agno, b, blen, XR_E_REFC, false);
 			break;
 		case XFS_RMAP_OWN_COW:
-			set_bmap_ext(agno, b, blen, XR_E_COW);
+			set_bmap_ext(agno, b, blen, XR_E_COW, false);
 			break;
 		case XFS_RMAP_OWN_NULL:
 			/* still unknown */
 			break;
 		default:
 			/* file data */
-			set_bmap_ext(agno, b, blen, XR_E_INUSE1);
+			set_bmap_ext(agno, b, blen, XR_E_INUSE1, false);
 			break;
 		}
 		break;
@@ -1207,7 +1208,8 @@ advance:
 
 			/* Check for block owner collisions. */
 			for ( ; b < end; b += blen)  {
-				state = get_bmap_ext(agno, b, end, &blen);
+				state = get_bmap_ext(agno, b, end, &blen,
+						false);
 				process_rmap_rec(mp, agno, b, end, blen, owner,
 						state, name);
 			}
@@ -1483,14 +1485,16 @@ _("leftover CoW extent has invalid startblock in record %u of %s btree block %u/
 				xfs_extlen_t	cnr;
 
 				for (c = agb; c < end; c += cnr) {
-					state = get_bmap_ext(agno, c, end, &cnr);
+					state = get_bmap_ext(agno, c, end, &cnr,
+							false);
 					switch (state) {
 					case XR_E_UNKNOWN:
 					case XR_E_COW:
 						do_warn(
 _("leftover CoW extent (%u/%u) len %u\n"),
 						agno, c, cnr);
-						set_bmap_ext(agno, c, cnr, XR_E_FREE);
+						set_bmap_ext(agno, c, cnr,
+							XR_E_FREE, false);
 						break;
 					default:
 						do_warn(

@@ -3,6 +3,8 @@
  * Copyright (c) 2000-2001,2005 Silicon Graphics, Inc.
  * All Rights Reserved.
  */
+#ifndef __XFS_REPAIR_AGHEADER_H__
+#define __XFS_REPAIR_AGHEADER_H__
 
 typedef struct fs_geometry  {
 	/*
@@ -82,3 +84,11 @@ typedef struct fs_geo_list  {
 #define XR_AG_AGF	0x2
 #define XR_AG_AGI	0x4
 #define XR_AG_SB_SEC	0x8
+
+static inline bool xfs_sb_version_hasmetadir(const struct xfs_sb *sbp)
+{
+	return xfs_sb_is_v5(sbp) &&
+		(sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_METADIR);
+}
+
+#endif /* __XFS_REPAIR_AGHEADER_H__ */

@@ -27,6 +27,7 @@
 #include "bulkload.h"
 #include "quotacheck.h"
 #include "rcbag_btree.h"
+#include "rt.h"
 
 /*
  * option tables for getsubopt calls
@@ -729,10 +730,12 @@ _("sb root inode value %" PRIu64 " valid but in unaligned location (expected %"P
 		rootino++;
 	}
 
-	validate_sb_ino(&mp->m_sb.sb_rbmino, rootino + 1,
-			_("realtime bitmap"));
-	validate_sb_ino(&mp->m_sb.sb_rsumino, rootino + 2,
-			_("realtime summary"));
+	if (!xfs_has_rtgroups(mp)) {
+		validate_sb_ino(&mp->m_sb.sb_rbmino, rootino + 1,
+				_("realtime bitmap"));
+		validate_sb_ino(&mp->m_sb.sb_rsumino, rootino + 2,
+				_("realtime summary"));
+	}
 }
 
 /*
@@ -1345,6 +1348,7 @@ main(int argc, char **argv)
 	incore_ino_init(mp);
 	incore_ext_init(mp);
 	rmaps_init(mp);
+	init_rtgroup_inodes();
 
 	/* initialize random globals now that we know the fs geometry */
 	inodes_per_block = mp->m_sb.sb_inopblock;
@@ -1390,11 +1394,14 @@ main(int argc, char **argv)
 		phase6(mp);
 		phase_end(mp, 6);
 
+		free_rtgroup_inodes();
+
 		phase7(mp, phase2_threads);
 		phase_end(mp, 7);
 	} else  {
 		do_warn(
 _("Inode allocation btrees are too corrupted, skipping phases 6 and 7\n"));
+		free_rtgroup_inodes();
 	}
 
 	if (lost_quotas && !have_uquotino && !have_gquotino && !have_pquotino) {

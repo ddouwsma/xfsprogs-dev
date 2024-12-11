@@ -23,28 +23,45 @@ void		init_bmaps(xfs_mount_t *mp);
 void		reset_bmaps(xfs_mount_t *mp);
 void		free_bmaps(xfs_mount_t *mp);
 
-void		lock_ag(xfs_agnumber_t agno);
-void		unlock_ag(xfs_agnumber_t agno);
+void		lock_group(xfs_agnumber_t agno, bool isrt);
+void		unlock_group(xfs_agnumber_t agno, bool isrt);
+
+static inline void lock_ag(xfs_agnumber_t agno)
+{
+	lock_group(agno, false);
+}
+
+static inline void unlock_ag(xfs_agnumber_t agno)
+{
+	unlock_group(agno, false);
+}
 
 void		set_bmap_ext(xfs_agnumber_t agno, xfs_agblock_t agbno,
-			     xfs_extlen_t blen, int state);
+			     xfs_extlen_t blen, int state, bool isrt);
 int		get_bmap_ext(xfs_agnumber_t agno, xfs_agblock_t agbno,
-			     xfs_agblock_t maxbno, xfs_extlen_t *blen);
-
-void		set_rtbmap(xfs_rtxnum_t rtx, int state);
-int		get_rtbmap(xfs_rtxnum_t rtx);
+			     xfs_agblock_t maxbno, xfs_extlen_t *blen,
+			     bool isrt);
 
 static inline void
 set_bmap(xfs_agnumber_t agno, xfs_agblock_t agbno, int state)
 {
-	set_bmap_ext(agno, agbno, 1, state);
+	set_bmap_ext(agno, agbno, 1, state, false);
 }
 
 static inline int
 get_bmap(xfs_agnumber_t agno, xfs_agblock_t agbno)
 {
-	return get_bmap_ext(agno, agbno, agbno + 1, NULL);
+	return get_bmap_ext(agno, agbno, agbno + 1, NULL, false);
 }
+
+static inline int
+get_rgbmap(xfs_rgnumber_t rgno, xfs_rgblock_t rgbno)
+{
+	return get_bmap_ext(rgno, rgbno, rgbno + 1, NULL, true);
+}
+
+void		set_rtbmap(xfs_rtxnum_t rtx, int state);
+int		get_rtbmap(xfs_rtxnum_t rtx);
 
 /*
  * extent tree definitions
@@ -698,6 +715,8 @@ static inline unsigned int
 xfs_rootrec_inodes_inuse(
 	struct xfs_mount	*mp)
 {
+	if (xfs_has_rtgroups(mp))
+		return 2; /* sb_rootino, sb_metadirino */
 	if (xfs_has_metadir(mp))
 		return 4; /* sb_rootino, sb_rbmino, sb_rsumino, sb_metadirino */
 	return 3; /* sb_rootino, sb_rbmino, sb_rsumino */
