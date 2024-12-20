@@ -49,7 +49,8 @@ struct xfs_fsop_geom {
 
 	__u32         sick;
 	__u32         checked;
-	__u64         reserved[17];
+	__u64         rgextents;
+	__u64         reserved[16];
 };
 .fi
 .in
@@ -138,6 +139,9 @@ indicate the relative health of various whole-filesystem metadata.
 Please see the section
 .B XFS METADATA HEALTH REPORTING
 for more details.
+.PP
+.I rgextents
+Is the number of RT extents in each rtgroup.
 .PP
 .I reserved
 is set to zero.
