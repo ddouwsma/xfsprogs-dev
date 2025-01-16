@@ -134,6 +134,7 @@ enum {
 	R_NOALIGN,
 	R_RGCOUNT,
 	R_RGSIZE,
+	R_CONCURRENCY,
 	R_MAX_OPTS,
 };
 
@@ -737,6 +738,7 @@ static struct opt_params ropts = {
 		[R_NOALIGN] = "noalign",
 		[R_RGCOUNT] = "rgcount",
 		[R_RGSIZE] = "rgsize",
+		[R_CONCURRENCY] = "concurrency",
 		[R_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -778,6 +780,7 @@ static struct opt_params ropts = {
 		},
 		{ .index = R_RGCOUNT,
 		  .conflicts = { { &ropts, R_RGSIZE },
+				 { &ropts, R_CONCURRENCY },
 				 { NULL, LAST_CONFLICT } },
 		  .minval = 1,
 		  .maxval = XFS_MAX_RGNUMBER,
@@ -785,11 +788,21 @@ static struct opt_params ropts = {
 		},
 		{ .index = R_RGSIZE,
 		  .conflicts = { { &ropts, R_RGCOUNT },
+				 { &ropts, R_CONCURRENCY },
 				 { NULL, LAST_CONFLICT } },
 		  .convert = true,
 		  .minval = 0,
 		  .maxval = (unsigned long long)XFS_MAX_RGBLOCKS << XFS_MAX_BLOCKSIZE_LOG,
 		  .defaultval = SUBOPT_NEEDS_VAL,
+		},
+		{ .index = R_CONCURRENCY,
+		  .conflicts = { { &ropts, R_RGCOUNT },
+				 { &ropts, R_RGSIZE },
+				 { NULL, LAST_CONFLICT } },
+		  .convert = true,
+		  .minval = 0,
+		  .maxval = INT_MAX,
+		  .defaultval = 1,
 		},
 	},
 };
@@ -1034,6 +1047,7 @@ struct cli_params {
 	int	proto_slashes_are_spaces;
 	int	data_concurrency;
 	int	log_concurrency;
+	int	rtvol_concurrency;
 
 	/* parameters where 0 is not a valid value */
 	int64_t	agcount;
@@ -1157,7 +1171,8 @@ usage( void )
 /* no-op info only */	[-N]\n\
 /* prototype file */	[-p fname]\n\
 /* quiet */		[-q]\n\
-/* realtime subvol */	[-r extsize=num,size=num,rtdev=xxx,rgcount=n,rgsize=n]\n\
+/* realtime subvol */	[-r extsize=num,size=num,rtdev=xxx,rgcount=n,rgsize=n,\n\
+			    concurrency=num]\n\
 /* sectorsize */	[-s size=num]\n\
 /* version */		[-V]\n\
 			devicename\n\
@@ -2071,6 +2086,31 @@ proto_opts_parser(
 	return 0;
 }
 
+static void
+set_rtvol_concurrency(
+	struct opt_params	*opts,
+	int			subopt,
+	struct cli_params	*cli,
+	const char		*value)
+{
+	long long		optnum;
+
+	/*
+	 * "nr_cpus" or "1" means set the concurrency level to the CPU count.
+	 * If this cannot be determined, fall back to the default rtgroup
+	 * geometry.
+	 */
+	if (!value || !strcmp(value, "nr_cpus"))
+		optnum = 1;
+	else
+		optnum = getnum(value, opts, subopt);
+
+	if (optnum == 1)
+		cli->rtvol_concurrency = nr_cpus();
+	else
+		cli->rtvol_concurrency = optnum;
+}
+
 static int
 rtdev_opts_parser(
 	struct opt_params	*opts,
@@ -2100,6 +2140,9 @@ rtdev_opts_parser(
 		break;
 	case R_RGSIZE:
 		cli->rgsize = getstr(value, opts, subopt);
+		break;
+	case R_CONCURRENCY:
+		set_rtvol_concurrency(opts, subopt, cli, value);
 		break;
 	default:
 		return -EINVAL;
@@ -3740,10 +3783,97 @@ _("realtime group size (%llu) not at all congruent with extent size (%llu)\n"),
 	return 0;
 }
 
+static bool
+rtdev_is_solidstate(
+	struct libxfs_init	*xi)
+{
+	unsigned short		rotational = 1;
+	int			error;
+
+	error = ioctl(xi->rt.fd, BLKROTATIONAL, &rotational);
+	if (error)
+		return false;
+
+	return rotational == 0;
+}
+
+static void
+calc_concurrency_rtgroup_geometry(
+	struct mkfs_params	*cfg,
+	struct cli_params	*cli,
+	struct libxfs_init	*xi)
+{
+	uint64_t		try_rgsize;
+	uint64_t		def_rgsize;
+	uint64_t		def_rgcount;
+	int			nr_threads = cli->rtvol_concurrency;
+	int			try_threads;
+
+	if (is_power_of_2(cfg->rtextblocks))
+		def_rgsize = calc_rgsize_extsize_power(cfg);
+	else
+		def_rgsize = calc_rgsize_extsize_nonpower(cfg);
+	def_rgcount = howmany(cfg->rtblocks, def_rgsize);
+	try_rgsize = def_rgsize;
+
+	/*
+	 * If the caller doesn't have a particular concurrency level in mind,
+	 * set it to the number of CPUs in the system.
+	 */
+	if (nr_threads < 0)
+		nr_threads = nr_cpus();
+
+	/*
+	 * Don't create fewer rtgroups than what we would create with the
+	 * default geometry calculation.
+	 */
+	if (!nr_threads || nr_threads < def_rgcount)
+		goto out;
+
+	/*
+	 * Let's try matching the number of rtgroups to the number of CPUs.  If
+	 * the proposed geometry results in rtgroups smaller than 4GB, reduce
+	 * the rtgroup count until we have 4GB rtgroups.  Don't let the thread
+	 * count go below the default geometry calculation.
+	 */
+	try_threads = nr_threads;
+	try_rgsize = cfg->rtblocks / try_threads;
+	if (try_rgsize < GIGABYTES(4, cfg->blocklog)) {
+		do {
+			try_threads--;
+			if (try_threads <= def_rgcount) {
+				try_rgsize = def_rgsize;
+				goto out;
+			}
+
+			try_rgsize = cfg->rtblocks / try_threads;
+		} while (try_rgsize < GIGABYTES(4, cfg->blocklog));
+		goto out;
+	}
+
+	/*
+	 * For large filesystems we try to ensure that the rtgroup count is a
+	 * multiple of the desired thread count.  Specifically, if the proposed
+	 * rtgroup size is larger than both the maximum rtgroup size and the
+	 * rtgroup size we would have gotten with the defaults, add the thread
+	 * count to the rtgroup count until we get an rtgroup size below both
+	 * of those factors.
+	 */
+	while (try_rgsize > XFS_MAX_RGBLOCKS && try_rgsize > def_rgsize) {
+		try_threads += nr_threads;
+		try_rgsize = cfg->dblocks / try_threads;
+	}
+
+out:
+	cfg->rgsize = try_rgsize;
+	cfg->rgcount = howmany(cfg->rtblocks, cfg->rgsize);
+}
+
 static void
 calculate_rtgroup_geometry(
 	struct mkfs_params	*cfg,
-	struct cli_params	*cli)
+	struct cli_params	*cli,
+	struct libxfs_init	*xi)
 {
 	if (!cli->sb_feat.metadir) {
 		cfg->rgcount = 0;
@@ -3783,6 +3913,9 @@ _("rgsize (%s) not a multiple of fs blk size (%d)\n"),
 		/* too small even for a single group */
 		cfg->rgsize = cfg->rtblocks;
 		cfg->rgcount = 0;
+	} else if (cli->rtvol_concurrency > 0 ||
+		   (cli->data_concurrency == -1 && rtdev_is_solidstate(xi))) {
+		calc_concurrency_rtgroup_geometry(cfg, cli, xi);
 	} else if (is_power_of_2(cfg->rtextblocks)) {
 		cfg->rgsize = calc_rgsize_extsize_power(cfg);
 		cfg->rgcount = cfg->rtblocks / cfg->rgsize +
@@ -4890,6 +5023,7 @@ main(
 		.is_supported	= 1,
 		.data_concurrency = -1, /* auto detect non-mechanical storage */
 		.log_concurrency = -1, /* auto detect non-mechanical ddev */
+		.rtvol_concurrency = -1, /* auto detect non-mechanical rtdev */
 		.autofsck = FSPROP_AUTOFSCK_UNSET,
 	};
 	struct mkfs_params	cfg = {};
@@ -5077,7 +5211,7 @@ main(
 	 */
 	calculate_initial_ag_geometry(&cfg, &cli, &xi);
 	align_ag_geometry(&cfg);
-	calculate_rtgroup_geometry(&cfg, &cli);
+	calculate_rtgroup_geometry(&cfg, &cli, &xi);
 
 	calculate_imaxpct(&cfg, &cli);
 

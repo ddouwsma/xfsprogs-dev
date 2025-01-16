@@ -1220,6 +1220,34 @@ The
 and
 .B rgsize
 suboptions are mutually exclusive.
+.TP
+.BI concurrency= value
+Create enough realtime allocation groups to handle the desired level of
+concurrency.
+The goal of this calculation scheme is to set the number of rtgroups to an
+integer multiple of the number of writer threads desired, to minimize
+contention of rtgroup locks.
+This scheme will neither create fewer rtgroups than would be created by the
+default configuration, nor will it create rtgroups smaller than 4GB.
+This option is not compatible with the
+.B rgcount
+or
+.B rgsize
+options.
+The magic value
+.I nr_cpus
+or
+.I 1
+or no value at all will set this parameter to the number of active processors
+in the system.
+If the kernel advertises that the realtime device is a non-mechanical storage
+device,
+.B mkfs.xfs
+will use this new geometry calculation scheme.
+The magic value of
+.I 0
+forces use of the older rtgroups geometry calculations that is used for
+mechanical storage.
 .RE
 .PP
 .PD 0
