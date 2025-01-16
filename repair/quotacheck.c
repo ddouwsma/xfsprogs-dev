@@ -691,7 +691,7 @@ discover_quota_inodes(
 	err2 = mark_quota_inode(tp, dp, XFS_DQTYPE_GROUP);
 	if (err2 && !error)
 		error = err2;
-	error = mark_quota_inode(tp, dp, XFS_DQTYPE_PROJ);
+	err2 = mark_quota_inode(tp, dp, XFS_DQTYPE_PROJ);
 	if (err2 && !error)
 		error = err2;
 
