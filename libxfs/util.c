@@ -193,7 +193,7 @@ libxfs_alloc_file_space(
 	int			rt;
 	xfs_trans_t		*tp;
 	xfs_bmbt_irec_t		imaps[1], *imapp;
-	int			error;
+	int			error = 0;
 
 	if (len <= 0)
 		return -EINVAL;
