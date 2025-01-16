@@ -112,7 +112,7 @@ AC_DEFUN([AC_NEED_INTERNAL_STATX],
           need_internal_statx=yes,
           [#include <linux/stat.h>]
         )
-      ],,
+      ],need_internal_statx=yes,
       [#include <linux/stat.h>]
     )
     AC_SUBST(need_internal_statx)
