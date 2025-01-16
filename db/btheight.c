@@ -145,6 +145,12 @@ construct_records_per_block(
 		}
 	}
 
+	p = strchr(tag, ':');
+	if (!p) {
+		fprintf(stderr, _("%s: expected a btree geometry specification.\n"), tag);
+		return -1;
+	}
+
 	toktag = strdup(tag);
 	ret = -1;
 
