@@ -91,22 +91,20 @@ xlog_recover_print_buffer(
 		len = item->ri_buf[i].i_len;
 		i++;
 		if (blkno == 0) { /* super block */
+			struct xfs_dsb  *dsb = (struct xfs_dsb *)p;
+
 			printf(_("	SUPER Block Buffer:\n"));
 			if (!print_buffer)
 				continue;
-		       printf(_("              icount:%llu ifree:%llu  "),
-			       (unsigned long long)
-				       be64_to_cpu(*(__be64 *)(p)),
-			       (unsigned long long)
-				       be64_to_cpu(*(__be64 *)(p+8)));
-		       printf(_("fdblks:%llu  frext:%llu\n"),
-			       (unsigned long long)
-				       be64_to_cpu(*(__be64 *)(p+16)),
-			       (unsigned long long)
-				       be64_to_cpu(*(__be64 *)(p+24)));
+			printf(_("              icount:%llu ifree:%llu  "),
+				(unsigned long long) get_unaligned_be64(&dsb->sb_icount),
+				(unsigned long long) get_unaligned_be64(&dsb->sb_ifree));
+			printf(_("fdblks:%llu  frext:%llu\n"),
+				(unsigned long long) get_unaligned_be64(&dsb->sb_fdblocks),
+				(unsigned long long) get_unaligned_be64(&dsb->sb_frextents));
 			printf(_("		sunit:%u  swidth:%u\n"),
-			       be32_to_cpu(*(__be32 *)(p+56)),
-			       be32_to_cpu(*(__be32 *)(p+60)));
+				get_unaligned_be32(&dsb->sb_unit),
+				get_unaligned_be32(&dsb->sb_width));
 		} else if (be32_to_cpu(*(__be32 *)p) == XFS_AGI_MAGIC) {
 			int bucket, buckets;
 			agi = (xfs_agi_t *)p;
