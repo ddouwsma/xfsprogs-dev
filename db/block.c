@@ -246,6 +246,7 @@ dblock_f(
 	int		nb;
 	xfs_extnum_t	nex;
 	char		*p;
+	bool		isrt;
 	typnm_t		type;
 
 	bno = (xfs_fileoff_t)strtoull(argv[1], &p, 0);
@@ -255,6 +256,7 @@ dblock_f(
 	}
 	push_cur();
 	set_cur_inode(iocur_top->ino);
+	isrt = is_rtfile(iocur_top->data);
 	type = inode_next_type();
 	pop_cur();
 	if (type == TYP_NONE) {
@@ -273,7 +275,7 @@ dblock_f(
 	ASSERT(typtab[type].typnm == type);
 	if (nex > 1)
 		make_bbmap(&bbmap, nex, bmp);
-	if (is_rtfile(iocur_top->data))
+	if (isrt)
 		set_rt_cur(&typtab[type], xfs_rtb_to_daddr(mp, dfsbno),
 				nb * blkbb, DB_RING_ADD,
 				nex > 1 ? &bbmap : NULL);
