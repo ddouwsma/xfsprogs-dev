@@ -1722,7 +1722,7 @@ set_data_concurrency(
 	 * "nr_cpus" or "1" means set the concurrency level to the CPU count.
 	 * If this cannot be determined, fall back to the default AG geometry.
 	 */
-	if (!strcmp(value, "nr_cpus"))
+	if (!value || !strcmp(value, "nr_cpus"))
 		optnum = 1;
 	else
 		optnum = getnum(value, opts, subopt);
@@ -1867,7 +1867,7 @@ set_log_concurrency(
 	 * "nr_cpus" or 1 means set the concurrency level to the CPU count.  If
 	 * this cannot be determined, fall back to the default computation.
 	 */
-	if (!strcmp(value, "nr_cpus"))
+	if (!value || !strcmp(value, "nr_cpus"))
 		optnum = 1;
 	else
 		optnum = getnum(value, opts, subopt);
