@@ -2299,7 +2299,9 @@ validate_sectorsize(
 		 * advertised sector size of the device.  We use the physical
 		 * sector size unless the requested block size is smaller
 		 * than that, then we can use logical, but warn about the
-		 * inefficiency.
+		 * inefficiency.  If the file system has a RT device, the
+		 * sectorsize needs to be the maximum of the data and RT
+		 * device.
 		 *
 		 * Some architectures have a page size > XFS_MAX_SECTORSIZE.
 		 * In that case, a ramdisk or persistent memory device may
@@ -2309,8 +2311,18 @@ validate_sectorsize(
 			ft->data.physical_sector_size =
 				ft->data.logical_sector_size;
 		}
-
 		cfg->sectorsize = ft->data.physical_sector_size;
+
+		if (cli->xi->rt.name) {
+			if (ft->rt.physical_sector_size > XFS_MAX_SECTORSIZE) {
+				ft->rt.physical_sector_size =
+					ft->rt.logical_sector_size;
+			}
+
+			if (cfg->sectorsize < ft->rt.physical_sector_size)
+				cfg->sectorsize = ft->rt.physical_sector_size;
+		}
+
 		if (cfg->blocksize < cfg->sectorsize &&
 		    cfg->blocksize >= ft->data.logical_sector_size) {
 			fprintf(stderr,
