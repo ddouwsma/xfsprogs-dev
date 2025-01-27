@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Copyright (C) 2018-2025 Oracle.  All Rights Reserved.
+# Author: Darrick J. Wong <djwong@kernel.org>
+
+[Unit]
+Description=Periodic XFS Online Metadata Check for All Filesystems
+
+# The xfs_scrub_all program records the last time that it performed a media
+# scan in @pkg_state_dir@.  If this path is not writable, the program
+# aborts and systemd records this as a failure.  Disable the timer if the path
+# is not writable.  This should be an uncommon situation since most
+# readonly-root systems set that up to be writable (and possibly volatile).
+ConditionPathIsReadWrite=@pkg_state_dir@
+
+[Timer]
+# Run on Sunday at 3:10am, to avoid running afoul of DST changes
+OnCalendar=Sun *-*-* 03:10:00
+RandomizedDelaySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target
