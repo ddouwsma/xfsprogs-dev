@@ -319,6 +319,51 @@ check_v5_feature_mismatch(
 	return XR_AG_SB_SEC;
 }
 
+static inline int
+require_zeroed_ino(
+	struct xfs_mount	*mp,
+	__be64			*inop,
+	const char		*tag,
+	xfs_agnumber_t		agno,
+	int			do_bzero)
+{
+	if (*inop == 0)
+		return 0;
+	if (!no_modify)
+		*inop = 0;
+	if (do_bzero)
+		return XR_AG_SB_SEC;
+
+	do_warn(_("non-zero %s inode field in superblock %d\n"),
+			tag, agno);
+	return XR_AG_SB;
+}
+
+/* With metadir, quota and rt metadata inums in the sb must all be zero. */
+static int
+check_pre_metadir_sb_inodes(
+	struct xfs_mount	*mp,
+	struct xfs_buf		*sbuf,
+	xfs_agnumber_t		agno,
+	int			do_bzero)
+{
+	struct xfs_dsb		*dsb = sbuf->b_addr;
+	int			rval = 0;
+
+	rval |= require_zeroed_ino(mp, &dsb->sb_uquotino,
+			_("user quota"), agno, do_bzero);
+	rval |= require_zeroed_ino(mp, &dsb->sb_gquotino,
+			_("group quota"), agno, do_bzero);
+	rval |= require_zeroed_ino(mp, &dsb->sb_pquotino,
+			_("project quota"), agno, do_bzero);
+
+	rval |= require_zeroed_ino(mp, &dsb->sb_rbmino,
+			_("realtime bitmap"), agno, do_bzero);
+	rval |= require_zeroed_ino(mp, &dsb->sb_rsumino,
+			_("realtime summary"), agno, do_bzero);
+	return rval;
+}
+
 /*
  * quota inodes and flags in secondary superblocks are never set by mkfs.
  * However, they could be set in a secondary if a fs with quotas was growfs'ed
@@ -509,7 +554,9 @@ secondary_sb_whack(
 			rval |= XR_AG_SB_SEC;
 	}
 
-	if (!xfs_has_metadir(mp))
+	if (xfs_has_metadir(mp))
+		rval |= check_pre_metadir_sb_inodes(mp, sbuf, i, do_bzero);
+	else
 		rval |= secondary_sb_quota(mp, sbuf, sb, i, do_bzero);
 
 	/*
