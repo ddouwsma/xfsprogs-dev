@@ -313,7 +313,6 @@ writefile(
 	struct xfs_mount	*mp = ip->i_mount;
 	struct stat		statbuf;
 	off_t			data_pos;
-	off_t			eof = 0;
 	int			error;
 
 	/* do not try to read from non-regular files */
@@ -340,8 +339,6 @@ writefile(
 		}
 
 		writefile_range(ip, fname, fd, data_pos, hole_pos - data_pos);
-		eof = hole_pos;
-
 		data_pos = lseek(fd, hole_pos, SEEK_DATA);
 	}
 	if (data_pos < 0 && errno != ENXIO)
@@ -354,7 +351,7 @@ writefile(
 		fail(_("error creating isize transaction"), error);
 
 	libxfs_trans_ijoin(tp, ip, 0);
-	ip->i_disk_size = eof;
+	ip->i_disk_size = statbuf.st_size;
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	error = -libxfs_trans_commit(tp);
 	if (error)
