@@ -54,7 +54,7 @@ def stat_to_extra(statbuf, fullpath):
 	if stat.S_ISREG(statbuf.st_mode):
 		return ' %s' % fullpath
 	elif stat.S_ISCHR(statbuf.st_mode) or stat.S_ISBLK(statbuf.st_mode):
-		return ' %d %d' % (statbuf.st_rdev, statbuf.st_rdev)
+		return ' %d %d' % (os.major(statbuf.st_rdev), os.minor(statbuf.st_rdev))
 	elif stat.S_ISLNK(statbuf.st_mode):
 		return ' %s' % os.readlink(fullpath)
 	return ''
