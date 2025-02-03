@@ -45,7 +45,7 @@ def stat_to_str(statbuf):
 
 	perms = stat.S_IMODE(statbuf.st_mode)
 
-	return '%s%s%s%o %d %d' % (type, suid, sgid, perms, statbuf.st_uid, \
+	return '%s%s%s%03o %d %d' % (type, suid, sgid, perms, statbuf.st_uid, \
 			statbuf.st_gid)
 
 def stat_to_extra(statbuf, fullpath):
