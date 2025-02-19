@@ -7,7 +7,7 @@ _BUILDRULES_INCLUDED_ = 1
 include $(TOPDIR)/include/builddefs
 
 clean clobber : $(addsuffix -clean,$(SUBDIRS))
-	@rm -f $(DIRT) .ltdep .dep
+	@rm -f $(DIRT) .ltdep .dep .extradep
 	@rm -fr $(DIRDIRT)
 %-clean:
 	@echo "Cleaning $*"
