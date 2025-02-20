@@ -100,7 +100,7 @@ if [ $? -eq 0 ]; then
 fi
 
 # Are we using stgit? This works even if no patch is applied.
-stg top &> /dev/null
+stg log &> /dev/null
 if [ $? -eq 0 ]; then
 	STGIT=1
 fi
