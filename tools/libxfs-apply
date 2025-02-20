@@ -297,6 +297,64 @@ fixup_header_format()
 
 }
 
+editor() {
+	if [ -n "${EDITOR}" ]; then
+		${EDITOR} "$@"
+	elif [ -n "${VISUAL}" ]; then
+		${VISUAL} "$@"
+	elif command -v editor &>/dev/null; then
+		editor "$@"
+	elif command -v nano &>/dev/null; then
+		nano "$@"
+	else
+		echo "No editor available, aborting messily."
+		exit 1
+	fi
+}
+
+stg_force_import()
+{
+	local patch_name="$1"
+	local patch="$2"
+
+	# Import patch to get the metadata even though the diff application
+	# might fail due to stg import being very picky.  If the patch applies
+	# cleanly, we're done.
+	stg import --reject -n "${patch_name}" "${patch}" && return 0
+
+	local tmpfile="${patch}.stgit"
+	rm -f "${tmpfile}"
+
+	# Erase whatever stgit managed to apply, then use patch(1)'s more
+	# flexible heuristics.  Capture the output for later use.
+	stg diff | patch -p1 -R
+	patch -p1 < "${patch}" &> "${tmpfile}"
+	cat "${tmpfile}"
+
+	# Attach any new files created by the patch
+	grep 'create mode' "${patch}" | sed -e 's/^.* mode [0-7]* //g' | while read -r f; do
+		git add "$f"
+	done
+
+	# Remove any existing files deleted by the patch
+	grep 'delete mode' "${patch}" | sed -e 's/^.* mode [0-7]* //g' | while read -r f; do
+		git rm "$f"
+	done
+
+	# Open an editor so the user can clean up the rejects.  Use readarray
+	# instead of "<<<" because the latter picks up empty output as a single
+	# line and does variable expansion...  stupid bash.
+	readarray -t rej_files < <(grep 'saving rejects to' "${tmpfile}" | \
+				   sed -e 's/^.*saving rejects to file //g')
+	rm -f "${tmpfile}"
+	if [ "${#rej_files[@]}" -gt 0 ]; then
+		echo "Opening editor to deal with rejects.  Changes commit when you close the editor."
+		editor "${rej_files[@]}"
+	fi
+
+	stg refresh
+}
+
 apply_patch()
 {
 	local _patch=$1
@@ -385,11 +443,13 @@ apply_patch()
 		stg import -n $_patch_name $_new_patch.2
 		if [ $? -ne 0 ]; then
 			echo "stgit push failed!"
-			read -r -p "Skip or Fail [s|F]? " response
-			if [ -z "$response" -o "$response" != "s" ]; then
+			read -r -p "Skip, force Apply, or Fail [s|a|F]? " response
+			if [ -z "$response" -o "$response" = "F" -o "$response" = "f" ]; then
 				echo "Force push patch, fix and refresh."
 				echo "Restart from commit $_current_commit"
 				fail "Manual cleanup required!"
+			elif [ "$response" = "a" -o "$response" = "A" ]; then
+				stg_force_import "$_patch_name" "$_new_patch.2"
 			else
 				echo "Skipping. Manual series file cleanup needed!"
 			fi
