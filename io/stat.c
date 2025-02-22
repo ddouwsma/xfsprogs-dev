@@ -104,8 +104,10 @@ print_extended_info(int verbose)
 	struct fsxattr fsx = {}, fsxa = {};
 
 	if ((ioctl(file->fd, FS_IOC_FSGETXATTR, &fsx)) < 0) {
-		perror("FS_IOC_GETXATTR");
-		exitcode = 1;
+		if (errno != ENOTTY) {
+			perror("FS_IOC_FSGETXATTR");
+			exitcode = 1;
+		}
 		return;
 	}
 
