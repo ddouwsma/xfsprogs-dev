@@ -61,6 +61,8 @@ cache_init(
 	cache->compare = cache_operations->compare;
 	cache->bulkrelse = cache_operations->bulkrelse ?
 		cache_operations->bulkrelse : cache_generic_bulkrelse;
+	cache->get = cache_operations->get;
+	cache->put = cache_operations->put;
 	pthread_mutex_init(&cache->c_mutex, NULL);
 
 	for (i = 0; i < hashsize; i++) {
@@ -415,6 +417,13 @@ cache_node_get(
 			 */
 			pthread_mutex_lock(&node->cn_mutex);
 
+			if (node->cn_count == 0 && cache->get) {
+				int err = cache->get(node);
+				if (err) {
+					pthread_mutex_unlock(&node->cn_mutex);
+					goto next_object;
+				}
+			}
 			if (node->cn_count == 0) {
 				ASSERT(node->cn_priority >= 0);
 				ASSERT(!list_empty(&node->cn_mru));
@@ -503,6 +512,8 @@ cache_node_put(
 #endif
 	node->cn_count--;
 
+	if (node->cn_count == 0 && cache->put)
+		cache->put(node);
 	if (node->cn_count == 0) {
 		/* add unreferenced node to appropriate MRU for shaker */
 		mru = &cache->c_mrus[node->cn_priority];
