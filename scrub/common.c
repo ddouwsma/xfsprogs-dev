@@ -418,14 +418,58 @@ scrub_render_ino_descr(
 
 	if (ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT) {
 		struct xfs_handle handle;
+		char		*pathbuf = buf;
+		size_t		used = 0;
 
 		handle_from_fshandle(&handle, ctx->fshandle, ctx->fshandle_len);
 		handle_from_inogen(&handle, ino, gen);
 
+		/*
+		 * @actual_mntpoint is the path we used to open the filesystem,
+		 * and @mntpoint is the path we use for display purposes.  If
+		 * these aren't the same string, then for reporting purposes
+		 * we must fix the start of the path string.  Start by copying
+		 * the display mountpoint into buf, except for trailing
+		 * slashes.  At this point buf will not be null-terminated.
+		 */
+		if (ctx->actual_mntpoint != ctx->mntpoint) {
+			used = strlen(ctx->mntpoint);
+			while (used && ctx->mntpoint[used - 1] == '/')
+				used--;
+
+			/* If it doesn't fit, report the handle instead. */
+			if (used >= buflen) {
+				used = 0;
+				goto report_inum;
+			}
+
+			memcpy(buf, ctx->mntpoint, used);
+			pathbuf += used;
+		}
+
 		ret = handle_to_path(&handle, sizeof(struct xfs_handle), 4096,
-				buf, buflen);
+				pathbuf, buflen - used);
 		if (ret)
 			goto report_inum;
+
+		/*
+		 * Now that handle_to_path formatted the full path (including
+		 * the actual mount point, stripped of any trailing slashes)
+		 * into the rest of pathbuf, slide down the contents by the
+		 * length of the actual mount point.  Don't count any trailing
+		 * slashes because handle_to_path uses libhandle, which strips
+		 * trailing slashes.  Copy one more byte to ensure we get the
+		 * terminating null.
+		 */
+		if (ctx->actual_mntpoint != ctx->mntpoint) {
+			size_t	len = strlen(ctx->actual_mntpoint);
+
+			while (len && ctx->actual_mntpoint[len - 1] == '/')
+				len--;
+
+			pathlen = strlen(pathbuf);
+			memmove(pathbuf, pathbuf + len, pathlen - len + 1);
+		}
 
 		/*
 		 * Leave at least 16 bytes for the description of what went
