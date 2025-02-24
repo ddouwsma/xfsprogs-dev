@@ -1095,6 +1095,28 @@ rtinit_nogroups(
 	}
 }
 
+static int
+init_rtrmap_for_rtsb(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = -libxfs_trans_alloc_inode(rtg_rmap(rtg),
+			&M_RES(mp)->tr_itruncate, 0, 0, false, &tp);
+	if (error)
+		return error;
+
+	error = -libxfs_rtrmapbt_init_rtsb(mp, rtg, tp);
+	if (error) {
+		libxfs_trans_cancel(tp);
+		return error;
+	}
+
+	return -libxfs_trans_commit(tp);
+}
+
 static void
 rtinit_groups(
 	struct xfs_mount	*mp)
@@ -1113,6 +1135,13 @@ rtinit_groups(
 			if (error)
 				fail(_("rt group inode creation failed"),
 						error);
+		}
+
+		if (xfs_has_rtsb(mp) && xfs_has_rtrmapbt(mp) &&
+		    rtg_rgno(rtg) == 0) {
+			error = init_rtrmap_for_rtsb(rtg);
+			if (error)
+				fail(_("rtrmap rtsb init failed"), error);
 		}
 
 		rtfreesp_init(rtg);

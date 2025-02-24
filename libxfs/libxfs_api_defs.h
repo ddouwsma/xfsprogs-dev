@@ -224,6 +224,8 @@
 
 #define xfs_metafile_iget		libxfs_metafile_iget
 #define xfs_trans_metafile_iget		libxfs_trans_metafile_iget
+#define xfs_metafile_resv_free		libxfs_metafile_resv_free
+#define xfs_metafile_resv_init		libxfs_metafile_resv_init
 #define xfs_metafile_set_iflag		libxfs_metafile_set_iflag
 #define xfs_metadir_cancel		libxfs_metadir_cancel
 #define xfs_metadir_commit		libxfs_metadir_commit
@@ -324,6 +326,7 @@
 #define xfs_rtrmapbt_droot_maxrecs	libxfs_rtrmapbt_droot_maxrecs
 #define xfs_rtrmapbt_maxlevels_ondisk	libxfs_rtrmapbt_maxlevels_ondisk
 #define xfs_rtrmapbt_init_cursor	libxfs_rtrmapbt_init_cursor
+#define xfs_rtrmapbt_init_rtsb		libxfs_rtrmapbt_init_rtsb
 #define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
 #define xfs_rtrmapbt_mem_init		libxfs_rtrmapbt_mem_init
 #define xfs_rtrmapbt_mem_cursor		libxfs_rtrmapbt_mem_cursor
