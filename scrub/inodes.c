@@ -51,7 +51,6 @@
 static void
 bulkstat_for_inumbers(
 	struct scrub_ctx		*ctx,
-	struct descr			*dsc,
 	const struct xfs_inumbers	*inumbers,
 	struct xfs_bulkstat_req		*breq)
 {
@@ -66,13 +65,7 @@ bulkstat_for_inumbers(
 
 	/* First we try regular bulkstat, for speed. */
 	breq->hdr.ino = inumbers->xi_startino;
-	error = -xfrog_bulkstat(&ctx->mnt, breq);
-	if (error) {
-		char	errbuf[DESCR_BUFSZ];
-
-		str_info(ctx, descr_render(dsc), "%s",
-			 strerror_r(error, errbuf, DESCR_BUFSZ));
-	}
+	xfrog_bulkstat(&ctx->mnt, breq);
 
 	/*
 	 * Bulkstat might return inodes beyond xi_startino + CHUNKSIZE.  Reduce
@@ -239,7 +232,7 @@ scan_ag_bulkstat(
 	descr_set(&dsc_inumbers, &agno);
 	handle_from_fshandle(&handle, ctx->fshandle, ctx->fshandle_len);
 retry:
-	bulkstat_for_inumbers(ctx, &dsc_inumbers, inumbers, breq);
+	bulkstat_for_inumbers(ctx, inumbers, breq);
 
 	/* Iterate all the inodes. */
 	for (i = 0; !si->aborted && i < breq->hdr.ocount; i++, bs++) {
