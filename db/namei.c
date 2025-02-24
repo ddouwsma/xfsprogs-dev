@@ -266,15 +266,18 @@ get_dstr(
 	return filetype_strings[filetype];
 }
 
-static void
-dir_emit(
-	struct xfs_mount	*mp,
+static int
+print_dirent(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*dp,
 	xfs_dir2_dataptr_t	off,
 	char			*name,
 	ssize_t			namelen,
 	xfs_ino_t		ino,
-	uint8_t			dtype)
+	uint8_t			dtype,
+	void			*private)
 {
+	struct xfs_mount	*mp = dp->i_mount;
 	char			*display_name;
 	struct xfs_name		xname = { .name = (unsigned char *)name };
 	const char		*dstr = get_dstr(mp, dtype);
@@ -306,11 +309,14 @@ dir_emit(
 
 	if (display_name != name)
 		free(display_name);
+	return 0;
 }
 
 static int
 list_sfdir(
-	struct xfs_da_args		*args)
+	struct xfs_da_args		*args,
+	dir_emit_t			dir_emit,
+	void				*private)
 {
 	struct xfs_inode		*dp = args->dp;
 	struct xfs_mount		*mp = dp->i_mount;
@@ -321,17 +327,24 @@ list_sfdir(
 	xfs_dir2_dataptr_t		off;
 	unsigned int			i;
 	uint8_t				filetype;
+	int				error;
 
 	/* . and .. entries */
 	off = xfs_dir2_db_off_to_dataptr(geo, geo->datablk,
 			geo->data_entry_offset);
-	dir_emit(args->dp->i_mount, off, ".", -1, dp->i_ino, XFS_DIR3_FT_DIR);
+	error = dir_emit(args->trans, args->dp, off, ".", -1, dp->i_ino,
+			XFS_DIR3_FT_DIR, private);
+	if (error)
+		return error;
 
 	ino = libxfs_dir2_sf_get_parent_ino(sfp);
 	off = xfs_dir2_db_off_to_dataptr(geo, geo->datablk,
 			geo->data_entry_offset +
 			libxfs_dir2_data_entsize(mp, sizeof(".") - 1));
-	dir_emit(args->dp->i_mount, off, "..", -1, ino, XFS_DIR3_FT_DIR);
+	error = dir_emit(args->trans, args->dp, off, "..", -1, ino,
+			XFS_DIR3_FT_DIR, private);
+	if (error)
+		return error;
 
 	/* Walk everything else. */
 	sfep = xfs_dir2_sf_firstentry(sfp);
@@ -341,8 +354,11 @@ list_sfdir(
 		off = xfs_dir2_db_off_to_dataptr(geo, geo->datablk,
 				xfs_dir2_sf_get_offset(sfep));
 
-		dir_emit(args->dp->i_mount, off, (char *)sfep->name,
-				sfep->namelen, ino, filetype);
+		error = dir_emit(args->trans, args->dp, off,
+				(char *)sfep->name, sfep->namelen, ino,
+				filetype, private);
+		if (error)
+			return error;
 		sfep = libxfs_dir2_sf_nextentry(mp, sfp, sfep);
 	}
 
@@ -352,7 +368,9 @@ list_sfdir(
 /* List entries in block format directory. */
 static int
 list_blockdir(
-	struct xfs_da_args	*args)
+	struct xfs_da_args	*args,
+	dir_emit_t		dir_emit,
+	void			*private)
 {
 	struct xfs_inode	*dp = args->dp;
 	struct xfs_mount	*mp = dp->i_mount;
@@ -363,7 +381,7 @@ list_blockdir(
 	unsigned int		end;
 	int			error;
 
-	error = xfs_dir3_block_read(NULL, dp, args->owner, &bp);
+	error = xfs_dir3_block_read(args->trans, dp, args->owner, &bp);
 	if (error)
 		return error;
 
@@ -383,8 +401,11 @@ list_blockdir(
 		diroff = xfs_dir2_db_off_to_dataptr(geo, geo->datablk, offset);
 		offset += libxfs_dir2_data_entsize(mp, dep->namelen);
 		filetype = libxfs_dir2_data_get_ftype(dp->i_mount, dep);
-		dir_emit(mp, diroff, (char *)dep->name, dep->namelen,
-				be64_to_cpu(dep->inumber), filetype);
+		error = dir_emit(args->trans, args->dp, diroff,
+				(char *)dep->name, dep->namelen,
+				be64_to_cpu(dep->inumber), filetype, private);
+		if (error)
+			break;
 	}
 
 	libxfs_trans_brelse(args->trans, bp);
@@ -394,7 +415,9 @@ list_blockdir(
 /* List entries in leaf format directory. */
 static int
 list_leafdir(
-	struct xfs_da_args	*args)
+	struct xfs_da_args	*args,
+	dir_emit_t		dir_emit,
+	void			*private)
 {
 	struct xfs_bmbt_irec	map;
 	struct xfs_iext_cursor	icur;
@@ -408,7 +431,7 @@ list_leafdir(
 	int			error = 0;
 
 	/* Read extent map. */
-	error = -libxfs_iread_extents(NULL, dp, XFS_DATA_FORK);
+	error = -libxfs_iread_extents(args->trans, dp, XFS_DATA_FORK);
 	if (error)
 		return error;
 
@@ -424,7 +447,7 @@ list_leafdir(
 		libxfs_trim_extent(&map, dabno, geo->leafblk - dabno);
 
 		/* Read the directory block of that first mapping. */
-		error = xfs_dir3_data_read(NULL, dp, args->owner,
+		error = xfs_dir3_data_read(args->trans, dp, args->owner,
 				map.br_startoff, 0, &bp);
 		if (error)
 			break;
@@ -449,18 +472,22 @@ list_leafdir(
 			offset += libxfs_dir2_data_entsize(mp, dep->namelen);
 			filetype = libxfs_dir2_data_get_ftype(mp, dep);
 
-			dir_emit(mp, xfs_dir2_byte_to_dataptr(dirboff + offset),
+			error = dir_emit(args->trans, args->dp,
+					xfs_dir2_byte_to_dataptr(dirboff + offset),
 					(char *)dep->name, dep->namelen,
-					be64_to_cpu(dep->inumber), filetype);
+					be64_to_cpu(dep->inumber), filetype,
+					private);
+			if (error)
+				break;
 		}
 
 		dabno += XFS_DADDR_TO_FSB(mp, bp->b_length);
-		libxfs_buf_relse(bp);
+		libxfs_trans_brelse(args->trans, bp);
 		bp = NULL;
 	}
 
 	if (bp)
-		libxfs_buf_relse(bp);
+		libxfs_trans_brelse(args->trans, bp);
 
 	return error;
 }
@@ -468,9 +495,13 @@ list_leafdir(
 /* Read the directory, display contents. */
 static int
 listdir(
-	struct xfs_inode	*dp)
+	struct xfs_trans	*tp,
+	struct xfs_inode	*dp,
+	dir_emit_t		dir_emit,
+	void			*private)
 {
 	struct xfs_da_args	args = {
+		.trans		= tp,
 		.dp		= dp,
 		.geo		= dp->i_mount->m_dir_geo,
 		.owner		= dp->i_ino,
@@ -479,14 +510,14 @@ listdir(
 
 	switch (libxfs_dir2_format(&args, &error)) {
 	case XFS_DIR2_FMT_SF:
-		return list_sfdir(&args);
+		return list_sfdir(&args, dir_emit, private);
 	case XFS_DIR2_FMT_BLOCK:
-		return list_blockdir(&args);
+		return list_blockdir(&args, dir_emit, private);
 	case XFS_DIR2_FMT_LEAF:
 	case XFS_DIR2_FMT_NODE:
-		return list_leafdir(&args);
+		return list_leafdir(&args, dir_emit, private);
 	default:
-		return error;
+		return EFSCORRUPTED;
 	}
 }
 
@@ -526,7 +557,7 @@ ls_cur(
 	if (tag)
 		dbprintf(_("%s:\n"), tag);
 
-	error = listdir(dp);
+	error = listdir(NULL, dp, print_dirent, NULL);
 	if (error)
 		goto rele;
 
