@@ -394,6 +394,7 @@
 #define xfs_verify_fsbext		libxfs_verify_fsbext
 #define xfs_verify_fsbno		libxfs_verify_fsbno
 #define xfs_verify_ino			libxfs_verify_ino
+#define xfs_verify_rgbno		libxfs_verify_rgbno
 #define xfs_verify_rtbno		libxfs_verify_rtbno
 #define xfs_zero_extent			libxfs_zero_extent
 

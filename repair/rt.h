@@ -33,6 +33,10 @@ static inline bool is_rtrmap_inode(xfs_ino_t ino)
 {
 	return is_rtgroup_inode(ino, XFS_RTGI_RMAP);
 }
+static inline bool is_rtrefcount_inode(xfs_ino_t ino)
+{
+	return is_rtgroup_inode(ino, XFS_RTGI_REFCOUNT);
+}
 
 void mark_rtgroup_inodes_bad(struct xfs_mount *mp, enum xfs_rtg_inodes type);
 bool rtgroup_inodes_were_bad(enum xfs_rtg_inodes type);
