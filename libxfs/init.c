@@ -21,6 +21,7 @@
 #include "xfs_trans.h"
 #include "xfs_rmap_btree.h"
 #include "xfs_refcount_btree.h"
+#include "xfs_metafile.h"
 #include "libfrog/platform.h"
 #include "libfrog/util.h"
 #include "libxfs/xfile.h"
@@ -598,6 +599,14 @@ xfs_agbtree_compute_maxlevels(
 	mp->m_agbtree_maxlevels = max(levels, mp->m_refc_maxlevels);
 }
 
+/* Compute maximum possible height for realtime btree types for this fs. */
+static inline void
+xfs_rtbtree_compute_maxlevels(
+	struct xfs_mount	*mp)
+{
+	mp->m_rtbtree_maxlevels = mp->m_rtrmap_maxlevels;
+}
+
 /* Compute maximum possible height of all btrees. */
 void
 libxfs_compute_all_maxlevels(
@@ -611,10 +620,11 @@ libxfs_compute_all_maxlevels(
 	igeo->attr_fork_offset = xfs_bmap_compute_attr_offset(mp);
 	xfs_ialloc_setup_geometry(mp);
 	xfs_rmapbt_compute_maxlevels(mp);
+	xfs_rtrmapbt_compute_maxlevels(mp);
 	xfs_refcountbt_compute_maxlevels(mp);
 
 	xfs_agbtree_compute_maxlevels(mp);
-
+	xfs_rtbtree_compute_maxlevels(mp);
 }
 
 /* Mount the metadata files under the metadata directory tree. */
