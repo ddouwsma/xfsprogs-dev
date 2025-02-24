@@ -202,6 +202,19 @@ print_rgresv_info(
 
 	ask += libxfs_rtrmapbt_calc_reserves(mp);
 
+	/* rtrefcount */
+	error = -libxfs_rtginode_load(rtg, XFS_RTGI_REFCOUNT, tp);
+	if (error) {
+		dbprintf(_("Cannot load rtgroup %u refcount inode, error %d\n"),
+			rtg_rgno(rtg), error);
+		goto out_rele_dp;
+	}
+	if (rtg_refcount(rtg))
+		used += rtg_refcount(rtg)->i_nblocks;
+	libxfs_rtginode_irele(&rtg->rtg_inodes[XFS_RTGI_REFCOUNT]);
+
+	ask += libxfs_rtrefcountbt_calc_reserves(mp);
+
 	printf(_("rtg %d: dblocks: %llu fdblocks: %llu reserved: %llu used: %llu"),
 			rtg_rgno(rtg),
 			(unsigned long long)mp->m_sb.sb_dblocks,
