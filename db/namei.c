@@ -14,6 +14,7 @@
 #include "fprint.h"
 #include "field.h"
 #include "inode.h"
+#include "namei.h"
 
 /* Path lookup */
 
@@ -144,7 +145,7 @@ out_trans:
 }
 
 /* Walk a directory path to an inode and set the io cursor to that inode. */
-static int
+int
 path_walk(
 	xfs_ino_t	rootino,
 	const char	*path)
@@ -493,7 +494,7 @@ list_leafdir(
 }
 
 /* Read the directory, display contents. */
-static int
+int
 listdir(
 	struct xfs_trans	*tp,
 	struct xfs_inode	*dp,

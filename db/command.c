@@ -145,4 +145,5 @@ init_commands(void)
 	timelimit_init();
 	iunlink_init();
 	bmapinflate_init();
+	rdump_init();
 }

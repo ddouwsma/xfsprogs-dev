@@ -45,6 +45,7 @@ HFILES = \
 	logformat.h \
 	malloc.h \
 	metadump.h \
+	namei.h \
 	obfuscate.h \
 	output.h \
 	print.h \
@@ -64,7 +65,7 @@ CFILES = $(HFILES:.h=.c) \
 	convert.c \
 	info.c \
 	iunlink.c \
-	namei.c \
+	rdump.c \
 	timelimit.c
 LSRCFILES = xfs_admin.sh xfs_ncheck.sh xfs_metadump.sh
 

@@ -1132,6 +1132,32 @@ command.
 Exit
 .BR xfs_db .
 .TP
+.BI "rdump [-s] [" "paths..." "] " "destination_dir"
+Recover the files given by the
+.B path
+arguments by copying them of the filesystem into the directory specified in
+.BR destination_dir .
+
+If the
+.B -s
+option is specified, errors are fatal.
+By default, read errors are ignored in favor of recovering as much data from
+the filesystem as possible.
+
+If zero
+.B paths
+are specified, the entire filesystem is dumped.
+If only one
+.B path
+is specified and it is a directory, the children of that directory will be
+copied directly to the destination.
+If multiple
+.B paths
+are specified, each file is copied into the directory as a new child.
+
+If possible, sparse holes, xfs file attributes, and extended attributes will be
+preserved.
+.TP
 .BI "rgresv [" rgno ]
 Displays the per-rtgroup reservation size, and per-rtgroup
 reservation usage for a given realtime allocation group.

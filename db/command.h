@@ -36,3 +36,4 @@ extern void		timelimit_init(void);
 extern void		namei_init(void);
 extern void		iunlink_init(void);
 extern void		bmapinflate_init(void);
+void			rdump_init(void);
