@@ -160,10 +160,34 @@ bulkstat_single_step(
 		 */
 		error = -xfrog_bulkstat_single(&ctx->mnt,
 				inumbers->xi_startino + i, breq->hdr.flags, bs);
-		if (error || bs->bs_ino != inumbers->xi_startino + i) {
+		switch (error) {
+		case ENOENT:
+			/*
+			 * This inode wasn't found, and no results were
+			 * returned.  We've likely hit the end of the
+			 * filesystem, but we'll move on to the next inode in
+			 * the mask for the sake of caution.
+			 */
+			continue;
+		case 0:
+			/*
+			 * If a result was returned but it wasn't the inode
+			 * we were looking for, then the missing inode was
+			 * freed.  Move on to the next inode in the mask.
+			 */
+			if (bs->bs_ino != inumbers->xi_startino + i)
+				continue;
+			break;
+		default:
+			/*
+			 * Some error happened.  Synthesize a bulkstat record
+			 * so that phase3 can try to see if there's a corrupt
+			 * inode that needs repairing.
+			 */
 			memset(bs, 0, sizeof(struct xfs_bulkstat));
 			bs->bs_ino = inumbers->xi_startino + i;
 			bs->bs_blksize = ctx->mnt_sv.f_frsize;
+			break;
 		}
 
 		breq->hdr.ocount++;
