@@ -16,6 +16,7 @@
 #include "libfrog/platform.h"
 #include "rcbag.h"
 #include "rt.h"
+#include "prefetch.h"
 
 #undef RMAP_DEBUG
 
@@ -195,8 +196,6 @@ rmaps_init(
 
 	for (i = 0; i < mp->m_sb.sb_rgcount; i++)
 		rmaps_init_rt(mp, i, &rg_rmaps[i]);
-
-	discover_rtgroup_inodes(mp);
 }
 
 /*
@@ -571,6 +570,27 @@ rmap_add_fixed_ag_rec(
 		rmap_add_ag_rec(mp, agno, agbno, mp->m_sb.sb_logblocks,
 				XFS_RMAP_OWN_LOG);
 	}
+}
+
+/* Add this realtime group's fixed metadata to the incore data. */
+void
+rmap_add_fixed_rtgroup_rec(
+	struct xfs_mount	*mp,
+	xfs_rgnumber_t		rgno)
+{
+	struct xfs_rmap_irec	rmap = {
+		.rm_startblock	= 0,
+		.rm_blockcount	= mp->m_sb.sb_rextsize,
+		.rm_owner	= XFS_RMAP_OWN_FS,
+		.rm_offset	= 0,
+		.rm_flags	= 0,
+	};
+
+	if (!rmap_needs_work(mp))
+		return;
+
+	if (xfs_has_rtsb(mp) && rgno == 0)
+		rmap_add_mem_rec(mp, true, rgno, &rmap);
 }
 
 /*
@@ -1213,6 +1233,91 @@ rmap_is_good(
 #undef NEXTP
 #undef NEXTL
 
+static int
+rmap_compare_records(
+	struct xfs_btree_cur	*rm_cur,
+	struct xfs_btree_cur	*bt_cur,
+	unsigned int		group)
+{
+	struct xfs_rmap_irec	rm_rec;
+	struct xfs_rmap_irec	tmp;
+	int			have;
+	int			error;
+
+	while ((error = rmap_get_mem_rec(rm_cur, &rm_rec)) == 1) {
+		error = rmap_lookup(bt_cur, &rm_rec, &tmp, &have);
+		if (error) {
+			do_warn(
+_("Could not read reverse-mapping record for (%u/%u).\n"),
+					group,
+					rm_rec.rm_startblock);
+			return error;
+		}
+
+		/*
+		 * Using the range query is expensive, so only do it if
+		 * the regular lookup doesn't find anything or if it doesn't
+		 * match the observed rmap.
+		 */
+		if (xfs_has_reflink(bt_cur->bc_mp) &&
+				(!have || !rmap_is_good(&rm_rec, &tmp))) {
+			error = rmap_lookup_overlapped(bt_cur, &rm_rec,
+					&tmp, &have);
+			if (error) {
+				do_warn(
+_("Could not read reverse-mapping record for (%u/%u).\n"),
+						group, rm_rec.rm_startblock);
+				return error;
+			}
+		}
+		if (!have) {
+			do_warn(
+_("Missing reverse-mapping record for (%u/%u) %slen %u owner %"PRId64" \
+%s%soff %"PRIu64"\n"),
+				group, rm_rec.rm_startblock,
+				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
+					_("unwritten ") : "",
+				rm_rec.rm_blockcount,
+				rm_rec.rm_owner,
+				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
+					_("attr ") : "",
+				(rm_rec.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
+					_("bmbt ") : "",
+				rm_rec.rm_offset);
+			continue;
+		}
+
+		/* Compare each rmap observation against the btree's */
+		if (!rmap_is_good(&rm_rec, &tmp)) {
+			do_warn(
+_("Incorrect reverse-mapping: saw (%u/%u) %slen %u owner %"PRId64" %s%soff \
+%"PRIu64"; should be (%u/%u) %slen %u owner %"PRId64" %s%soff %"PRIu64"\n"),
+				group, tmp.rm_startblock,
+				(tmp.rm_flags & XFS_RMAP_UNWRITTEN) ?
+					_("unwritten ") : "",
+				tmp.rm_blockcount,
+				tmp.rm_owner,
+				(tmp.rm_flags & XFS_RMAP_ATTR_FORK) ?
+					_("attr ") : "",
+				(tmp.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
+					_("bmbt ") : "",
+				tmp.rm_offset,
+				group, rm_rec.rm_startblock,
+				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
+					_("unwritten ") : "",
+				rm_rec.rm_blockcount,
+				rm_rec.rm_owner,
+				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
+					_("attr ") : "",
+				(rm_rec.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
+					_("bmbt ") : "",
+				rm_rec.rm_offset);
+		}
+	}
+
+	return error;
+}
+
 /*
  * Compare the observed reverse mappings against what's in the ag btree.
  */
@@ -1222,12 +1327,9 @@ rmaps_verify_btree(
 	xfs_agnumber_t		agno)
 {
 	struct xfs_btree_cur	*rm_cur;
-	struct xfs_rmap_irec	rm_rec;
-	struct xfs_rmap_irec	tmp;
 	struct xfs_btree_cur	*bt_cur = NULL;
 	struct xfs_buf		*agbp = NULL;
 	struct xfs_perag	*pag = NULL;
-	int			have;
 	int			error;
 
 	if (!xfs_has_rmapbt(mp))
@@ -1262,82 +1364,98 @@ rmaps_verify_btree(
 		goto err_agf;
 	}
 
-	while ((error = rmap_get_mem_rec(rm_cur, &rm_rec)) == 1) {
-		error = rmap_lookup(bt_cur, &rm_rec, &tmp, &have);
-		if (error) {
-			do_warn(
-_("Could not read reverse-mapping record for (%u/%u).\n"),
-					agno, rm_rec.rm_startblock);
-			goto err_cur;
-		}
-
-		/*
-		 * Using the range query is expensive, so only do it if
-		 * the regular lookup doesn't find anything or if it doesn't
-		 * match the observed rmap.
-		 */
-		if (xfs_has_reflink(bt_cur->bc_mp) &&
-				(!have || !rmap_is_good(&rm_rec, &tmp))) {
-			error = rmap_lookup_overlapped(bt_cur, &rm_rec,
-					&tmp, &have);
-			if (error) {
-				do_warn(
-_("Could not read reverse-mapping record for (%u/%u).\n"),
-						agno, rm_rec.rm_startblock);
-				goto err_cur;
-			}
-		}
-		if (!have) {
-			do_warn(
-_("Missing reverse-mapping record for (%u/%u) %slen %u owner %"PRId64" \
-%s%soff %"PRIu64"\n"),
-				agno, rm_rec.rm_startblock,
-				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
-					_("unwritten ") : "",
-				rm_rec.rm_blockcount,
-				rm_rec.rm_owner,
-				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
-					_("attr ") : "",
-				(rm_rec.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
-					_("bmbt ") : "",
-				rm_rec.rm_offset);
-			continue;
-		}
-
-		/* Compare each refcount observation against the btree's */
-		if (!rmap_is_good(&rm_rec, &tmp)) {
-			do_warn(
-_("Incorrect reverse-mapping: saw (%u/%u) %slen %u owner %"PRId64" %s%soff \
-%"PRIu64"; should be (%u/%u) %slen %u owner %"PRId64" %s%soff %"PRIu64"\n"),
-				agno, tmp.rm_startblock,
-				(tmp.rm_flags & XFS_RMAP_UNWRITTEN) ?
-					_("unwritten ") : "",
-				tmp.rm_blockcount,
-				tmp.rm_owner,
-				(tmp.rm_flags & XFS_RMAP_ATTR_FORK) ?
-					_("attr ") : "",
-				(tmp.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
-					_("bmbt ") : "",
-				tmp.rm_offset,
-				agno, rm_rec.rm_startblock,
-				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
-					_("unwritten ") : "",
-				rm_rec.rm_blockcount,
-				rm_rec.rm_owner,
-				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
-					_("attr ") : "",
-				(rm_rec.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
-					_("bmbt ") : "",
-				rm_rec.rm_offset);
-		}
-	}
+	error = rmap_compare_records(rm_cur, bt_cur, agno);
+	if (error)
+		goto err_cur;
 
 err_cur:
-	libxfs_btree_del_cursor(bt_cur, XFS_BTREE_NOERROR);
+	libxfs_btree_del_cursor(bt_cur, error);
 err_agf:
 	libxfs_buf_relse(agbp);
 err_pag:
 	libxfs_perag_put(pag);
+	libxfs_btree_del_cursor(rm_cur, error);
+}
+
+/*
+ * Compare the observed reverse mappings against what's in the rtgroup btree.
+ */
+void
+rtrmaps_verify_btree(
+	struct xfs_mount	*mp,
+	xfs_rgnumber_t		rgno)
+{
+	struct xfs_btree_cur	*rm_cur;
+	struct xfs_btree_cur	*bt_cur = NULL;
+	struct xfs_rtgroup	*rtg = NULL;
+	struct xfs_inode	*ip = NULL;
+	int			error;
+
+	if (!xfs_has_rmapbt(mp))
+		return;
+	if (rmapbt_suspect) {
+		if (no_modify && rgno == 0)
+			do_warn(_("would rebuild corrupt rmap btrees.\n"));
+		return;
+	}
+
+	/* Create cursors to rmap structures */
+	error = rmap_init_mem_cursor(mp, NULL, true, rgno, &rm_cur);
+	if (error) {
+		do_warn(_("Not enough memory to check reverse mappings.\n"));
+		return;
+	}
+
+	rtg = libxfs_rtgroup_get(mp, rgno);
+	if (!rtg) {
+		do_warn(_("Could not load rtgroup %u.\n"), rgno);
+		goto err_rcur;
+	}
+
+	ip = rtg_rmap(rtg);
+	if (!ip) {
+		do_warn(_("Could not find rtgroup %u rmap inode.\n"), rgno);
+		goto err_rtg;
+	}
+
+	if (ip->i_df.if_format != XFS_DINODE_FMT_META_BTREE) {
+		do_warn(
+_("rtgroup %u rmap inode has wrong format 0x%x, expected 0x%x\n"),
+				rgno, ip->i_df.if_format,
+				XFS_DINODE_FMT_META_BTREE);
+		goto err_rtg;
+	}
+
+	if (ip->i_metatype != XFS_METAFILE_RTRMAP) {
+		do_warn(
+_("rtgroup %u rmap inode has wrong metatype 0x%x, expected 0x%x\n"),
+				rgno, ip->i_df.if_format,
+				XFS_METAFILE_RTRMAP);
+		goto err_rtg;
+	}
+
+	if (xfs_inode_has_attr_fork(ip) &&
+	    !(xfs_has_metadir(mp) && xfs_has_parent(mp))) {
+		do_warn(
+_("rtgroup %u rmap inode should not have extended attributes\n"), rgno);
+		goto err_rtg;
+	}
+
+	bt_cur = libxfs_rtrmapbt_init_cursor(NULL, rtg);
+	if (!bt_cur) {
+		do_warn(_("Not enough memory to check reverse mappings.\n"));
+		goto err_rtg;
+	}
+
+	error = rmap_compare_records(rm_cur, bt_cur, rgno);
+	if (error)
+		goto err_cur;
+
+err_cur:
+	libxfs_btree_del_cursor(bt_cur, error);
+err_rtg:
+	libxfs_rtgroup_put(rtg);
+err_rcur:
 	libxfs_btree_del_cursor(rm_cur, error);
 }
 
