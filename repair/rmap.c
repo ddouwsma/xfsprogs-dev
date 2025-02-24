@@ -1682,9 +1682,10 @@ _("Unable to fix reflink flag on inode %"PRIu64".\n"),
 uint64_t
 refcount_record_count(
 	struct xfs_mount	*mp,
+	bool			isrt,
 	xfs_agnumber_t		agno)
 {
-	struct xfs_ag_rmap	*x = rmaps_for_group(false, agno);
+	struct xfs_ag_rmap	*x = rmaps_for_group(isrt, agno);
 
 	return slab_count(x->ar_refcount_items);
 }
@@ -2080,4 +2081,23 @@ estimate_rtrmapbt_blocks(
 
 	nr_recs = xmbuf_bytes(x->ar_xmbtp) / sizeof(struct xfs_rmap_rec);
 	return libxfs_rtrmapbt_calc_size(mp, nr_recs);
+}
+
+/* Estimate the size of the ondisk rtrefcountbt from the incore data. */
+xfs_filblks_t
+estimate_rtrefcountbt_blocks(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+	struct xfs_ag_rmap	*x;
+
+	if (!rmap_needs_work(mp) || !xfs_has_rtreflink(mp))
+		return 0;
+
+	x = &rg_rmaps[rtg_rgno(rtg)];
+	if (!x->ar_refcount_items)
+		return 0;
+
+	return libxfs_rtrefcountbt_calc_size(mp,
+			slab_count(x->ar_refcount_items));
 }

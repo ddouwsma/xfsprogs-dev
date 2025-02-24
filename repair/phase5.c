@@ -705,7 +705,7 @@ are_packed_btrees_needed(
 	 * If we don't have inode-based metadata, we can let the AG btrees
 	 * pack as needed; there are no global space concerns here.
 	 */
-	if (!xfs_has_rtrmapbt(mp))
+	if (!xfs_has_rtrmapbt(mp) && !xfs_has_rtreflink(mp))
 		return false;
 
 	while ((pag = xfs_perag_next(mp, pag))) {
@@ -716,8 +716,10 @@ are_packed_btrees_needed(
 		fdblocks += ag_fdblocks;
 	}
 
-	while ((rtg = xfs_rtgroup_next(mp, rtg)))
+	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		metadata_blocks += estimate_rtrmapbt_blocks(rtg);
+		metadata_blocks += estimate_rtrefcountbt_blocks(rtg);
+	}
 
 	/*
 	 * If we think we'll have more metadata blocks than free space, then
