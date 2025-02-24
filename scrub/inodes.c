@@ -65,7 +65,9 @@ bulkstat_for_inumbers(
 
 	/* First we try regular bulkstat, for speed. */
 	breq->hdr.ino = inumbers->xi_startino;
-	xfrog_bulkstat(&ctx->mnt, breq);
+	error = -xfrog_bulkstat(&ctx->mnt, breq);
+	if (!error && !breq->hdr.ocount)
+		return;
 
 	/*
 	 * Bulkstat might return inodes beyond xi_startino + CHUNKSIZE.  Reduce
