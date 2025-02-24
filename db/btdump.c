@@ -456,6 +456,7 @@ dump_btree_inode(
 	char			*prefix;
 	struct xfs_dinode	*dip = iocur_top->data;
 	struct xfs_rtrmap_root	*rtrmap;
+	struct xfs_rtrefcount_root *rtrefc;
 	int			level;
 	int			numrecs;
 	int			ret;
@@ -466,6 +467,12 @@ dump_btree_inode(
 		rtrmap = (struct xfs_rtrmap_root *)XFS_DFORK_DPTR(dip);
 		level = be16_to_cpu(rtrmap->bb_level);
 		numrecs = be16_to_cpu(rtrmap->bb_numrecs);
+		break;
+	case XFS_METAFILE_RTREFCOUNT:
+		prefix = "u3.rtrefcbt";
+		rtrefc = (struct xfs_rtrefcount_root *)XFS_DFORK_DPTR(dip);
+		level = be16_to_cpu(rtrefc->bb_level);
+		numrecs = be16_to_cpu(rtrefc->bb_numrecs);
 		break;
 	default:
 		dbprintf("Unknown metadata inode btree type %u\n",
@@ -549,6 +556,7 @@ btdump_f(
 	case TYP_BMAPBTA:
 	case TYP_BMAPBTD:
 	case TYP_RTRMAPBT:
+	case TYP_RTREFCBT:
 		return dump_btree_long(iflag);
 	case TYP_INODE:
 		if (is_btree_inode())
