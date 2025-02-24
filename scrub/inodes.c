@@ -50,15 +50,17 @@
  */
 static void
 bulkstat_for_inumbers(
-	struct scrub_ctx	*ctx,
-	struct descr		*dsc,
-	const struct xfs_inumbers *inumbers,
-	struct xfs_bulkstat_req	*breq)
+	struct scrub_ctx		*ctx,
+	struct descr			*dsc,
+	const struct xfs_inumbers	*inumbers,
+	struct xfs_bulkstat_req		*breq)
 {
-	struct xfs_bulkstat	*bstat = breq->bulkstat;
-	struct xfs_bulkstat	*bs;
-	int			i;
-	int			error;
+	struct xfs_bulkstat		*bstat = breq->bulkstat;
+	struct xfs_bulkstat		*bs;
+	const uint64_t			limit_ino =
+		inumbers->xi_startino + LIBFROG_BULKSTAT_CHUNKSIZE;
+	int				i;
+	int				error;
 
 	assert(inumbers->xi_allocmask != 0);
 
@@ -71,6 +73,16 @@ bulkstat_for_inumbers(
 
 		str_info(ctx, descr_render(dsc), "%s",
 			 strerror_r(error, errbuf, DESCR_BUFSZ));
+	}
+
+	/*
+	 * Bulkstat might return inodes beyond xi_startino + CHUNKSIZE.  Reduce
+	 * ocount to ignore inodes not described by the inumbers record.
+	 */
+	for (i = breq->hdr.ocount - 1; i >= 0; i--) {
+		if (breq->bulkstat[i].bs_ino < limit_ino)
+			break;
+		breq->hdr.ocount--;
 	}
 
 	/*
