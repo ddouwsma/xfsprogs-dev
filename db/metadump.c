@@ -3073,6 +3073,17 @@ copy_rtsb(void)
 		print_warning("cannot read realtime superblock");
 		return !metadump.stop_on_read_error;
 	}
+
+	/* Replace any filesystem label with "L's" */
+	if (metadump.obfuscate) {
+		struct xfs_rtsb	*rtsb = iocur_top->data;
+
+		memset(rtsb->rsb_fname, 'L',
+		       min(strlen((char *)rtsb->rsb_fname),
+				sizeof(rtsb->rsb_fname)));
+		iocur_top->need_crc = 1;
+	}
+
 	error = write_buf(iocur_top);
 	pop_cur();
 
