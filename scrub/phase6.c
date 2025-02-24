@@ -567,14 +567,16 @@ report_all_media_errors(
 
 	/*
 	 * Scan the directory tree to get file paths if we didn't already use
-	 * directory parent pointers to report the loss.
+	 * directory parent pointers to report the loss.  If parent pointers
+	 * are enabled, report_ioerr_fsmap will have already reported file
+	 * paths that have lost file data and xattrs.
 	 */
-	if (!can_use_pptrs(ctx)) {
-		ret = scan_fs_tree(ctx, report_dir_loss, report_dirent_loss,
-				vs);
-		if (ret)
-			return ret;
-	}
+	if (can_use_pptrs(ctx))
+		return 0;
+
+	ret = scan_fs_tree(ctx, report_dir_loss, report_dirent_loss, vs);
+	if (ret)
+		return ret;
 
 	/* Scan for unlinked files. */
 	return scrub_scan_all_inodes(ctx, report_inode_loss, 0, vs);
