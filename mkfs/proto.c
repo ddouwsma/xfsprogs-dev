@@ -1057,7 +1057,7 @@ rtfreesp_init(
 		if (error)
 			res_failed(error);
 
-		libxfs_trans_ijoin(tp, rtg->rtg_inodes[XFS_RTGI_BITMAP], 0);
+		libxfs_trans_ijoin(tp, rtg_bitmap(rtg), 0);
 		error = -libxfs_rtfree_extent(tp, rtg, start_rtx, nr);
 		if (error) {
 			fprintf(stderr,
