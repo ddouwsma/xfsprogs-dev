@@ -140,10 +140,10 @@ rele:
 static int
 path_walk(
 	xfs_ino_t	rootino,
-	char		*path)
+	const char	*path)
 {
 	struct dirpath	*dirpath;
-	char		*p = path;
+	const char	*p = path;
 	int		error = 0;
 
 	if (*p == '/') {
