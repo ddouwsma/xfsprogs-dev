@@ -125,6 +125,11 @@ rmaps_init_rt(
 	if (error)
 		goto nomem;
 
+	error = init_slab(&ag_rmap->ar_refcount_items,
+			  sizeof(struct xfs_refcount_irec));
+	if (error)
+		goto nomem;
+
 	return;
 nomem:
 	do_error(
@@ -878,6 +883,7 @@ mark_reflink_inodes(
 static void
 refcount_emit(
 	struct xfs_mount	*mp,
+	bool			isrt,
 	xfs_agnumber_t		agno,
 	xfs_agblock_t		agbno,
 	xfs_extlen_t		len,
@@ -887,7 +893,7 @@ refcount_emit(
 	int			error;
 	struct xfs_slab		*rlslab;
 
-	rlslab = rmaps_for_group(false, agno)->ar_refcount_items;
+	rlslab = rmaps_for_group(isrt, agno)->ar_refcount_items;
 	ASSERT(nr_rmaps > 0);
 
 	dbg_printf("REFL: agno=%u pblk=%u, len=%u -> refcount=%zu\n",
@@ -1005,6 +1011,7 @@ refcount_push_rmaps_at(
 int
 compute_refcounts(
 	struct xfs_mount	*mp,
+	bool			isrt,
 	xfs_agnumber_t		agno)
 {
 	struct xfs_btree_cur	*rmcur;
@@ -1020,12 +1027,12 @@ compute_refcounts(
 
 	if (!xfs_has_reflink(mp))
 		return 0;
-	if (!rmaps_has_observations(rmaps_for_group(false, agno)))
+	if (!rmaps_has_observations(rmaps_for_group(isrt, agno)))
 		return 0;
 
-	nr_rmaps = rmap_record_count(mp, false, agno);
+	nr_rmaps = rmap_record_count(mp, isrt, agno);
 
-	error = rmap_init_mem_cursor(mp, NULL, false, agno, &rmcur);
+	error = rmap_init_mem_cursor(mp, NULL, isrt, agno, &rmcur);
 	if (error)
 		return error;
 
@@ -1082,7 +1089,7 @@ compute_refcounts(
 			ASSERT(nbno > cbno);
 			if (rcbag_count(rcstack) != old_stack_height) {
 				if (old_stack_height > 1) {
-					refcount_emit(mp, agno, cbno,
+					refcount_emit(mp, isrt, agno, cbno,
 							nbno - cbno,
 							old_stack_height);
 				}
