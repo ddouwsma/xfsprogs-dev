@@ -708,7 +708,7 @@ _("illegal state %d in block map %" PRIu64 "\n"),
 			}
 		}
 		if (collect_rmaps && !zap_metadata) /* && !check_dups */
-			rmap_add_rec(mp, ino, whichfork, &irec);
+			rmap_add_rec(mp, ino, whichfork, &irec, isrt);
 		*tot += irec.br_blockcount;
 	}
 	error = 0;
