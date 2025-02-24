@@ -1131,6 +1131,11 @@ command.
 Exit
 .BR xfs_db .
 .TP
+.BI "rgresv [" rgno ]
+Displays the per-rtgroup reservation size, and per-rtgroup
+reservation usage for a given realtime allocation group.
+If no argument is given, display information for all rtgroups.
+.TP
 .BI "rtblock [" rtbno ]
 Set current address to the location on the realtime device given by
 .IR rtbno .
