@@ -79,4 +79,13 @@ static inline void kfree_rcu_mightsleep(const void *ptr)
 __attribute__((format(printf,2,3)))
 char *kasprintf(gfp_t gfp, const char *fmt, ...);
 
+static inline void *kmemdup(const void *src, size_t len, gfp_t gfp)
+{
+	void *p = kmalloc(len, gfp);
+
+	if (p)
+		memcpy(p, src, len);
+	return p;
+}
+
 #endif
