@@ -282,6 +282,9 @@ process_sf_dir2(
 		} else if (is_rtrmap_inode(lino)) {
 			junkit = 1;
 			junkreason = _("realtime rmap");
+		} else if (is_rtrefcount_inode(lino)) {
+			junkit = 1;
+			junkreason = _("realtime refcount");
 		} else if ((irec_p = find_inode_rec(mp,
 					XFS_INO_TO_AGNO(mp, lino),
 					XFS_INO_TO_AGINO(mp, lino))) != NULL) {
@@ -761,6 +764,8 @@ process_dir2_data(
 			clearreason = _("metadata directory root");
 		} else if (is_rtrmap_inode(ent_ino)) {
 			clearreason = _("realtime rmap");
+		} else if (is_rtrefcount_inode(ent_ino)) {
+			clearreason = _("realtime refcount");
 		} else {
 			irec_p = find_inode_rec(mp,
 						XFS_INO_TO_AGNO(mp, ent_ino),

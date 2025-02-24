@@ -181,6 +181,9 @@ clear_dinode(
 
 	if (is_rtrmap_inode(ino_num))
 		rmap_avoid_check(mp);
+
+	if (is_rtrefcount_inode(ino_num))
+		refcount_avoid_check(mp);
 }
 
 /*
@@ -1139,14 +1142,27 @@ _("rtrefcount inode %" PRIu64 " not flagged as metadata\n"),
 		return 1;
 	}
 
-	if (!is_rtrefcount_inode(lino)) {
-		do_warn(
-_("could not associate refcount inode %" PRIu64 " with any rtgroup\n"),
-			lino);
-		return 1;
-	}
-
+	/*
+	 * If this rtrefcount file claims to be from an rtgroup that actually
+	 * exists, check that inode discovery actually found it.  Note that
+	 * we can have stray rtrefcount files from failed growfsrt operations.
+	 */
 	priv.rgno = metafile_rgnumber(dip);
+	if (priv.rgno < mp->m_sb.sb_rgcount) {
+		if (type != XR_INO_RTREFC) {
+			do_warn(
+_("rtrefcount inode %" PRIu64 " was not found in the metadata directory tree\n"),
+				lino);
+			return 1;
+		}
+
+		if (!is_rtrefcount_inode(lino)) {
+			do_warn(
+_("could not associate refcount inode %" PRIu64 " with any rtgroup\n"),
+				lino);
+			return 1;
+		}
+	}
 
 	dib = (struct xfs_rtrefcount_root *)XFS_DFORK_PTR(dip, XFS_DATA_FORK);
 	*tot = 0;
@@ -1179,7 +1195,7 @@ _("computed size of rtrefcountbt root (%zu bytes) is greater than space in "
 		error = process_rtrefc_reclist(mp, rp, numrecs,
 				&priv, "rtrefcountbt root");
 		if (error) {
-			refcount_avoid_check();
+			refcount_avoid_check(mp);
 			return 1;
 		}
 		return 0;
@@ -2143,6 +2159,9 @@ process_check_metadata_inodes(
 	if (is_rtrmap_inode(lino))
 		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
 				XR_INO_RTRMAP, _("realtime rmap btree"));
+	if (is_rtrefcount_inode(lino))
+		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
+				XR_INO_RTREFC, _("realtime refcount btree"));
 	return 0;
 }
 
@@ -2249,6 +2268,18 @@ _("realtime summary inode %" PRIu64 " has bad size %" PRIu64 " (should be %" PRI
 		if (!xfs_has_rmapbt(mp)) {
 			do_warn(
 _("found inode %" PRIu64 " claiming to be a rtrmapbt file, but rmapbt is disabled\n"), lino);
+			return 1;
+		}
+		break;
+
+	case XR_INO_RTREFC:
+		/*
+		 * if we have no refcountbt, any inode claiming
+		 * to be a real-time file is bogus
+		 */
+		if (!xfs_has_reflink(mp)) {
+			do_warn(
+_("found inode %" PRIu64 " claiming to be a rtrefcountbt file, but reflink is disabled\n"), lino);
 			return 1;
 		}
 		break;
@@ -3453,6 +3484,8 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			type = XR_INO_PQUOTA;
 		else if (is_rtrmap_inode(lino))
 			type = XR_INO_RTRMAP;
+		else if (is_rtrefcount_inode(lino))
+			type = XR_INO_RTREFC;
 		else
 			type = XR_INO_DATA;
 		break;
