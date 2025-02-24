@@ -60,5 +60,6 @@ int rmap_get_mem_rec(struct xfs_btree_cur *rmcur, struct xfs_rmap_irec *irec);
 
 void populate_rtgroup_rmapbt(struct xfs_rtgroup *rtg,
 		xfs_filblks_t est_fdblocks);
+xfs_filblks_t estimate_rtrmapbt_blocks(struct xfs_rtgroup *rtg);
 
 #endif /* RMAP_H_ */

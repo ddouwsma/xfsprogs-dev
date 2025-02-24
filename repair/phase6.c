@@ -21,6 +21,8 @@
 #include "repair/pptr.h"
 #include "repair/rt.h"
 #include "repair/quotacheck.h"
+#include "repair/slab.h"
+#include "repair/rmap.h"
 
 static xfs_ino_t		orphanage_ino;
 
@@ -683,6 +685,15 @@ ensure_rtgroup_summary(
 		return;
 
 	fill_rtsummary(rtg);
+}
+
+static void
+ensure_rtgroup_rmapbt(
+	struct xfs_rtgroup	*rtg,
+	xfs_filblks_t		est_fdblocks)
+{
+	if (ensure_rtgroup_file(rtg, XFS_RTGI_RMAP))
+		populate_rtgroup_rmapbt(rtg, est_fdblocks);
 }
 
 /* Initialize a root directory. */
@@ -3365,6 +3376,8 @@ reset_rt_metadir_inodes(
 	struct xfs_mount	*mp)
 {
 	struct xfs_rtgroup	*rtg = NULL;
+	xfs_filblks_t		metadata_blocks = 0;
+	xfs_filblks_t		est_fdblocks = 0;
 	int			error;
 
 	/*
@@ -3386,6 +3399,13 @@ reset_rt_metadir_inodes(
 		mark_ino_metadata(mp, mp->m_rtdirip->i_ino);
 	}
 
+	/* Estimate how much free space will be left after building btrees */
+	while ((rtg = xfs_rtgroup_next(mp, rtg)))
+		metadata_blocks += estimate_rtrmapbt_blocks(rtg);
+
+	if (mp->m_sb.sb_fdblocks > metadata_blocks)
+		est_fdblocks = mp->m_sb.sb_fdblocks - metadata_blocks;
+
 	/*
 	 * This isn't the whole story, but it keeps the message that we've had
 	 * for years and which is expected in xfstests and more.
@@ -3400,6 +3420,7 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		ensure_rtgroup_bitmap(rtg);
 		ensure_rtgroup_summary(rtg);
+		ensure_rtgroup_rmapbt(rtg, est_fdblocks);
 	}
 }
 
