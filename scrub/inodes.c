@@ -60,6 +60,8 @@ bulkstat_for_inumbers(
 	int			i;
 	int			error;
 
+	assert(inumbers->xi_allocmask != 0);
+
 	/* First we try regular bulkstat, for speed. */
 	breq->hdr.ino = inumbers->xi_startino;
 	breq->hdr.icount = inumbers->xi_alloccount;
@@ -246,11 +248,24 @@ retry:
 		case ESTALE: {
 			stale_count++;
 			if (stale_count < 30) {
-				ireq->hdr.ino = inumbers->xi_startino;
+				uint64_t	old_startino;
+
+				ireq->hdr.ino = old_startino =
+					inumbers->xi_startino;
 				error = -xfrog_inumbers(&ctx->mnt, ireq);
 				if (error)
 					goto err;
-				goto retry;
+				/*
+				 * Retry only if inumbers returns the same
+				 * inobt record as the previous record and
+				 * there are allocated inodes in it.
+				 */
+				if (!si->aborted &&
+				    ireq->hdr.ocount > 0 &&
+				    inumbers->xi_alloccount > 0 &&
+				    inumbers->xi_startino == old_startino)
+					goto retry;
+				goto out;
 			}
 			str_info(ctx, descr_render(&dsc_bulkstat),
 _("Changed too many times during scan; giving up."));
