@@ -710,6 +710,55 @@ copy_refcount_btree(
 	return scan_btree(agno, root, levels, TYP_REFCBT, agf, scanfunc_refcntbt);
 }
 
+static int
+scanfunc_rtrefcbt(
+	struct xfs_btree_block	*block,
+	xfs_agnumber_t		agno,
+	xfs_agblock_t		agbno,
+	int			level,
+	typnm_t			btype,
+	void			*arg)
+{
+	xfs_rtrefcount_ptr_t	*pp;
+	int			i;
+	int			numrecs;
+
+	if (level == 0)
+		return 1;
+
+	numrecs = be16_to_cpu(block->bb_numrecs);
+	if (numrecs > mp->m_rtrefc_mxr[1]) {
+		if (metadump.show_warnings)
+			print_warning("invalid numrecs (%u) in %s block %u/%u",
+				numrecs, typtab[btype].name, agno, agbno);
+		return 1;
+	}
+
+	pp = xfs_rtrefcount_ptr_addr(block, 1, mp->m_rtrefc_mxr[1]);
+	for (i = 0; i < numrecs; i++) {
+		xfs_agnumber_t	pagno;
+		xfs_agblock_t	pbno;
+
+		pagno = XFS_FSB_TO_AGNO(mp, get_unaligned_be64(&pp[i]));
+		pbno = XFS_FSB_TO_AGBNO(mp, get_unaligned_be64(&pp[i]));
+
+		if (pbno == 0 || pbno > mp->m_sb.sb_agblocks ||
+		    pagno > mp->m_sb.sb_agcount) {
+			if (metadump.show_warnings)
+				print_warning("invalid block number (%u/%u) "
+						"in inode %llu %s block %u/%u",
+						pagno, pbno,
+						(unsigned long long)metadump.cur_ino,
+						typtab[btype].name, agno, agbno);
+			continue;
+		}
+		if (!scan_btree(pagno, pbno, level, btype, arg,
+				scanfunc_rtrefcbt))
+			return 0;
+	}
+	return 1;
+}
+
 /* filename and extended attribute obfuscation routines */
 
 struct name_ent {
@@ -2438,6 +2487,69 @@ process_rtrmap(
 }
 
 static int
+process_rtrefc(
+	struct xfs_dinode	*dip)
+{
+	int			whichfork = XFS_DATA_FORK;
+	struct xfs_rtrefcount_root *dib =
+		(struct xfs_rtrefcount_root *)XFS_DFORK_PTR(dip, whichfork);
+	int			level = be16_to_cpu(dib->bb_level);
+	int			nrecs = be16_to_cpu(dib->bb_numrecs);
+	typnm_t			btype = TYP_RTREFCBT;
+	int			maxrecs;
+	xfs_rtrefcount_ptr_t	*pp;
+	int			i;
+
+	if (level > mp->m_rtrefc_maxlevels) {
+		if (metadump.show_warnings)
+			print_warning("invalid level (%u) in inode %lld %s "
+					"root", level,
+					(unsigned long long)metadump.cur_ino,
+					typtab[btype].name);
+		return 1;
+	}
+
+	if (level == 0)
+		return 1;
+
+	maxrecs = libxfs_rtrefcountbt_droot_maxrecs(
+			XFS_DFORK_SIZE(dip, mp, whichfork),
+			false);
+	if (nrecs > maxrecs) {
+		if (metadump.show_warnings)
+			print_warning("invalid numrecs (%u) in inode %lld %s "
+					"root", nrecs,
+					(unsigned long long)metadump.cur_ino,
+					typtab[btype].name);
+		return 1;
+	}
+
+	pp = xfs_rtrefcount_droot_ptr_addr(dib, 1, maxrecs);
+	for (i = 0; i < nrecs; i++) {
+		xfs_agnumber_t	ag;
+		xfs_agblock_t	bno;
+
+		ag = XFS_FSB_TO_AGNO(mp, get_unaligned_be64(&pp[i]));
+		bno = XFS_FSB_TO_AGBNO(mp, get_unaligned_be64(&pp[i]));
+
+		if (bno == 0 || bno > mp->m_sb.sb_agblocks ||
+				ag > mp->m_sb.sb_agcount) {
+			if (metadump.show_warnings)
+				print_warning("invalid block number (%u/%u) "
+						"in inode %llu %s root", ag,
+						bno,
+						(unsigned long long)metadump.cur_ino,
+						typtab[btype].name);
+			continue;
+		}
+
+		if (!scan_btree(ag, bno, level, btype, NULL, scanfunc_rtrefcbt))
+			return 0;
+	}
+	return 1;
+}
+
+static int
 process_inode_data(
 	struct xfs_dinode	*dip)
 {
@@ -2483,6 +2595,8 @@ process_inode_data(
 		switch (be16_to_cpu(dip->di_metatype)) {
 		case XFS_METAFILE_RTRMAP:
 			return process_rtrmap(dip);
+		case XFS_METAFILE_RTREFCOUNT:
+			return process_rtrefc(dip);
 		default:
 			return 1;
 		}
