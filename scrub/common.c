@@ -320,7 +320,11 @@ string_escape(
 	char			*q;
 	int			x;
 
-	str = malloc(strlen(in) * 4);
+	/*
+	 * Each non-printing byte renders as a four-byte escape sequence, so
+	 * allocate 4x the input length, plus a byte for the null terminator.
+	 */
+	str = malloc(strlen(in) * 4 + 1);
 	if (!str)
 		return NULL;
 	for (p = in, q = str; *p != '\0'; p++) {
