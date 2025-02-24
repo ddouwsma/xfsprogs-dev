@@ -508,8 +508,14 @@ name_entry_examine(
 		if (is_nonrendering(uchr))
 			ret |= UNICRASH_INVISIBLE;
 
-		/* control characters */
-		if (u_iscntrl(uchr))
+		/*
+		 * Warn about control characters in filenames except for zero
+		 * width joiners because those are used to construct compound
+		 * emoji and glyphs in various languages.  ZWJ is already
+		 * covered by UNICRASH_INVISIBLE, so we can detect its use in
+		 * confusing names.
+		 */
+		if (uchr != 0x200D && u_iscntrl(uchr))
 			ret |= UNICRASH_CONTROL_CHAR;
 
 		switch (u_charDirection(uchr)) {
