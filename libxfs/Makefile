@@ -65,6 +65,7 @@ HFILES = \
 	xfs_rmap_btree.h \
 	xfs_rtbitmap.h \
 	xfs_rtgroup.h \
+	xfs_rtrmap_btree.h \
 	xfs_sb.h \
 	xfs_shared.h \
 	xfs_trans_resv.h \
@@ -126,6 +127,7 @@ CFILES = buf_mem.c \
 	xfs_rmap_btree.c \
 	xfs_rtbitmap.c \
 	xfs_rtgroup.c \
+	xfs_rtrmap_btree.c \
 	xfs_sb.c \
 	xfs_symlink_remote.c \
 	xfs_trans_inode.c \
