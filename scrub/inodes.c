@@ -20,6 +20,8 @@
 #include "libfrog/fsgeom.h"
 #include "libfrog/bulkstat.h"
 #include "libfrog/handle_priv.h"
+#include "bitops.h"
+#include "libfrog/bitmask.h"
 
 /*
  * Iterate a range of inodes.
@@ -55,6 +57,15 @@
  * this is also true, but we must be careful to reduce the array length to
  * avoid scanning inodes that are not in the inumber chunk.  In case (3) we
  * conclude that there were no inodes left to scan and terminate.
+ *
+ * In case (2) and (4) we don't know why bulkstat returned fewer than C
+ * elements.  We might have found the end of the filesystem, or the kernel
+ * might have found a corrupt inode and stopped.  This we must investigate by
+ * trying to fill out the rest of the bstat array starting with the next
+ * inumber after the last bstat array element filled, and continuing until S'
+ * is beyond S0 + C, or the array is full.  Each time we succeed in loading
+ * new records, the kernel increases S' for us; if instead we encounter case
+ * (4), we can increment S' ourselves.
  *
  * Inodes that are set in the allocmask but not set in the seen mask are the
  * corrupt inodes.  For each of these cases, we try to populate the bulkstat
@@ -103,6 +114,87 @@ seen_mask_from_bulkstat(
 		ret |= 1ULL << i;
 
 	return ret;
+}
+
+/*
+ * Try to fill the rest of orig_breq with bulkstat data by re-running bulkstat
+ * with increasing start_ino until we either hit the end of the inumbers info
+ * or fill up the bstat array with something.  Returns a bitmask of the inodes
+ * within inums that were filled by the bulkstat requests.
+ */
+static __u64
+bulkstat_the_rest(
+	struct scrub_ctx		*ctx,
+	const struct xfs_inumbers	*inums,
+	struct xfs_bulkstat_req		*orig_breq,
+	int				orig_error)
+{
+	struct xfs_bulkstat_req		*new_breq;
+	struct xfs_bulkstat		*old_bstat =
+		&orig_breq->bulkstat[orig_breq->hdr.ocount];
+	const __u64			limit_ino =
+		inums->xi_startino + LIBFROG_BULKSTAT_CHUNKSIZE;
+	__u64				start_ino = orig_breq->hdr.ino;
+	__u64				seen_mask = 0;
+	int				error;
+
+	assert(orig_breq->hdr.ocount < orig_breq->hdr.icount);
+
+	/*
+	 * If the first bulkstat returned a corruption error, that means
+	 * start_ino is corrupt.  Restart instead at the next inumber.
+	 */
+	if (orig_error == EFSCORRUPTED)
+		start_ino++;
+	if (start_ino >= limit_ino)
+		return 0;
+
+	error = -xfrog_bulkstat_alloc_req(
+			orig_breq->hdr.icount - orig_breq->hdr.ocount,
+			start_ino, &new_breq);
+	if (error)
+		return error;
+	new_breq->hdr.flags = orig_breq->hdr.flags;
+
+	do {
+		/*
+		 * Fill the new bulkstat request with stat data starting at
+		 * start_ino.
+		 */
+		error = -xfrog_bulkstat(&ctx->mnt, new_breq);
+		if (error == EFSCORRUPTED) {
+			/*
+			 * start_ino is corrupt, increment and try the next
+			 * inode.
+			 */
+			start_ino++;
+			new_breq->hdr.ino = start_ino;
+			continue;
+		}
+		if (error) {
+			/*
+			 * Any other error means the caller falls back to
+			 * single stepping.
+			 */
+			break;
+		}
+		if (new_breq->hdr.ocount == 0)
+			break;
+
+		/* Copy new results to the original bstat buffer */
+		memcpy(old_bstat, new_breq->bulkstat,
+		       new_breq->hdr.ocount * sizeof(struct xfs_bulkstat));
+		orig_breq->hdr.ocount += new_breq->hdr.ocount;
+		old_bstat += new_breq->hdr.ocount;
+		seen_mask |= seen_mask_from_bulkstat(inums, start_ino,
+					new_breq);
+
+		new_breq->hdr.icount -= new_breq->hdr.ocount;
+		start_ino = new_breq->hdr.ino;
+	} while (new_breq->hdr.icount > 0 && new_breq->hdr.ino < limit_ino);
+
+	free(new_breq);
+	return seen_mask;
 }
 
 #define cmp_int(l, r)		((l > r) - (l < r))
@@ -200,6 +292,12 @@ bulkstat_single_step(
 				sizeof(struct xfs_bulkstat), compare_bstat);
 }
 
+/* Return the inumber of the highest allocated inode in the inumbers data. */
+static inline uint64_t last_allocmask_ino(const struct xfs_inumbers *i)
+{
+	return i->xi_startino + xfrog_highbit64(i->xi_allocmask);
+}
+
 /*
  * Run bulkstat on an entire inode allocation group, then check that we got
  * exactly the inodes we expected.  If not, load them one at a time (or fake
@@ -230,6 +328,16 @@ bulkstat_for_inumbers(
 	}
 
 	/*
+	 * If the last allocated inode as reported by inumbers is higher than
+	 * the last inode reported by bulkstat, two things could have happened.
+	 * Either all the inodes at the high end of the cluster were freed
+	 * since the inumbers call; or bulkstat encountered a corrupt inode and
+	 * returned early.  Try to bulkstat the rest of the array.
+	 */
+	if (last_allocmask_ino(inumbers) > last_bstat_ino(breq))
+		seen_mask |= bulkstat_the_rest(ctx, inumbers, breq, error);
+
+	/*
 	 * Bulkstat might return inodes beyond xi_startino + CHUNKSIZE.  Reduce
 	 * ocount to ignore inodes not described by the inumbers record.
 	 */
@@ -241,7 +349,7 @@ bulkstat_for_inumbers(
 
 	/*
 	 * Fill in any missing inodes that are mentioned in the alloc mask but
-	 * weren't previously seen by bulkstat.
+	 * weren't previously seen by bulkstat.  These are the corrupt inodes.
 	 */
 	bulkstat_single_step(ctx, inumbers, seen_mask, breq);
 }

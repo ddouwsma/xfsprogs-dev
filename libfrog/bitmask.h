@@ -42,4 +42,10 @@ static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
 	return 0;
 }
 
+/* Get high bit set out of 64-bit argument, -1 if none set */
+static inline int xfrog_highbit64(uint64_t v)
+{
+	return fls64(v) - 1;
+}
+
 #endif /* __LIBFROG_BITMASK_H_ */
