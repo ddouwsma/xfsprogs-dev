@@ -101,6 +101,14 @@ If this is set, data fork extent count is returned via bs_extents64 field and
 via bs_extents field and bs_extents64 is assigned a value of 0. In the second
 case, bs_extents is set to (2^31 - 1) if data fork extent count is larger than
 2^31. This flag may be set independently of whether other flags have been set.
+.TP
+.B XFS_BULK_IREQ_METADIR
+Return metadata directory tree inodes in the stat output as well.
+The only fields that will be populated are
+.IR bs_ino ", " bs_gen ", " bs_mode ", " bs_sick ", and " bs_checked.
+All other fields, notably
+.IR bs_blksize ,
+will be zero.
 .RE
 .PP
 .I hdr.icount
