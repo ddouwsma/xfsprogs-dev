@@ -207,7 +207,7 @@ typedef struct xfs_mount {
 #define XFS_FEAT_METADIR	(1ULL << 28)	/* metadata directory tree */
 
 #define __XFS_HAS_FEAT(name, NAME) \
-static inline bool xfs_has_ ## name (struct xfs_mount *mp) \
+static inline bool xfs_has_ ## name (const struct xfs_mount *mp) \
 { \
 	return mp->m_features & XFS_FEAT_ ## NAME; \
 }
@@ -253,25 +253,25 @@ __XFS_HAS_FEAT(exchange_range, EXCHANGE_RANGE)
 __XFS_HAS_FEAT(metadir, METADIR)
 
 
-static inline bool xfs_has_rtgroups(struct xfs_mount *mp)
+static inline bool xfs_has_rtgroups(const struct xfs_mount *mp)
 {
 	/* all metadir file systems also allow rtgroups */
 	return xfs_has_metadir(mp);
 }
 
-static inline bool xfs_has_rtsb(struct xfs_mount *mp)
+static inline bool xfs_has_rtsb(const struct xfs_mount *mp)
 {
 	/* all rtgroups filesystems with an rt section have an rtsb */
 	return xfs_has_rtgroups(mp) && xfs_has_realtime(mp);
 }
 
-static inline bool xfs_has_rtrmapbt(struct xfs_mount *mp)
+static inline bool xfs_has_rtrmapbt(const struct xfs_mount *mp)
 {
 	return xfs_has_rtgroups(mp) && xfs_has_realtime(mp) &&
 	       xfs_has_rmapbt(mp);
 }
 
-static inline bool xfs_has_rtreflink(struct xfs_mount *mp)
+static inline bool xfs_has_rtreflink(const struct xfs_mount *mp)
 {
 	return xfs_has_metadir(mp) && xfs_has_realtime(mp) &&
 	       xfs_has_reflink(mp);
@@ -279,7 +279,7 @@ static inline bool xfs_has_rtreflink(struct xfs_mount *mp)
 
 /* Kernel mount features that we don't support */
 #define __XFS_UNSUPP_FEAT(name) \
-static inline bool xfs_has_ ## name (struct xfs_mount *mp) \
+static inline bool xfs_has_ ## name (const struct xfs_mount *mp) \
 { \
 	return false; \
 }
