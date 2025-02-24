@@ -15,6 +15,8 @@
 #include "da_util.h"
 #include "prefetch.h"
 #include "progress.h"
+#include "slab.h"
+#include "rmap.h"
 #include "rt.h"
 
 /*
@@ -277,6 +279,9 @@ process_sf_dir2(
 		} else if (lino == mp->m_sb.sb_metadirino)  {
 			junkit = 1;
 			junkreason = _("metadata directory root");
+		} else if (is_rtrmap_inode(lino)) {
+			junkit = 1;
+			junkreason = _("realtime rmap");
 		} else if ((irec_p = find_inode_rec(mp,
 					XFS_INO_TO_AGNO(mp, lino),
 					XFS_INO_TO_AGINO(mp, lino))) != NULL) {
@@ -754,6 +759,8 @@ process_dir2_data(
 			clearreason = _("project quota");
 		} else if (ent_ino == mp->m_sb.sb_metadirino)  {
 			clearreason = _("metadata directory root");
+		} else if (is_rtrmap_inode(ent_ino)) {
+			clearreason = _("realtime rmap");
 		} else {
 			irec_p = find_inode_rec(mp,
 						XFS_INO_TO_AGNO(mp, ent_ino),

@@ -178,6 +178,9 @@ clear_dinode(
 
 	if (is_rtsummary_inode(ino_num))
 		mark_rtgroup_inodes_bad(mp, XFS_RTGI_SUMMARY);
+
+	if (is_rtrmap_inode(ino_num))
+		rmap_avoid_check(mp);
 }
 
 /*
@@ -823,6 +826,14 @@ get_agino_buf(
 	return bp;
 }
 
+static inline xfs_rgnumber_t
+metafile_rgnumber(
+	const struct xfs_dinode	*dip)
+{
+	return (xfs_rgnumber_t)be16_to_cpu(dip->di_projid_hi) << 16 |
+			       be16_to_cpu(dip->di_projid_lo);
+}
+
 /*
  * higher level inode processing stuff starts here:
  * first, one utility routine for each type of inode
@@ -870,7 +881,10 @@ process_rtrmap(
 
 	lino = XFS_AGINO_TO_INO(mp, agno, ino);
 
-	/* This rmap btree inode must be a metadata inode. */
+	/*
+	 * This rmap btree inode must be a metadata inode reachable via
+	 * /rtgroups/$rgno.rmap in the metadata directory tree.
+	 */
 	if (!(dip->di_flags2 & be64_to_cpu(XFS_DIFLAG2_METADATA))) {
 		do_warn(
 _("rtrmap inode %" PRIu64 " not flagged as metadata\n"),
@@ -878,11 +892,25 @@ _("rtrmap inode %" PRIu64 " not flagged as metadata\n"),
 		return 1;
 	}
 
-	if (!is_rtrmap_inode(lino)) {
-		do_warn(
+	/*
+	 * If this rtrmap file claims to be from an rtgroup that actually
+	 * exists, check that inode discovery actually found it.  Note that
+	 * we can have stray rtrmap files from failed growfsrt operations.
+	 */
+	if (metafile_rgnumber(dip) < mp->m_sb.sb_rgcount) {
+		if (type != XR_INO_RTRMAP) {
+			do_warn(
+_("rtrmap inode %" PRIu64 " was not found in the metadata directory tree\n"),
+				lino);
+			return 1;
+		}
+
+		if (!is_rtrmap_inode(lino)) {
+			do_warn(
 _("could not associate rtrmap inode %" PRIu64 " with any rtgroup\n"),
-			lino);
-		return 1;
+				lino);
+			return 1;
+		}
 	}
 
 	memset(&priv.high_key, 0xFF, sizeof(priv.high_key));
@@ -921,7 +949,7 @@ _("computed size of rtrmapbt root (%zu bytes) is greater than space in "
 		error = process_rtrmap_reclist(mp, rp, numrecs,
 				&priv.last_rec, NULL, "rtrmapbt root");
 		if (error) {
-			rmap_avoid_check();
+			rmap_avoid_check(mp);
 			return 1;
 		}
 		return 0;
@@ -1891,6 +1919,9 @@ process_check_metadata_inodes(
 	if (lino == mp->m_sb.sb_rbmino || is_rtbitmap_inode(lino))
 		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
 				XR_INO_RTBITMAP, _("realtime bitmap"));
+	if (is_rtrmap_inode(lino))
+		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
+				XR_INO_RTRMAP, _("realtime rmap btree"));
 	return 0;
 }
 
@@ -1989,6 +2020,18 @@ _("realtime summary inode %" PRIu64 " has bad size %" PRIu64 " (should be %" PRI
 		}
 		break;
 
+	case XR_INO_RTRMAP:
+		/*
+		 * if we have no rmapbt, any inode claiming
+		 * to be a real-time file is bogus
+		 */
+		if (!xfs_has_rmapbt(mp)) {
+			do_warn(
+_("found inode %" PRIu64 " claiming to be a rtrmapbt file, but rmapbt is disabled\n"), lino);
+			return 1;
+		}
+		break;
+
 	default:
 		break;
 	}
@@ -2017,6 +2060,14 @@ _("bad attr fork offset %d in dev inode %" PRIu64 ", should be %d\n"),
 			return 1;
 		}
 		break;
+	case XFS_DINODE_FMT_META_BTREE:
+		if (!xfs_has_metadir(mp) || !xfs_has_parent(mp)) {
+			do_warn(
+_("metadata inode %" PRIu64 " type %d cannot have attr fork\n"),
+				lino, dino->di_format);
+			return 1;
+		}
+		fallthrough;
 	case XFS_DINODE_FMT_LOCAL:
 	case XFS_DINODE_FMT_EXTENTS:
 	case XFS_DINODE_FMT_BTREE:
@@ -3173,6 +3224,8 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			type = XR_INO_GQUOTA;
 		else if (is_quota_inode(XFS_DQTYPE_PROJ, lino))
 			type = XR_INO_PQUOTA;
+		else if (is_rtrmap_inode(lino))
+			type = XR_INO_RTRMAP;
 		else
 			type = XR_INO_DATA;
 		break;

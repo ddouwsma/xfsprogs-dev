@@ -1348,7 +1348,7 @@ _("out of order key %u in %s btree block (%u/%u)\n"),
 
 out:
 	if (suspect)
-		rmap_avoid_check();
+		rmap_avoid_check(mp);
 }
 
 int
@@ -1728,7 +1728,7 @@ _("bad %s btree ptr 0x%llx in ino %" PRIu64 "\n"),
 
 out:
 	if (hdr_errors || suspect) {
-		rmap_avoid_check();
+		rmap_avoid_check(mp);
 		return 1;
 	}
 	return 0;
@@ -2811,7 +2811,7 @@ validate_agf(
 		if (levels == 0 || levels > mp->m_rmap_maxlevels) {
 			do_warn(_("bad levels %u for rmapbt root, agno %d\n"),
 				levels, agno);
-			rmap_avoid_check();
+			rmap_avoid_check(mp);
 		}
 
 		bno = be32_to_cpu(agf->agf_rmap_root);
@@ -2826,7 +2826,7 @@ validate_agf(
 		} else {
 			do_warn(_("bad agbno %u for rmapbt root, agno %d\n"),
 				bno, agno);
-			rmap_avoid_check();
+			rmap_avoid_check(mp);
 		}
 	}
 
