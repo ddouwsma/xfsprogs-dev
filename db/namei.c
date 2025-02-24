@@ -87,14 +87,19 @@ path_navigate(
 	xfs_ino_t		rootino,
 	struct dirpath		*dirpath)
 {
+	struct xfs_trans	*tp;
 	struct xfs_inode	*dp;
 	xfs_ino_t		ino = rootino;
 	unsigned int		i;
 	int			error;
 
-	error = -libxfs_iget(mp, NULL, ino, 0, &dp);
+	error = -libxfs_trans_alloc_empty(mp, &tp);
 	if (error)
 		return error;
+
+	error = -libxfs_iget(mp, tp, ino, 0, &dp);
+	if (error)
+		goto out_trans;
 
 	for (i = 0; i < dirpath->depth; i++) {
 		struct xfs_name	xname = {
@@ -104,35 +109,37 @@ path_navigate(
 
 		if (!S_ISDIR(VFS_I(dp)->i_mode)) {
 			error = ENOTDIR;
-			goto rele;
+			goto out_rele;
 		}
 
-		error = -libxfs_dir_lookup(NULL, dp, &xname, &ino, NULL);
+		error = -libxfs_dir_lookup(tp, dp, &xname, &ino, NULL);
 		if (error)
-			goto rele;
+			goto out_rele;
 		if (!xfs_verify_ino(mp, ino)) {
 			error = EFSCORRUPTED;
-			goto rele;
+			goto out_rele;
 		}
 
 		libxfs_irele(dp);
 		dp = NULL;
 
-		error = -libxfs_iget(mp, NULL, ino, 0, &dp);
+		error = -libxfs_iget(mp, tp, ino, 0, &dp);
 		switch (error) {
 		case EFSCORRUPTED:
 		case EFSBADCRC:
 		case 0:
 			break;
 		default:
-			return error;
+			goto out_trans;
 		}
 	}
 
 	set_cur_inode(ino);
-rele:
+out_rele:
 	if (dp)
 		libxfs_irele(dp);
+out_trans:
+	libxfs_trans_cancel(tp);
 	return error;
 }
 
