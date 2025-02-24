@@ -29,6 +29,7 @@
 #include "xfs_exchmaps.h"
 #include "defer_item.h"
 #include "xfs_group.h"
+#include "xfs_rtgroup.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -289,9 +290,18 @@ xfs_rmap_defer_add(
 
 	trace_xfs_rmap_defer(mp, ri);
 
+	/*
+	 * Deferred rmap updates for the realtime and data sections must use
+	 * separate transactions to finish deferred work because updates to
+	 * realtime metadata files can lock AGFs to allocate btree blocks and
+	 * we don't want that mixing with the AGF locks taken to finish data
+	 * section updates.
+	 */
 	ri->ri_group = xfs_group_intent_get(mp, ri->ri_bmap.br_startblock,
-			XG_TYPE_AG);
-	xfs_defer_add(tp, &ri->ri_list, &xfs_rmap_update_defer_type);
+			ri->ri_realtime ? XG_TYPE_RTG : XG_TYPE_AG);
+	xfs_defer_add(tp, &ri->ri_list, ri->ri_realtime ?
+			&xfs_rtrmap_update_defer_type :
+			&xfs_rmap_update_defer_type);
 }
 
 /* Cancel a deferred rmap update. */
@@ -353,6 +363,27 @@ const struct xfs_defer_op_type xfs_rmap_update_defer_type = {
 	.create_done	= xfs_rmap_update_create_done,
 	.finish_item	= xfs_rmap_update_finish_item,
 	.finish_cleanup = xfs_rmap_finish_one_cleanup,
+	.cancel_item	= xfs_rmap_update_cancel_item,
+};
+
+/* Clean up after calling xfs_rtrmap_finish_one. */
+STATIC void
+xfs_rtrmap_finish_one_cleanup(
+	struct xfs_trans	*tp,
+	struct xfs_btree_cur	*rcur,
+	int			error)
+{
+	if (rcur)
+		xfs_btree_del_cursor(rcur, error);
+}
+
+const struct xfs_defer_op_type xfs_rtrmap_update_defer_type = {
+	.name		= "rtrmap",
+	.create_intent	= xfs_rmap_update_create_intent,
+	.abort_intent	= xfs_rmap_update_abort_intent,
+	.create_done	= xfs_rmap_update_create_done,
+	.finish_item	= xfs_rmap_update_finish_item,
+	.finish_cleanup = xfs_rtrmap_finish_one_cleanup,
 	.cancel_item	= xfs_rmap_update_cancel_item,
 };
 
