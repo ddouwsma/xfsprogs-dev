@@ -11,6 +11,7 @@
 #include "handle.h"
 #include "init.h"
 #include "io.h"
+#include "libfrog/handle_priv.h"
 
 static cmdinfo_t parent_cmd;
 static char *mntpt;
@@ -205,12 +206,8 @@ parent_f(
 			return 0;
 		}
 
-		memcpy(&handle, hanp, sizeof(handle));
-		handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
-				sizeof(handle.ha_fid.fid_len);
-		handle.ha_fid.fid_pad = 0;
-		handle.ha_fid.fid_ino = ino;
-		handle.ha_fid.fid_gen = gen;
+		handle_from_fshandle(&handle, hanp, hlen);
+		handle_from_inogen(&handle, ino, gen);
 	} else if (optind != argc) {
 		return command_usage(&parent_cmd);
 	}

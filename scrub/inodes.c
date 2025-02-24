@@ -19,6 +19,7 @@
 #include "descr.h"
 #include "libfrog/fsgeom.h"
 #include "libfrog/bulkstat.h"
+#include "libfrog/handle_priv.h"
 
 /*
  * Iterate a range of inodes.
@@ -209,7 +210,7 @@ scan_ag_bulkstat(
 	xfs_agnumber_t		agno,
 	void			*arg)
 {
-	struct xfs_handle	handle = { };
+	struct xfs_handle	handle;
 	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	struct scan_ichunk	*ichunk = arg;
 	struct xfs_inumbers_req	*ireq = ichunk_to_inumbers(ichunk);
@@ -225,12 +226,7 @@ scan_ag_bulkstat(
 	DEFINE_DESCR(dsc_inumbers, ctx, render_inumbers_from_agno);
 
 	descr_set(&dsc_inumbers, &agno);
-
-	memcpy(&handle.ha_fsid, ctx->fshandle, sizeof(handle.ha_fsid));
-	handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
-			sizeof(handle.ha_fid.fid_len);
-	handle.ha_fid.fid_pad = 0;
-
+	handle_from_fshandle(&handle, ctx->fshandle, ctx->fshandle_len);
 retry:
 	bulkstat_for_inumbers(ctx, &dsc_inumbers, inumbers, breq);
 
@@ -244,8 +240,7 @@ retry:
 			continue;
 
 		descr_set(&dsc_bulkstat, bs);
-		handle.ha_fid.fid_ino = scan_ino;
-		handle.ha_fid.fid_gen = bs->bs_gen;
+		handle_from_bulkstat(&handle, bs);
 		error = si->fn(ctx, &handle, bs, si->arg);
 		switch (error) {
 		case 0:

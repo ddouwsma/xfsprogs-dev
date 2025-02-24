@@ -10,6 +10,7 @@
 #include "platform_defs.h"
 #include "libfrog/paths.h"
 #include "libfrog/getparents.h"
+#include "libfrog/handle_priv.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "progress.h"
@@ -414,12 +415,8 @@ scrub_render_ino_descr(
 	if (ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT) {
 		struct xfs_handle handle;
 
-		memcpy(&handle.ha_fsid, ctx->fshandle, sizeof(handle.ha_fsid));
-		handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
-				sizeof(handle.ha_fid.fid_len);
-		handle.ha_fid.fid_pad = 0;
-		handle.ha_fid.fid_ino = ino;
-		handle.ha_fid.fid_gen = gen;
+		handle_from_fshandle(&handle, ctx->fshandle, ctx->fshandle_len);
+		handle_from_inogen(&handle, ino, gen);
 
 		ret = handle_to_path(&handle, sizeof(struct xfs_handle), 4096,
 				buf, buflen);

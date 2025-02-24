@@ -18,6 +18,7 @@
 #include "libfrog/bitmap.h"
 #include "libfrog/bulkstat.h"
 #include "libfrog/fakelibattr.h"
+#include "libfrog/handle_priv.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "inodes.h"
@@ -474,9 +475,7 @@ retry_deferred_inode(
 	if (error)
 		return error;
 
-	handle->ha_fid.fid_ino = bstat.bs_ino;
-	handle->ha_fid.fid_gen = bstat.bs_gen;
-
+	handle_from_bulkstat(handle, &bstat);
 	return check_inode_names(ncs->ctx, handle, &bstat, ncs);
 }
 
@@ -487,16 +486,13 @@ retry_deferred_inode_range(
 	uint64_t		len,
 	void			*arg)
 {
-	struct xfs_handle	handle = { };
+	struct xfs_handle	handle;
 	struct ncheck_state	*ncs = arg;
 	struct scrub_ctx	*ctx = ncs->ctx;
 	uint64_t		i;
 	int			error;
 
-	memcpy(&handle.ha_fsid, ctx->fshandle, sizeof(handle.ha_fsid));
-	handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
-			sizeof(handle.ha_fid.fid_len);
-	handle.ha_fid.fid_pad = 0;
+	handle_from_fshandle(&handle, ctx->fshandle, ctx->fshandle_len);
 
 	for (i = 0; i < len; i++) {
 		error = retry_deferred_inode(ncs, &handle, ino + i);

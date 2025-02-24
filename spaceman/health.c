@@ -14,6 +14,7 @@
 #include "libfrog/bulkstat.h"
 #include "space.h"
 #include "libfrog/getparents.h"
+#include "libfrog/handle_priv.h"
 
 static cmdinfo_t health_cmd;
 static unsigned long long reported;
@@ -317,12 +318,8 @@ report_inode(
 	    (file->xfd.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT)) {
 		struct xfs_handle handle;
 
-		memcpy(&handle.ha_fsid, file->fshandle, sizeof(handle.ha_fsid));
-		handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
-				sizeof(handle.ha_fid.fid_len);
-		handle.ha_fid.fid_pad = 0;
-		handle.ha_fid.fid_ino = bs->bs_ino;
-		handle.ha_fid.fid_gen = bs->bs_gen;
+		handle_from_fshandle(&handle, file->fshandle, file->fshandle_len);
+		handle_from_bulkstat(&handle, bs);
 
 		ret = handle_to_path(&handle, sizeof(struct xfs_handle), 0,
 				descr, sizeof(descr) - 1);

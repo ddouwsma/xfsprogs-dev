@@ -53,6 +53,7 @@ fsgeom.h \
 fsproperties.h \
 fsprops.h \
 getparents.h \
+handle_priv.h \
 histogram.h \
 logging.h \
 paths.h \
