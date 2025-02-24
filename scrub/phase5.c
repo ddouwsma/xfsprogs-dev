@@ -882,7 +882,7 @@ _("Filesystem has errors, skipping connectivity checks."));
 
 	pthread_mutex_init(&ncs.lock, NULL);
 
-	ret = scrub_scan_all_inodes(ctx, check_inode_names, 0, &ncs);
+	ret = scrub_scan_user_files(ctx, check_inode_names, &ncs);
 	if (ret)
 		goto out_lock;
 	if (ncs.aborted) {

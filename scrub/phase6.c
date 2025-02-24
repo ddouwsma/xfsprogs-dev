@@ -579,7 +579,7 @@ report_all_media_errors(
 		return ret;
 
 	/* Scan for unlinked files. */
-	return scrub_scan_all_inodes(ctx, report_inode_loss, 0, vs);
+	return scrub_scan_user_files(ctx, report_inode_loss, vs);
 }
 
 /* Schedule a read-verify of a (data block) extent. */

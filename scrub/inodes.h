@@ -7,7 +7,7 @@
 #define XFS_SCRUB_INODES_H_
 
 /*
- * Visit each space mapping of an inode fork.  Return 0 to continue iteration
+ * Callback for each inode in a filesystem.  Return 0 to continue iteration
  * or a positive error code to interrupt iteraton.  If ESTALE is returned,
  * iteration will be restarted from the beginning of the inode allocation
  * group.  Any other non zero value will stop iteration.  The special return
@@ -22,6 +22,10 @@ typedef int (*scrub_inode_iter_fn)(struct scrub_ctx *ctx,
 
 int scrub_scan_all_inodes(struct scrub_ctx *ctx, scrub_inode_iter_fn fn,
 		unsigned int flags, void *arg);
+
+/* Scan all user-created files in the filesystem. */
+int scrub_scan_user_files(struct scrub_ctx *ctx, scrub_inode_iter_fn fn,
+		void *arg);
 
 int scrub_open_handle(struct xfs_handle *handle);
 

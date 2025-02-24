@@ -445,6 +445,157 @@ kill_bulkstat:
 	return si.aborted ? -1 : 0;
 }
 
+struct user_bulkstat {
+	struct scan_inodes	*si;
+
+	/* vla, must be last */
+	struct xfs_bulkstat_req	breq;
+};
+
+/* Iterate all the user files returned by a bulkstat. */
+static void
+scan_user_files(
+	struct workqueue	*wq,
+	xfs_agnumber_t		agno,
+	void			*arg)
+{
+	struct xfs_handle	handle;
+	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
+	struct user_bulkstat	*ureq = arg;
+	struct xfs_bulkstat	*bs = &ureq->breq.bulkstat[0];
+	struct scan_inodes	*si = ureq->si;
+	int			i;
+	int			error = 0;
+	DEFINE_DESCR(dsc_bulkstat, ctx, render_ino_from_bulkstat);
+
+	handle_from_fshandle(&handle, ctx->fshandle, ctx->fshandle_len);
+
+	for (i = 0; !si->aborted && i < ureq->breq.hdr.ocount; i++, bs++) {
+		descr_set(&dsc_bulkstat, bs);
+		handle_from_bulkstat(&handle, bs);
+		error = si->fn(ctx, &handle, bs, si->arg);
+		switch (error) {
+		case 0:
+			break;
+		case ESTALE:
+		case ECANCELED:
+			error = 0;
+			fallthrough;
+		default:
+			goto err;
+		}
+		if (scrub_excessive_errors(ctx)) {
+			si->aborted = true;
+			goto out;
+		}
+	}
+
+err:
+	if (error) {
+		str_liberror(ctx, error, descr_render(&dsc_bulkstat));
+		si->aborted = true;
+	}
+out:
+	free(ureq);
+}
+
+/*
+ * Run one step of the user files bulkstat scan and schedule background
+ * processing of the stat data returned.  Returns 1 to keep going, or 0 to
+ * stop.
+ */
+static int
+scan_user_bulkstat(
+	struct scrub_ctx	*ctx,
+	struct scan_inodes	*si,
+	uint64_t		*cursor)
+{
+	struct user_bulkstat	*ureq;
+	const char		*what = NULL;
+	int			ret;
+
+	ureq = calloc(1, sizeof(struct user_bulkstat) +
+			 XFS_BULKSTAT_REQ_SIZE(LIBFROG_BULKSTAT_CHUNKSIZE));
+	if (!ureq) {
+		ret = ENOMEM;
+		what = _("creating bulkstat work item");
+		goto err;
+	}
+	ureq->si = si;
+	ureq->breq.hdr.icount = LIBFROG_BULKSTAT_CHUNKSIZE;
+	ureq->breq.hdr.ino = *cursor;
+
+	ret = -xfrog_bulkstat(&ctx->mnt, &ureq->breq);
+	if (ret) {
+		what = _("user files bulkstat");
+		goto err_ureq;
+	}
+	if (ureq->breq.hdr.ocount == 0) {
+		*cursor = NULLFSINO;
+		free(ureq);
+		return 0;
+	}
+
+	*cursor = ureq->breq.hdr.ino;
+
+	/* scan_user_files frees ureq; do not access it */
+	ret = -workqueue_add(&si->wq_bulkstat, scan_user_files, 0, ureq);
+	if (ret) {
+		what = _("queueing bulkstat work");
+		goto err_ureq;
+	}
+	ureq = NULL;
+
+	return 1;
+
+err_ureq:
+	free(ureq);
+err:
+	si->aborted = true;
+	str_liberror(ctx, ret, what);
+	return 0;
+}
+
+/*
+ * Scan all the user files in a filesystem in inumber order.  On error, this
+ * function will log an error message and return -1.
+ */
+int
+scrub_scan_user_files(
+	struct scrub_ctx	*ctx,
+	scrub_inode_iter_fn	fn,
+	void			*arg)
+{
+	struct scan_inodes	si = {
+		.fn		= fn,
+		.arg		= arg,
+		.nr_threads	= scrub_nproc_workqueue(ctx),
+	};
+	uint64_t		ino = 0;
+	int			ret;
+
+	/* Queue up to four bulkstat result sets per thread. */
+	ret = -workqueue_create_bound(&si.wq_bulkstat, (struct xfs_mount *)ctx,
+			si.nr_threads, si.nr_threads * 4);
+	if (ret) {
+		str_liberror(ctx, ret, _("creating bulkstat workqueue"));
+		return -1;
+	}
+
+	while ((ret = scan_user_bulkstat(ctx, &si, &ino)) == 1) {
+		/* empty */
+	}
+
+	ret = -workqueue_terminate(&si.wq_bulkstat);
+	if (ret) {
+		si.aborted = true;
+		str_liberror(ctx, ret, _("finishing bulkstat work"));
+	}
+	workqueue_destroy(&si.wq_bulkstat);
+
+	return si.aborted ? -1 : 0;
+}
+
 /* Open a file by handle, returning either the fd or -1 on error. */
 int
 scrub_open_handle(
