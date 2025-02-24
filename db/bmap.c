@@ -65,16 +65,18 @@ bmap(
 	fmt = (enum xfs_dinode_fmt)XFS_DFORK_FORMAT(dip, whichfork);
 	typ = whichfork == XFS_DATA_FORK ? TYP_BMAPBTD : TYP_BMAPBTA;
 	ASSERT(typtab[typ].typnm == typ);
-	ASSERT(fmt == XFS_DINODE_FMT_LOCAL || fmt == XFS_DINODE_FMT_EXTENTS ||
-		fmt == XFS_DINODE_FMT_BTREE);
-	if (fmt == XFS_DINODE_FMT_EXTENTS) {
+	switch (fmt) {
+	case XFS_DINODE_FMT_LOCAL:
+		break;
+	case XFS_DINODE_FMT_EXTENTS:
 		nextents = xfs_dfork_nextents(dip, whichfork);
 		xp = (xfs_bmbt_rec_t *)XFS_DFORK_PTR(dip, whichfork);
 		for (ep = xp; ep < &xp[nextents] && n < nex; ep++) {
 			if (!bmap_one_extent(ep, &curoffset, eoffset, &n, bep))
 				break;
 		}
-	} else if (fmt == XFS_DINODE_FMT_BTREE) {
+		break;
+	case XFS_DINODE_FMT_BTREE:
 		push_cur();
 		rblock = (xfs_bmdr_block_t *)XFS_DFORK_PTR(dip, whichfork);
 		fsize = XFS_DFORK_SIZE(dip, mp, whichfork);
@@ -114,6 +116,13 @@ bmap(
 			block = (struct xfs_btree_block *)iocur_top->data;
 		}
 		pop_cur();
+		break;
+	default:
+		dbprintf(
+ _("%s fork format %u does not support indexable blocks\n"),
+				whichfork == XFS_DATA_FORK ? "data" : "attr",
+				fmt);
+		break;
 	}
 	pop_cur();
 	*nexp = n;
