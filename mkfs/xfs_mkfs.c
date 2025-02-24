@@ -4989,8 +4989,7 @@ write_rtsb(
 	}
 
 	error = -libxfs_buf_get_uncached(mp->m_rtdev_targp,
-				XFS_FSB_TO_BB(mp, 1), XFS_RTSB_DADDR,
-				&rtsb_bp);
+				XFS_FSB_TO_BB(mp, 1), 0, &rtsb_bp);
 	if (error) {
 		fprintf(stderr,
  _("%s: couldn't grab realtime superblock buffer\n"), progname);
