@@ -159,6 +159,8 @@ extern int		fail_after_phase;
 
 extern struct libxfs_init x;
 
+extern bool		need_packed_btrees;
+
 void set_quota_inode(xfs_dqtype_t type, xfs_ino_t);
 void lose_quota_inode(xfs_dqtype_t type);
 void clear_quota_inode(xfs_dqtype_t type);

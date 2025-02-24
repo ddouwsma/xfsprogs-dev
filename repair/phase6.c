@@ -3399,12 +3399,18 @@ reset_rt_metadir_inodes(
 		mark_ino_metadata(mp, mp->m_rtdirip->i_ino);
 	}
 
-	/* Estimate how much free space will be left after building btrees */
-	while ((rtg = xfs_rtgroup_next(mp, rtg)))
-		metadata_blocks += estimate_rtrmapbt_blocks(rtg);
+	/*
+	 * Estimate how much free space will be left after building btrees
+	 * unless we already decided that we needed to pack all new blocks
+	 * maximally.
+	 */
+	if (!need_packed_btrees) {
+		while ((rtg = xfs_rtgroup_next(mp, rtg)))
+			metadata_blocks += estimate_rtrmapbt_blocks(rtg);
 
-	if (mp->m_sb.sb_fdblocks > metadata_blocks)
-		est_fdblocks = mp->m_sb.sb_fdblocks - metadata_blocks;
+		if (mp->m_sb.sb_fdblocks > metadata_blocks)
+			est_fdblocks = mp->m_sb.sb_fdblocks - metadata_blocks;
+	}
 
 	/*
 	 * This isn't the whole story, but it keeps the message that we've had

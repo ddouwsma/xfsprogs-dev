@@ -114,6 +114,12 @@ int		thread_count;
 /* If nonzero, simulate failure after this phase. */
 int		fail_after_phase;
 
+/*
+ * Do we think we're going to be so low on disk space that we need to pack
+ * all rebuilt btree blocks completely full to avoid running out of space?
+ */
+bool		need_packed_btrees;
+
 /* quota inode numbers */
 enum quotino_state {
 	QI_STATE_UNKNOWN,
