@@ -2671,12 +2671,36 @@ _("inode btree counters not supported without finobt support\n"));
 	}
 
 	if (cli->xi->rt.name) {
-		if (cli->sb_feat.reflink && cli_opt_set(&mopts, M_REFLINK)) {
-			fprintf(stderr,
-_("reflink not supported with realtime devices\n"));
-			usage();
+		if (cli->rtextsize && cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices with rt extent size specified\n"));
+				usage();
+			}
+			cli->sb_feat.reflink = false;
 		}
-		cli->sb_feat.reflink = false;
+		if (cfg->blocksize < XFS_MIN_RTEXTSIZE && cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices with blocksize %d < %d\n"),
+						cli->blocksize,
+						XFS_MIN_RTEXTSIZE);
+				usage();
+			}
+			cli->sb_feat.reflink = false;
+		}
+		if (!cli->sb_feat.metadir && cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK) &&
+			    cli_opt_set(&mopts, M_METADIR)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices without metadir feature\n"));
+				usage();
+			} else if (cli_opt_set(&mopts, M_REFLINK)) {
+				cli->sb_feat.metadir = true;
+			} else {
+				cli->sb_feat.reflink = false;
+			}
+		}
 
 		if (!cli->sb_feat.metadir && cli->sb_feat.rmapbt) {
 			if (cli_opt_set(&mopts, M_RMAPBT) &&
@@ -2874,6 +2898,19 @@ validate_rtextsize(
 			usage();
 		}
 		cfg->rtextblocks = (xfs_extlen_t)(rtextbytes >> cfg->blocklog);
+	} else if (cli->sb_feat.reflink && cli->xi->rt.name) {
+		/*
+		 * reflink doesn't support rt extent size > 1FSB yet, so set
+		 * an extent size of 1FSB.  Make sure we still satisfy the
+		 * minimum rt extent size.
+		 */
+		if (cfg->blocksize < XFS_MIN_RTEXTSIZE) {
+			fprintf(stderr,
+		_("reflink not supported on rt volume with blocksize %d\n"),
+				cfg->blocksize);
+			usage();
+		}
+		cfg->rtextblocks = 1;
 	} else {
 		/*
 		 * If realtime extsize has not been specified by the user,
@@ -2905,6 +2942,12 @@ validate_rtextsize(
 		}
 	}
 	ASSERT(cfg->rtextblocks);
+
+	if (cli->sb_feat.reflink && cfg->rtblocks > 0 && cfg->rtextblocks > 1) {
+		fprintf(stderr,
+_("reflink not supported on realtime with extent sizes > 1\n"));
+		usage();
+	}
 }
 
 /* Validate the incoming extsize hint. */
@@ -5086,11 +5129,19 @@ check_rt_meta_prealloc(
 		error = -libxfs_metafile_resv_init(rtg_rmap(rtg), ask);
 		if (error)
 			prealloc_fail(mp, error, ask, _("realtime rmap btree"));
+
+		ask = libxfs_rtrefcountbt_calc_reserves(mp);
+		error = -libxfs_metafile_resv_init(rtg_refcount(rtg), ask);
+		if (error)
+			prealloc_fail(mp, error, ask,
+					_("realtime refcount btree"));
 	}
 
 	/* Unreserve the realtime metadata reservations. */
-	while ((rtg = xfs_rtgroup_next(mp, rtg)))
+	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		libxfs_metafile_resv_free(rtg_rmap(rtg));
+		libxfs_metafile_resv_free(rtg_refcount(rtg));
+	}
 
 	/* Unreserve the per-AG reservations. */
 	while ((pag = xfs_perag_next(mp, pag)))
