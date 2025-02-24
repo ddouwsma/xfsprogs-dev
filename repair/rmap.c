@@ -123,6 +123,15 @@ nomem:
 _("Insufficient memory while allocating realtime reverse mapping btree."));
 }
 
+xfs_rgnumber_t
+rtgroup_for_rtrmap_inode(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino)
+{
+	/* This will be implemented later. */
+	return NULLRGNUMBER;
+}
+
 /*
  * Initialize per-AG reverse map data.
  */

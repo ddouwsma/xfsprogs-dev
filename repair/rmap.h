@@ -55,4 +55,6 @@ int rmap_init_mem_cursor(struct xfs_mount *mp, struct xfs_trans *tp,
 		xfs_agnumber_t agno, struct xfs_btree_cur **rmcurp);
 int rmap_get_mem_rec(struct xfs_btree_cur *rmcur, struct xfs_rmap_irec *irec);
 
+xfs_rgnumber_t rtgroup_for_rtrmap_inode(struct xfs_mount *mp, xfs_ino_t ino);
+
 #endif /* RMAP_H_ */
