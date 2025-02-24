@@ -390,4 +390,11 @@
 #define trace_xfs_group_put(...)		((void) 0)
 #define trace_xfs_group_rele(...)		((void) 0)
 
+#define trace_xfs_metafile_resv_alloc_space(...)	((void) 0)
+#define trace_xfs_metafile_resv_critical(...)	((void) 0)
+#define trace_xfs_metafile_resv_free(...)		((void) 0)
+#define trace_xfs_metafile_resv_free_space(...)	((void) 0)
+#define trace_xfs_metafile_resv_init(...)		((void) 0)
+#define trace_xfs_metafile_resv_init_error(...)	((void) 0)
+
 #endif /* __TRACE_H__ */

@@ -219,6 +219,17 @@ uint32_t get_random_u32(void);
 #define get_random_u32()	(0)
 #endif
 
+static inline int
+__percpu_counter_compare(uint64_t *count, int64_t rhs, int32_t batch)
+{
+	if (*count > rhs)
+		return 1;
+	else if (*count < rhs)
+		return -1;
+	return 0;
+}
+
+
 #define PAGE_SIZE		getpagesize()
 extern unsigned int PAGE_SHIFT;
 
