@@ -180,11 +180,12 @@ The link to examine can be specified in the same manner as
 .PP
 .nf
 .B XFS_SCRUB_TYPE_RTBITMAP
+.B XFS_SCRUB_TYPE_RTSUM
 .fi
 .TP
-.B XFS_SCRUB_TYPE_RTSUM
-Examine the realtime block bitmap and realtime summary inodes for
-corruption.
+.B XFS_SCRUB_TYPE_RTRMAPBT
+Examine a given realtime allocation group's free space bitmap, summary file,
+or reverse mapping btree, respectively.
 
 .PP
 .nf
@@ -246,6 +247,9 @@ Group quota file.
 .TP
 .B XFS_SCRUB_METAPATH_PRJQUOTA
 Project quota file.
+.TP
+.B XFS_SCRUB_METAPATH_RTRMAPBT
+Realtime rmap btree file.
 .RE
 
 The values of
