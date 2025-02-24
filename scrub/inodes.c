@@ -26,22 +26,98 @@
  *
  * This is a little more involved than repeatedly asking BULKSTAT for a
  * buffer's worth of stat data for some number of inodes.  We want to scan as
- * many of the inodes that the inobt thinks there are, including the ones that
- * are broken, but if we ask for n inodes starting at x, it'll skip the bad
- * ones and fill from beyond the range (x + n).
+ * many of the inodes that the inobt thinks there are, so we use the INUMBERS
+ * ioctl to walk all the inobt records in the filesystem and spawn a worker to
+ * bulkstat and iterate.  The worker starts with an inumbers record that can
+ * look like this:
  *
- * Therefore, we ask INUMBERS to return one inobt chunk's worth of inode
- * bitmap information.  Then we try to BULKSTAT only the inodes that were
- * present in that chunk, and compare what we got against what INUMBERS said
- * was there.  If there's a mismatch, we know that we have an inode that fails
- * the verifiers but we can inject the bulkstat information to force the scrub
- * code to deal with the broken inodes.
+ * {startino = S, allocmask = 0b11011}
+ *
+ * Given a starting inumber S and count C=64, bulkstat will return a sorted
+ * array of stat information.  The bs_ino of those array elements can look like
+ * any of the following:
+ *
+ * 0. [S, S+1, S+3, S+4]
+ * 1. [S+e, S+e+1, S+e+3, S+e+4, S+e+C+1...], where e >= 0
+ * 2. [S+e+n], where n >= 0
+ * 3. []
+ * 4. [], errno == EFSCORRUPTED
+ *
+ * We know that bulkstat scanned the entire inode range between S and bs_ino of
+ * the last array element, even though it only fills out an array element for
+ * allocated inodes.  Therefore, we can say in cases 0-2 that S was filled,
+ * even if there is no bstat[] record for S.  In turn, we can create a bitmask
+ * of inodes that we have seen, and set bits 0 through (bstat[-1].bs_ino - S),
+ * being careful not to set any bits past S+C.
+ *
+ * In case (0) we find that seen mask matches the inumber record
+ * exactly, so the caller can walk the stat records and move on.  In case (1)
+ * this is also true, but we must be careful to reduce the array length to
+ * avoid scanning inodes that are not in the inumber chunk.  In case (3) we
+ * conclude that there were no inodes left to scan and terminate.
+ *
+ * Inodes that are set in the allocmask but not set in the seen mask are the
+ * corrupt inodes.  For each of these cases, we try to populate the bulkstat
+ * array one inode at a time.  If the kernel returns a matching record we can
+ * use it; if instead we receive an error, we synthesize enough of a record
+ * to be able to run online scrub by handle.
  *
  * If the iteration function returns ESTALE, that means that the inode has
  * been deleted and possibly recreated since the BULKSTAT call.  We wil
  * refresh the stat information and try again up to 30 times before reporting
  * the staleness as an error.
  */
+
+/*
+ * Return the inumber of the highest inode in the bulkstat data, assuming the
+ * records are sorted in inumber order.
+ */
+static inline uint64_t last_bstat_ino(const struct xfs_bulkstat_req *b)
+{
+	return b->hdr.ocount ? b->bulkstat[b->hdr.ocount - 1].bs_ino : 0;
+}
+
+/*
+ * Deduce the bitmask of the inodes in inums that were seen by bulkstat.  If
+ * the inode is present in the bstat array this is trivially true; or if it is
+ * not in the array but higher inumbers are present, then it was freed.
+ */
+static __u64
+seen_mask_from_bulkstat(
+	const struct xfs_inumbers	*inums,
+	__u64				breq_startino,
+	const struct xfs_bulkstat_req	*breq)
+{
+	const __u64			limit_ino =
+		inums->xi_startino + LIBFROG_BULKSTAT_CHUNKSIZE;
+	const __u64			last = last_bstat_ino(breq);
+	__u64				ret = 0;
+	int				i, maxi;
+
+	/* Ignore the bulkstat results if they don't cover inumbers */
+	if (breq_startino > limit_ino || last < inums->xi_startino)
+		return 0;
+
+	maxi = min(LIBFROG_BULKSTAT_CHUNKSIZE, last - inums->xi_startino + 1);
+	for (i = breq_startino - inums->xi_startino; i < maxi; i++)
+		ret |= 1ULL << i;
+
+	return ret;
+}
+
+#define cmp_int(l, r)		((l > r) - (l < r))
+
+/* Compare two bulkstat records by inumber. */
+static int
+compare_bstat(
+	const void		*a,
+	const void		*b)
+{
+	const struct xfs_bulkstat *ba = a;
+	const struct xfs_bulkstat *bb = b;
+
+	return cmp_int(ba->bs_ino, bb->bs_ino);
+}
 
 /*
  * Run bulkstat on an entire inode allocation group, then check that we got
@@ -54,10 +130,10 @@ bulkstat_for_inumbers(
 	const struct xfs_inumbers	*inumbers,
 	struct xfs_bulkstat_req		*breq)
 {
-	struct xfs_bulkstat		*bstat = breq->bulkstat;
-	struct xfs_bulkstat		*bs;
+	struct xfs_bulkstat		*bs = NULL;
 	const uint64_t			limit_ino =
 		inumbers->xi_startino + LIBFROG_BULKSTAT_CHUNKSIZE;
+	uint64_t			seen_mask = 0;
 	int				i;
 	int				error;
 
@@ -66,8 +142,12 @@ bulkstat_for_inumbers(
 	/* First we try regular bulkstat, for speed. */
 	breq->hdr.ino = inumbers->xi_startino;
 	error = -xfrog_bulkstat(&ctx->mnt, breq);
-	if (!error && !breq->hdr.ocount)
-		return;
+	if (!error) {
+		if (!breq->hdr.ocount)
+			return;
+		seen_mask |= seen_mask_from_bulkstat(inumbers,
+					inumbers->xi_startino, breq);
+	}
 
 	/*
 	 * Bulkstat might return inodes beyond xi_startino + CHUNKSIZE.  Reduce
@@ -80,18 +160,33 @@ bulkstat_for_inumbers(
 	}
 
 	/*
-	 * Check each of the stats we got back to make sure we got the inodes
-	 * we asked for.
+	 * Walk the xi_allocmask looking for set bits that aren't present in
+	 * the fill mask.  For each such inode, fill the entries at the end of
+	 * the array with stat information one at a time, synthesizing them if
+	 * necessary.  At this point, (xi_allocmask & ~seen_mask) should be the
+	 * corrupt inodes.
 	 */
-	for (i = 0, bs = bstat; i < LIBFROG_BULKSTAT_CHUNKSIZE; i++) {
+	for (i = 0; i < LIBFROG_BULKSTAT_CHUNKSIZE; i++) {
+		/*
+		 * Don't single-step if inumbers said it wasn't allocated or
+		 * bulkstat actually filled it.
+		 */
 		if (!(inumbers->xi_allocmask & (1ULL << i)))
 			continue;
-		if (bs->bs_ino == inumbers->xi_startino + i) {
-			bs++;
+		if (seen_mask & (1ULL << i))
 			continue;
-		}
 
-		/* Load the one inode. */
+		assert(breq->hdr.ocount < LIBFROG_BULKSTAT_CHUNKSIZE);
+
+		if (!bs)
+			bs = &breq->bulkstat[breq->hdr.ocount];
+
+		/*
+		 * Didn't get desired stat data and we've hit the end of the
+		 * returned data.  We can't distinguish between the inode being
+		 * freed vs. the inode being to corrupt to load, so try a
+		 * bulkstat single to see if we can load the inode.
+		 */
 		error = -xfrog_bulkstat_single(&ctx->mnt,
 				inumbers->xi_startino + i, breq->hdr.flags, bs);
 		if (error || bs->bs_ino != inumbers->xi_startino + i) {
@@ -99,8 +194,15 @@ bulkstat_for_inumbers(
 			bs->bs_ino = inumbers->xi_startino + i;
 			bs->bs_blksize = ctx->mnt_sv.f_frsize;
 		}
+
+		breq->hdr.ocount++;
 		bs++;
 	}
+
+	/* If we added any entries, re-sort the array. */
+	if (bs)
+		qsort(breq->bulkstat, breq->hdr.ocount,
+				sizeof(struct xfs_bulkstat), compare_bstat);
 }
 
 /* BULKSTAT wrapper routines. */
