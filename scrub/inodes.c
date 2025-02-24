@@ -66,7 +66,6 @@ bulkstat_for_inumbers(
 
 	/* First we try regular bulkstat, for speed. */
 	breq->hdr.ino = inumbers->xi_startino;
-	breq->hdr.icount = inumbers->xi_alloccount;
 	error = -xfrog_bulkstat(&ctx->mnt, breq);
 	if (error) {
 		char	errbuf[DESCR_BUFSZ];
