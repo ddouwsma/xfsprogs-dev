@@ -49,6 +49,7 @@ static int	inode_u_sfdir2_count(void *obj, int startoff);
 static int	inode_u_sfdir3_count(void *obj, int startoff);
 static int	inode_u_symlink_count(void *obj, int startoff);
 static int	inode_u_rtrmapbt_count(void *obj, int startoff);
+static int	inode_u_rtrefcbt_count(void *obj, int startoff);
 
 static const cmdinfo_t	inode_cmd =
 	{ "inode", NULL, inode_f, 0, 1, 1, "[inode#]",
@@ -236,6 +237,8 @@ const field_t	inode_u_flds[] = {
 	  TYP_NONE },
 	{ "rtrmapbt", FLDT_RTRMAPROOT, NULL, inode_u_rtrmapbt_count, FLD_COUNT,
 	  TYP_NONE },
+	{ "rtrefcbt", FLDT_RTREFCROOT, NULL, inode_u_rtrefcbt_count, FLD_COUNT,
+	  TYP_NONE },
 	{ NULL }
 };
 
@@ -302,7 +305,7 @@ fp_dinode_fmt(
 
 static const char	*metatype_name[] =
 	{ "unknown", "dir", "usrquota", "grpquota", "prjquota", "rtbitmap",
-	  "rtsummary", "rtrmap"
+	  "rtsummary", "rtrmap", "rtrefcount"
 	};
 static const int	metatype_name_size = ARRAY_SIZE(metatype_name);
 
@@ -722,6 +725,8 @@ inode_next_type(void)
 				return TYP_RGSUMMARY;
 			case XFS_METAFILE_RTRMAP:
 				return TYP_RTRMAPBT;
+			case XFS_METAFILE_RTREFCOUNT:
+				return TYP_RTREFCBT;
 			default:
 				return TYP_DATA;
 			}
@@ -884,6 +889,21 @@ inode_u_rtrmapbt_count(
 	ASSERT((char *)XFS_DFORK_DPTR(dip) - (char *)dip == byteize(startoff));
 	return dip->di_format == XFS_DINODE_FMT_META_BTREE &&
 	       dip->di_metatype == cpu_to_be16(XFS_METAFILE_RTRMAP);
+}
+
+static int
+inode_u_rtrefcbt_count(
+	void			*obj,
+	int			startoff)
+{
+	struct xfs_dinode	*dip;
+
+	ASSERT(bitoffs(startoff) == 0);
+	ASSERT(obj == iocur_top->data);
+	dip = obj;
+	ASSERT((char *)XFS_DFORK_DPTR(dip) - (char *)dip == byteize(startoff));
+	return dip->di_format == XFS_DINODE_FMT_META_BTREE &&
+	       dip->di_metatype == cpu_to_be16(XFS_METAFILE_RTREFCOUNT);
 }
 
 int
