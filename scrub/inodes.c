@@ -216,7 +216,7 @@ scan_ag_bulkstat(
 	struct xfs_inumbers_req	*ireq = ichunk_to_inumbers(ichunk);
 	struct xfs_bulkstat_req	*breq = ichunk_to_bulkstat(ichunk);
 	struct scan_inodes	*si = ichunk->si;
-	struct xfs_bulkstat	*bs;
+	struct xfs_bulkstat	*bs = &breq->bulkstat[0];
 	struct xfs_inumbers	*inumbers = &ireq->inumbers[0];
 	uint64_t		last_ino = 0;
 	int			i;
@@ -231,8 +231,7 @@ retry:
 	bulkstat_for_inumbers(ctx, &dsc_inumbers, inumbers, breq);
 
 	/* Iterate all the inodes. */
-	bs = &breq->bulkstat[0];
-	for (i = 0; !si->aborted && i < inumbers->xi_alloccount; i++, bs++) {
+	for (i = 0; !si->aborted && i < breq->hdr.ocount; i++, bs++) {
 		uint64_t	scan_ino = bs->bs_ino;
 
 		/* ensure forward progress if we retried */
