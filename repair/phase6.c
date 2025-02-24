@@ -3540,10 +3540,41 @@ reset_quota_metadir_inodes(
 	libxfs_irele(dp);
 }
 
+static int
+reserve_ag_blocks(
+	struct xfs_mount	*mp)
+{
+	struct xfs_perag	*pag = NULL;
+	int			error = 0;
+	int			err2;
+
+	mp->m_finobt_nores = false;
+
+	while ((pag = xfs_perag_next(mp, pag))) {
+		err2 = -libxfs_ag_resv_init(pag, NULL);
+		if (err2 && !error)
+			error = err2;
+	}
+
+	return error;
+}
+
+static void
+unreserve_ag_blocks(
+	struct xfs_mount	*mp)
+{
+	struct xfs_perag	*pag = NULL;
+
+	while ((pag = xfs_perag_next(mp, pag)))
+		libxfs_ag_resv_free(pag);
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
 	ino_tree_node_t		*irec;
+	bool			reserve_perag;
+	int			error;
 	int			i;
 
 	parent_ptr_init(mp);
@@ -3588,6 +3619,17 @@ phase6(xfs_mount_t *mp)
 		do_warn(_("would reinitialize metadata root directory\n"));
 	}
 
+	reserve_perag = xfs_has_realtime(mp) && !no_modify;
+	if (reserve_perag) {
+		error = reserve_ag_blocks(mp);
+		if (error) {
+			if (error != ENOSPC)
+				do_warn(
+	_("could not reserve per-AG space to rebuild realtime metadata"));
+			reserve_perag = false;
+		}
+	}
+
 	if (xfs_has_rtgroups(mp))
 		reset_rt_metadir_inodes(mp);
 	else
@@ -3595,6 +3637,9 @@ phase6(xfs_mount_t *mp)
 
 	if (xfs_has_metadir(mp) && xfs_has_quota(mp) && !no_modify)
 		reset_quota_metadir_inodes(mp);
+
+	if (reserve_perag)
+		unreserve_ag_blocks(mp);
 
 	mark_standalone_inodes(mp);
 
