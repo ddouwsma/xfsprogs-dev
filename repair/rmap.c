@@ -1694,10 +1694,11 @@ refcount_record_count(
  */
 int
 init_refcount_cursor(
+	bool			isrt,
 	xfs_agnumber_t		agno,
 	struct xfs_slab_cursor	**cur)
 {
-	struct xfs_ag_rmap	*x = rmaps_for_group(false, agno);
+	struct xfs_ag_rmap	*x = rmaps_for_group(isrt, agno);
 
 	return init_slab_cursor(x->ar_refcount_items, NULL, cur);
 }
@@ -1714,55 +1715,17 @@ refcount_avoid_check(
 	refcbt_suspect = true;
 }
 
-/*
- * Compare the observed reference counts against what's in the ag btree.
- */
-void
-check_refcounts(
-	struct xfs_mount		*mp,
+static int
+check_refcount_records(
+	struct xfs_slab_cursor		*rl_cur,
+	struct xfs_btree_cur		*bt_cur,
 	xfs_agnumber_t			agno)
 {
 	struct xfs_refcount_irec	tmp;
-	struct xfs_slab_cursor		*rl_cur;
-	struct xfs_btree_cur		*bt_cur = NULL;
-	struct xfs_buf			*agbp = NULL;
-	struct xfs_perag		*pag = NULL;
 	struct xfs_refcount_irec	*rl_rec;
-	int				have;
 	int				i;
+	int				have;
 	int				error;
-
-	if (!xfs_has_reflink(mp))
-		return;
-	if (refcbt_suspect) {
-		if (no_modify && agno == 0)
-			do_warn(_("would rebuild corrupt refcount btrees.\n"));
-		return;
-	}
-
-	/* Create cursors to refcount structures */
-	error = init_refcount_cursor(agno, &rl_cur);
-	if (error) {
-		do_warn(_("Not enough memory to check refcount data.\n"));
-		return;
-	}
-
-	pag = libxfs_perag_get(mp, agno);
-	error = -libxfs_alloc_read_agf(pag, NULL, 0, &agbp);
-	if (error) {
-		do_warn(_("Could not read AGF %u to check refcount btree.\n"),
-				agno);
-		goto err_pag;
-	}
-
-	/* Leave the per-ag data "uninitialized" since we rewrite it later */
-	clear_bit(XFS_AGSTATE_AGF_INIT, &pag->pag_opstate);
-
-	bt_cur = libxfs_refcountbt_init_cursor(mp, NULL, agbp, pag);
-	if (!bt_cur) {
-		do_warn(_("Not enough memory to check refcount data.\n"));
-		goto err_agf;
-	}
 
 	rl_rec = pop_slab_cursor(rl_cur);
 	while (rl_rec) {
@@ -1774,7 +1737,7 @@ check_refcounts(
 			do_warn(
 _("Could not read reference count record for (%u/%u).\n"),
 					agno, rl_rec->rc_startblock);
-			goto err_cur;
+			return error;
 		}
 		if (!have) {
 			do_warn(
@@ -1789,7 +1752,7 @@ _("Missing reference count record for (%u/%u) len %u count %u\n"),
 			do_warn(
 _("Could not read reference count record for (%u/%u).\n"),
 					agno, rl_rec->rc_startblock);
-			goto err_cur;
+			return error;
 		}
 		if (!i) {
 			do_warn(
@@ -1819,12 +1782,154 @@ next_loop:
 		rl_rec = pop_slab_cursor(rl_cur);
 	}
 
+	return 0;
+}
+
+/*
+ * Compare the observed reference counts against what's in the ag btree.
+ */
+void
+check_refcounts(
+	struct xfs_mount		*mp,
+	xfs_agnumber_t			agno)
+{
+	struct xfs_slab_cursor		*rl_cur;
+	struct xfs_btree_cur		*bt_cur = NULL;
+	struct xfs_buf			*agbp = NULL;
+	struct xfs_perag		*pag = NULL;
+	int				error;
+
+	if (!xfs_has_reflink(mp))
+		return;
+	if (refcbt_suspect) {
+		if (no_modify && agno == 0)
+			do_warn(_("would rebuild corrupt refcount btrees.\n"));
+		return;
+	}
+
+	/* Create cursors to refcount structures */
+	error = init_refcount_cursor(false, agno, &rl_cur);
+	if (error) {
+		do_warn(_("Not enough memory to check refcount data.\n"));
+		return;
+	}
+
+	pag = libxfs_perag_get(mp, agno);
+	error = -libxfs_alloc_read_agf(pag, NULL, 0, &agbp);
+	if (error) {
+		do_warn(_("Could not read AGF %u to check refcount btree.\n"),
+				agno);
+		goto err_pag;
+	}
+
+	/* Leave the per-ag data "uninitialized" since we rewrite it later */
+	clear_bit(XFS_AGSTATE_AGF_INIT, &pag->pag_opstate);
+
+	bt_cur = libxfs_refcountbt_init_cursor(mp, NULL, agbp, pag);
+	if (!bt_cur) {
+		do_warn(_("Not enough memory to check refcount data.\n"));
+		goto err_agf;
+	}
+
+	error = check_refcount_records(rl_cur, bt_cur, agno);
+	if (error)
+		goto err_cur;
+
 err_cur:
 	libxfs_btree_del_cursor(bt_cur, error);
 err_agf:
 	libxfs_buf_relse(agbp);
 err_pag:
 	libxfs_perag_put(pag);
+	free_slab_cursor(&rl_cur);
+}
+
+/*
+ * Compare the observed reference counts against what's in the ondisk btree.
+ */
+void
+check_rtrefcounts(
+	struct xfs_mount		*mp,
+	xfs_rgnumber_t			rgno)
+{
+	struct xfs_slab_cursor		*rl_cur;
+	struct xfs_btree_cur		*bt_cur = NULL;
+	struct xfs_rtgroup		*rtg = NULL;
+	struct xfs_inode		*ip = NULL;
+	int				error;
+
+	if (!xfs_has_reflink(mp))
+		return;
+	if (refcbt_suspect) {
+		if (no_modify && rgno == 0)
+			do_warn(_("would rebuild corrupt refcount btrees.\n"));
+		return;
+	}
+	if (mp->m_sb.sb_rblocks == 0) {
+		if (rmap_record_count(mp, true, rgno) != 0)
+			do_error(_("realtime refcounts but no rtdev?\n"));
+		return;
+	}
+
+	/* Create cursors to refcount structures */
+	error = init_refcount_cursor(true, rgno, &rl_cur);
+	if (error) {
+		do_warn(_("Not enough memory to check refcount data.\n"));
+		return;
+	}
+
+	rtg = libxfs_rtgroup_get(mp, rgno);
+	if (!rtg) {
+		do_warn(_("Could not load rtgroup %u.\n"), rgno);
+		goto err_rcur;
+	}
+
+	ip = rtg_refcount(rtg);
+	if (!ip) {
+		do_warn(_("Could not find rtgroup %u refcount inode.\n"),
+			rgno);
+		goto err_rtg;
+	}
+
+	if (ip->i_df.if_format != XFS_DINODE_FMT_META_BTREE) {
+		do_warn(
+_("rtgroup %u refcount inode has wrong format 0x%x, expected 0x%x\n"),
+				rgno, ip->i_df.if_format,
+				XFS_DINODE_FMT_META_BTREE);
+		goto err_rtg;
+	}
+
+	if (ip->i_metatype != XFS_METAFILE_RTREFCOUNT) {
+		do_warn(
+_("rtgroup %u refcount inode has wrong metatype 0x%x, expected 0x%x\n"),
+				rgno, ip->i_df.if_format,
+				XFS_METAFILE_RTREFCOUNT);
+		goto err_rtg;
+	}
+
+	if (xfs_inode_has_attr_fork(ip) &&
+	    !(xfs_has_metadir(mp) && xfs_has_parent(mp))) {
+		do_warn(
+_("rtgroup %u refcount inode should not have extended attributes\n"),
+				rgno);
+		goto err_rtg;
+	}
+
+	bt_cur = libxfs_rtrefcountbt_init_cursor(NULL, rtg);
+	if (!bt_cur) {
+		do_warn(_("Not enough memory to check refcount data.\n"));
+		goto err_rtg;
+	}
+
+	error = check_refcount_records(rl_cur, bt_cur, rgno);
+	if (error)
+		goto err_cur;
+
+err_cur:
+	libxfs_btree_del_cursor(bt_cur, error);
+err_rtg:
+	libxfs_rtgroup_put(rtg);
+err_rcur:
 	free_slab_cursor(&rl_cur);
 }
 
