@@ -519,7 +519,7 @@ If the cursor points at an inode, dump the extended attribute block mapping btre
 Dump all keys and pointers in intermediate btree nodes, and all records in leaf btree nodes.
 .RE
 .TP
-.BI "btheight [\-b " blksz "] [\-n " recs "] [\-w " max "|" min "|" absmax "] btree types..."
+.BI "btheight [\-b " blksz "] [\-n " recs "] [\-w " max "|" min "|" absmax "|" avg "] btree types..."
 For a given number of btree records and a btree type, report the number of
 records and blocks for each level of the btree, and the total number of blocks.
 The btree type must be given after the options.
@@ -562,6 +562,10 @@ maximally loaded.
 .B \-w min
 shows only the worst case scenario, which is when the btree blocks are
 half full.
+.TP
+.B \-w avg
+shows only the average case scenario, which is when the btree blocks are
+three quarters full.
 .RE
 .TP
 .BI "convert " "type number" " [" "type number" "] ... " type
