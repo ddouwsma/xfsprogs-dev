@@ -65,12 +65,14 @@ cscope.*
 /mdrestore/xfs_mdrestore
 /mkfs/fstyp
 /mkfs/mkfs.xfs
+/mkfs/xfs_protofile
 /quota/xfs_quota
 /repair/xfs_repair
 /rtcp/xfs_rtcp
 /spaceman/xfs_spaceman
 /scrub/xfs_scrub
 /scrub/xfs_scrub_all
+/scrub/xfs_scrub_all.timer
 /scrub/xfs_scrub_fail
 /scrub/*.cron
 /scrub/*.service
