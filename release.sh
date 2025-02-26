@@ -14,12 +14,14 @@ set -e
 KUP=0
 COMMIT=1
 LAST_HEAD=""
+FOR_NEXT=0
 
 help() {
 	echo "$(basename $0) - prepare xfsprogs release tarball or for-next update"
 	printf "\t[--kup|-k] upload final tarball with KUP\n"
 	printf "\t[--no-commit|-n] don't create release commit\n"
 	printf "\t[--last-head|-l] commit of the last release\n"
+	printf "\t[--for-next|-f] generate announce email for for-next update\n"
 }
 
 update_version() {
@@ -96,6 +98,9 @@ while [ $# -gt 0 ]; do
 			LAST_HEAD=$2
 			shift
 			;;
+		--for-next|-f)
+			FOR_NEXT=1
+			;;
 		--help|-h)
 			help
 			exit 0
@@ -107,6 +112,17 @@ while [ $# -gt 0 ]; do
 		esac
 	shift
 done
+
+if [ $FOR_NEXT -eq 1 ]; then
+	echo "Push your for-next branch:"
+	printf "\tgit push origin for-next:for-next\n"
+	prepare_mail "for-next"
+	if [ -n "$LAST_HEAD" ]; then
+		echo "Command to send ANNOUNCE email"
+		printf "\tneomutt -H $mail_file\n"
+	fi
+	exit 0
+fi
 
 if [ -z "$EDITOR" ]; then
 	EDITOR=$(command -v vi)
