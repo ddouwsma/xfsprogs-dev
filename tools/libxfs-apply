@@ -254,6 +254,7 @@ fixup_header_format()
 		}
 		/^Date:/ { date_seen=1; next }
 		/^difflib/ { next }
+		/[Cc]{2}: <?stable@vger.kernel.org>?.*/ { next }
 
 		// {
 			if (date_seen == 0)
