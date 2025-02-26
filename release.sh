@@ -13,11 +13,13 @@ set -e
 
 KUP=0
 COMMIT=1
+LAST_HEAD=""
 
 help() {
 	echo "$(basename $0) - prepare xfsprogs release tarball or for-next update"
 	printf "\t[--kup|-k] upload final tarball with KUP\n"
 	printf "\t[--no-commit|-n] don't create release commit\n"
+	printf "\t[--last-head|-l] commit of the last release\n"
 }
 
 update_version() {
@@ -40,6 +42,48 @@ update_version() {
 	sed -i "1s/^/xfsprogs (${version}-1) unstable; urgency=low\n/" ./debian/changelog
 }
 
+prepare_mail() {
+	branch="$1"
+	mail_file=$(mktemp)
+	if [ -n "$LAST_HEAD" ]; then
+		if [ $branch == "master" ]; then
+			reason="$(git describe --abbrev=0 $branch) released"
+		else
+			reason="for-next updated to $(git log --oneline --format="%h" -1 $branch)"
+		fi;
+		cat << EOF > $mail_file
+To: linux-xfs@vger.kernel.org
+Cc: $(./tools/git-contributors.py $LAST_HEAD..$branch --separator ', ')
+Subject: [ANNOUNCE] xfsprogs: $reason
+
+Hi folks,
+
+The xfsprogs $branch branch in repository at:
+
+	git://git.kernel.org/pub/scm/fs/xfs/xfsprogs-dev.git
+
+has just been updated.
+
+Patches often get missed, so if your outstanding patches are properly reviewed
+on the list and not included in this update, please let me know.
+
+The for-next branch has also been updated to match the state of master.
+
+The new head of the $branch branch is commit:
+
+$(git log --oneline --format="%H" -1 $branch)
+
+New commits:
+
+$(git shortlog --format="[%h] %s" $LAST_HEAD..$branch)
+
+Code Diffstat:
+
+$(git diff --stat --summary -C -M $LAST_HEAD..$branch)
+EOF
+	fi
+}
+
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--kup|-k)
@@ -47,6 +91,10 @@ while [ $# -gt 0 ]; do
 			;;
 		--no-commit|-n)
 			COMMIT=0
+			;;
+		--last-head|-l)
+			LAST_HEAD=$2
+			shift
 			;;
 		--help|-h)
 			help
@@ -126,6 +174,12 @@ if [ $KUP -eq 1 ]; then
 		pub/linux/utils/fs/xfs/xfsprogs/
 fi;
 
+prepare_mail "master"
+
 echo ""
 echo "Done. Please remember to push out tags and the branch."
 printf "\tgit push origin v${version} master:master master:for-next\n"
+if [ -n "$LAST_HEAD" ]; then
+	echo "Command to send ANNOUNCE email"
+	printf "\tneomutt -H $mail_file\n"
+fi
