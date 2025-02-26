@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 # List all contributors to a series of git commits.
 # Copyright(C) 2025 Oracle, All Rights Reserved.
@@ -144,8 +144,7 @@ def main():
     global DEBUG
 
     parser = argparse.ArgumentParser(description = "List email addresses of contributors to a series of git commits.")
-    parser.add_argument("revspec", nargs = '?', default = None, \
-            help = "git revisions to process.")
+    parser.add_argument("revspec", help = "git revisions to process.")
     parser.add_argument("--separator", type = str, default = '\n', \
             help = "Separate each email address with this string.")
     parser.add_argument('--debug', action = 'store_true', default = False, \
@@ -160,9 +159,6 @@ def main():
         # read git commits from repo
         contributors = fd.run(backtick(['git', 'log', '--pretty=medium',
                   args.revspec]))
-    else:
-        # read patch from stdin
-        contributors = fd.run(sys.stdin.readlines())
 
     print(args.separator.join(sorted(contributors)))
     return 0
