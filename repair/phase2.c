@@ -72,10 +72,11 @@ zero_log(
 				do_warn(_(
 "ERROR: The filesystem has valuable metadata changes in a log which needs to\n"
 "be replayed.  Mount the filesystem to replay the log, and unmount it before\n"
-"re-running xfs_repair.  If you are unable to mount the filesystem, then use\n"
-"the -L option to destroy the log and attempt a repair.\n"
-"Note that destroying the log may cause corruption -- please attempt a mount\n"
-"of the filesystem before doing this.\n"));
+"re-running xfs_repair.  If the filesystem is a snapshot of a mounted\n"
+"filesystem, you may need to give mount the nouuid option. If you are unable\n"
+"to mount the filesystem, then use the -L option to destroy the log and\n"
+"attempt a repair.  Note that destroying the log may cause corruption --\n"
+"please attempt a mount of the filesystem before doing this.\n"));
 				exit(2);
 			}
 		}

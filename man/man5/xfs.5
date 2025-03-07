@@ -91,6 +91,11 @@ may become confused when doing incremental and resumed dumps.
 and
 .BR xfsrestore (8)
 are recommended for making copies of XFS filesystems.
+To mount a snapshot of an already-mounted filesystem, you may need to supply
+the
+.B nouuid
+option to
+.BR mount " (8)."
 .SH OPERATIONS
 Some functionality specific to the XFS filesystem is accessible to
 applications through the

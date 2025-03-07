@@ -266,10 +266,11 @@ sb_logcheck(void)
 		dbprintf(_(
 "ERROR: The filesystem has valuable metadata changes in a log which needs to\n"
 "be replayed.  Mount the filesystem to replay the log, and unmount it before\n"
-"re-running %s.  If you are unable to mount the filesystem, then use\n"
-"the xfs_repair -L option to destroy the log and attempt a repair.\n"
-"Note that destroying the log may cause corruption -- please attempt a mount\n"
-"of the filesystem before doing this.\n"), progname);
+"re-running %s.  If the filesystem is a snapshot of a mounted filesystem,\n"
+"you may need to give mount the nouuid option.  If you are unable to mount\n"
+"the filesystem, then use the xfs_repair -L option to destroy the log and\n"
+"attempt a repair.  Note that destroying the log may cause corruption --\n"
+"please attempt a mount of the filesystem before doing this.\n"), progname);
 		return 0;
 	}
 	/* Log is clean */
