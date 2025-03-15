@@ -45,6 +45,7 @@ pwrite_help(void)
 " -N   -- Perform the pwritev2() with RWF_NOWAIT\n"
 " -D   -- Perform the pwritev2() with RWF_DSYNC\n"
 " -A   -- Perform the pwritev2() with RWF_ATOMIC\n"
+" -U   -- Perform the pwritev2() with RWF_DONTCACHE\n"
 #endif
 "\n"));
 }
@@ -285,7 +286,7 @@ pwrite_f(
 	init_cvtnum(&fsblocksize, &fssectsize);
 	bsize = fsblocksize;
 
-	while ((c = getopt(argc, argv, "Ab:BCdDf:Fi:NqRs:OS:uV:wWZ:")) != EOF) {
+	while ((c = getopt(argc, argv, "Ab:BCdDf:Fi:NqRs:OS:uUV:wWZ:")) != EOF) {
 		switch (c) {
 		case 'b':
 			tmp = cvtnum(fsblocksize, fssectsize, optarg);
@@ -327,6 +328,9 @@ pwrite_f(
 			break;
 		case 'A':
 			pwritev2_flags |= RWF_ATOMIC;
+			break;
+		case 'U':
+			pwritev2_flags |= RWF_DONTCACHE;
 			break;
 #endif
 		case 's':
@@ -392,6 +396,12 @@ pwrite_f(
 		exitcode = 1;
 		return command_usage(&pwrite_cmd);
 	}
+	if (pwritev2_flags != 0 && vectors == 0) {
+		printf(_("pwritev2 flags require vectored I/O (-V)\n"));
+		exitcode = 1;
+		return command_usage(&pwrite_cmd);
+	}
+
 	offset = cvtnum(fsblocksize, fssectsize, argv[optind]);
 	if (offset < 0) {
 		printf(_("non-numeric offset argument -- %s\n"), argv[optind]);
@@ -480,7 +490,7 @@ pwrite_init(void)
 	pwrite_cmd.argmax = -1;
 	pwrite_cmd.flags = CMD_NOMAP_OK | CMD_FOREIGN_OK;
 	pwrite_cmd.args =
-_("[-i infile [-qAdDwNOW] [-s skip]] [-b bs] [-S seed] [-FBR [-Z N]] [-V N] off len");
+_("[-i infile [-qAdDwNOUW] [-s skip]] [-b bs] [-S seed] [-FBR [-Z N]] [-V N] off len");
 	pwrite_cmd.oneline =
 		_("writes a number of bytes at a specified offset");
 	pwrite_cmd.help = pwrite_help;

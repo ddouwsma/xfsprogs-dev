@@ -237,6 +237,11 @@ struct fsxattr {
 #define RWF_ATOMIC	((__kernel_rwf_t)0x00000040)
 #endif
 
+/* buffered IO that drops the cache after reading or writing data */
+#ifndef RWF_DONTCACHE
+#define RWF_DONTCACHE	((__kernel_rwf_t)0x00000080)
+#endif
+
 /*
  * Reminder: anything added to this file will be compiled into downstream
  * userspace projects!
