@@ -200,7 +200,7 @@ option will set the file permissions to read-write (0644). This allows xfs_io to
 set up mismatches between the file permissions and the open file descriptor
 read/write mode to exercise permission checks inside various syscalls.
 .TP
-.BI "pread [ \-b " bsize " ] [ \-qv ] [ \-FBR [ \-Z " seed " ] ] [ \-V " vectors " ] " "offset length"
+.BI "pread [ \-b " bsize " ] [ \-qUv ] [ \-FBR [ \-Z " seed " ] ] [ \-V " vectors " ] " "offset length"
 Reads a range of bytes in a specified blocksize from the given
 .IR offset .
 .RS 1.0i
@@ -213,6 +213,12 @@ requests will be split. The default blocksize is 4096 bytes.
 .TP
 .B \-q
 quiet mode, do not write anything to standard output.
+.TP
+.B \-U
+Perform the
+.BR preadv2 (2)
+call with
+.IR RWF_DONTCACHE .
 .TP
 .B \-v
 dump the contents of the buffer after reading,

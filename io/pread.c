@@ -38,6 +38,9 @@ pread_help(void)
 " -Z N -- zeed the random number generator (used when reading randomly)\n"
 "         (heh, zorry, the -s/-S arguments were already in use in pwrite)\n"
 " -V N -- use vectored IO with N iovecs of blocksize each (preadv)\n"
+#ifdef HAVE_PREADV2
+" -U   -- Perform the preadv2() with RWF_DONTCACHE\n"
+#endif
 "\n"
 " When in \"random\" mode, the number of read operations will equal the\n"
 " number required to do a complete forward/backward scan of the range.\n"
@@ -388,7 +391,7 @@ pread_f(
 	init_cvtnum(&fsblocksize, &fssectsize);
 	bsize = fsblocksize;
 
-	while ((c = getopt(argc, argv, "b:BCFRquvV:Z:")) != EOF) {
+	while ((c = getopt(argc, argv, "b:BCFRquUvV:Z:")) != EOF) {
 		switch (c) {
 		case 'b':
 			tmp = cvtnum(fsblocksize, fssectsize, optarg);
@@ -417,6 +420,11 @@ pread_f(
 		case 'u':
 			uflag = 1;
 			break;
+#ifdef HAVE_PREADV2
+		case 'U':
+			preadv2_flags |= RWF_DONTCACHE;
+			break;
+#endif
 		case 'v':
 			vflag = 1;
 			break;
@@ -443,6 +451,11 @@ pread_f(
 		}
 	}
 	if (optind != argc - 2) {
+		exitcode = 1;
+		return command_usage(&pread_cmd);
+	}
+	if (preadv2_flags != 0 && vectors == 0) {
+		printf(_("preadv2 flags require vectored I/O (-V)\n"));
 		exitcode = 1;
 		return command_usage(&pread_cmd);
 	}
@@ -514,7 +527,7 @@ pread_init(void)
 	pread_cmd.argmin = 2;
 	pread_cmd.argmax = -1;
 	pread_cmd.flags = CMD_NOMAP_OK | CMD_FOREIGN_OK;
-	pread_cmd.args = _("[-b bs] [-qv] [-i N] [-FBR [-Z N]] off len");
+	pread_cmd.args = _("[-b bs] [-qUv] [-i N] [-FBR [-Z N]] off len");
 	pread_cmd.oneline = _("reads a number of bytes at a specified offset");
 	pread_cmd.help = pread_help;
 
