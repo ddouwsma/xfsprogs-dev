@@ -61,6 +61,11 @@ CFILES += copy_file_range.c
 LCFLAGS += -DHAVE_COPY_FILE_RANGE
 endif
 
+ifeq ($(HAVE_CACHESTAT),yes)
+CFILES += cachestat.c
+LCFLAGS += -DHAVE_CACHESTAT
+endif
+
 ifeq ($(ENABLE_EDITLINE),yes)
 LLDLIBS += $(LIBEDITLINE) $(LIBTERMCAP)
 endif

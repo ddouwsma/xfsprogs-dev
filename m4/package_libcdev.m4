@@ -36,6 +36,25 @@ syscall(__NR_copy_file_range, 0, 0, 0, 0, 0, 0);
   ])
 
 #
+# Check if we have a cachestat system call (Linux)
+#
+AC_DEFUN([AC_HAVE_CACHESTAT],
+  [ AC_MSG_CHECKING([for cachestat])
+    AC_LINK_IFELSE(
+    [	AC_LANG_PROGRAM([[
+#include <unistd.h>
+#include <linux/mman.h>
+#include <asm/unistd.h>
+	]], [[
+syscall(__NR_cachestat, 0, 0, 0, 0);
+	]])
+    ], have_cachestat=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_cachestat)
+  ])
+
+#
 # Check if we need to override the system struct fsxattr with
 # the internal definition.  This /only/ happens if the system
 # actually defines struct fsxattr /and/ the system definition

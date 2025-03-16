@@ -132,6 +132,12 @@ extern void		copy_range_init(void);
 #define copy_range_init()	do { } while (0)
 #endif
 
+#ifdef HAVE_CACHESTAT
+extern void cachestat_init(void);
+#else
+#define cachestat_init() do { } while (0)
+#endif
+
 extern void		sync_range_init(void);
 extern void		readdir_init(void);
 extern void		reflink_init(void);
