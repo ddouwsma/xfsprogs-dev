@@ -399,6 +399,7 @@
 #define xfs_verify_agbext		libxfs_verify_agbext
 #define xfs_verify_agino		libxfs_verify_agino
 #define xfs_verify_cksum		libxfs_verify_cksum
+#define xfs_verify_dablk		libxfs_verify_dablk
 #define xfs_verify_dir_ino		libxfs_verify_dir_ino
 #define xfs_verify_fsbext		libxfs_verify_fsbext
 #define xfs_verify_fsbno		libxfs_verify_fsbno

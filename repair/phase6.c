@@ -2169,6 +2169,13 @@ longform_dir2_check_node(
 		if (bmap_next_offset(ip, &next_da_bno))
 			break;
 
+		if (next_da_bno != NULLFILEOFF &&
+		    !libxfs_verify_dablk(mp, next_da_bno)) {
+			do_warn(_("invalid dir leaf block 0x%llx\n"),
+					(unsigned long long)next_da_bno);
+			return 1;
+		}
+
 		/*
 		 * we need to use the da3 node verifier here as it handles the
 		 * fact that reading the leaf hash tree blocks can return either
@@ -2243,6 +2250,13 @@ longform_dir2_check_node(
 		next_da_bno = da_bno + mp->m_dir_geo->fsbcount - 1;
 		if (bmap_next_offset(ip, &next_da_bno))
 			break;
+
+		if (next_da_bno != NULLFILEOFF &&
+		    !libxfs_verify_dablk(mp, next_da_bno)) {
+			do_warn(_("invalid dir free block 0x%llx\n"),
+					(unsigned long long)next_da_bno);
+			return 1;
+		}
 
 		error = dir_read_buf(ip, da_bno, &bp, &xfs_dir3_free_buf_ops,
 				&fixit);
@@ -2377,6 +2391,14 @@ longform_dir2_entry_check(
 				goto out_fix;
 			}
 			break;
+		}
+
+		if (next_da_bno != NULLFILEOFF &&
+		    !libxfs_verify_dablk(mp, next_da_bno)) {
+			do_warn(_("invalid dir data block 0x%llx\n"),
+					(unsigned long long)next_da_bno);
+			fixit++;
+			goto out_fix;
 		}
 
 		if (fmt == XFS_DIR2_FMT_BLOCK)
