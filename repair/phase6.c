@@ -3538,6 +3538,11 @@ reset_quota_metadir_inodes(
 	struct xfs_inode	*dp = NULL;
 	int			error;
 
+	if (!has_quota_inode(XFS_DQTYPE_USER) &&
+	    !has_quota_inode(XFS_DQTYPE_GROUP) &&
+	    !has_quota_inode(XFS_DQTYPE_PROJ))
+		return;
+
 	error = -libxfs_dqinode_mkdir_parent(mp, &dp);
 	if (error)
 		do_error(_("failed to create quota metadir (%d)\n"),
