@@ -2378,7 +2378,6 @@ longform_dir2_entry_check(
 	     da_bno = (xfs_dablk_t)next_da_bno) {
 		const struct xfs_buf_ops *ops;
 		int			 error;
-		struct xfs_dir2_data_hdr *d;
 
 		next_da_bno = da_bno + mp->m_dir_geo->fsbcount - 1;
 		if (bmap_next_offset(ip, &next_da_bno)) {
@@ -2426,9 +2425,7 @@ longform_dir2_entry_check(
 		}
 
 		/* check v5 metadata */
-		d = bp->b_addr;
-		if (be32_to_cpu(d->magic) == XFS_DIR3_BLOCK_MAGIC ||
-		    be32_to_cpu(d->magic) == XFS_DIR3_DATA_MAGIC) {
+		if (xfs_has_crc(mp)) {
 			error = check_dir3_header(mp, bp, ino);
 			if (error) {
 				fixit++;
