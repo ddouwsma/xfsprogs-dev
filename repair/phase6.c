@@ -3397,15 +3397,21 @@ reset_rt_metadir_inodes(
 		unload_rtgroup_inodes(mp);
 
 	if (mp->m_sb.sb_rgcount > 0) {
-		if (!no_modify) {
+		if (no_modify) {
+			if (!mp->m_rtdirip)
+				do_warn(_("would recreate realtime metadir\n"));
+		} else {
 			error = -libxfs_rtginode_mkdir_parent(mp);
 			if (error)
 				do_error(_("failed to create realtime metadir (%d)\n"),
 					error);
 		}
-		mark_ino_inuse(mp, mp->m_rtdirip->i_ino, S_IFDIR,
-				mp->m_metadirip->i_ino);
-		mark_ino_metadata(mp, mp->m_rtdirip->i_ino);
+
+		if (mp->m_rtdirip) {
+			mark_ino_inuse(mp, mp->m_rtdirip->i_ino, S_IFDIR,
+					mp->m_metadirip->i_ino);
+			mark_ino_metadata(mp, mp->m_rtdirip->i_ino);
+		}
 	}
 
 	/*
