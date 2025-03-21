@@ -132,7 +132,7 @@ verify_inode_chunk(xfs_mount_t		*mp,
 	if (igeo->ialloc_blks == 1)  {
 		if (agbno > max_agbno)
 			return 0;
-		if (check_aginode_block(mp, agno, agino) == 0)
+		if (check_aginode_block(mp, agno, agbno) == 0)
 			return 0;
 
 		lock_ag(agno);
