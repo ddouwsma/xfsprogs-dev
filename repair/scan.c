@@ -2082,7 +2082,7 @@ _("invalid rt reference count %u in record %u of %s\n"),
 				case XR_E_UNKNOWN:
 				case XR_E_COW:
 					do_warn(
-_("leftover CoW rtextent (%llu)\n"),
+_("leftover rt CoW rtextent (%llu)\n"),
 						(unsigned long long)rgbno);
 					set_bmap_ext(rgno, b, len, XR_E_FREE,
 							true);
