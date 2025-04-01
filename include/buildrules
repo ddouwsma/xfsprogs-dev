@@ -85,9 +85,17 @@ endif
 endif
 
 ifdef POTHEAD
+XGETTEXT_FLAGS=\
+	--language=C \
+	--keyword=_ \
+	--keyword=N_ \
+	--package-name=$(PKG_NAME) \
+	--package-version=$(PKG_VERSION) \
+	--msgid-bugs-address=$(PKG_BUGREPORT)
+
 $(POTHEAD): $(XGETTEXTFILES)
 	@echo "    [GETTXT] $@"
-	$(Q)$(XGETTEXT) --language=C --keyword=_ --keyword=N_ -o $@ $(XGETTEXTFILES)
+	$(Q)$(XGETTEXT) $(XGETTEXT_FLAGS) -o $@ $(XGETTEXTFILES)
 
 # Update translations
 update-po: $(POTHEAD) $(wildcard $(TOPDIR)/po/*.po)

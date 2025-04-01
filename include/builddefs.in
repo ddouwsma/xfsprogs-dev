@@ -42,6 +42,7 @@ PKG_GROUP	= @pkg_group@
 PKG_RELEASE	= @pkg_release@
 PKG_VERSION	= @pkg_version@
 PKG_DISTRIBUTION= @pkg_distribution@
+PKG_BUGREPORT	= @PACKAGE_BUGREPORT@
 
 prefix		= @prefix@
 exec_prefix	= @exec_prefix@
