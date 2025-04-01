@@ -116,7 +116,7 @@ xfs_scrub_all.timer: xfs_scrub_all.timer.in $(builddefs)
 	@echo "    [SED]    $@"
 	$(Q)$(SED) -e "s|@pkg_state_dir@|$(PKG_STATE_DIR)|g" < $< > $@
 
-$(XFS_SCRUB_ALL_PROG): $(XFS_SCRUB_ALL_PROG).in $(builddefs)
+$(XFS_SCRUB_ALL_PROG): $(XFS_SCRUB_ALL_PROG).in $(builddefs) $(TOPDIR)/libfrog/gettext.py
 	@echo "    [SED]    $@"
 	$(Q)$(SED) -e "s|@sbindir@|$(PKG_SBIN_DIR)|g" \
 		   -e "s|@scrub_svcname@|$(scrub_svcname)|g" \
@@ -124,7 +124,10 @@ $(XFS_SCRUB_ALL_PROG): $(XFS_SCRUB_ALL_PROG).in $(builddefs)
 		   -e "s|@pkg_version@|$(PKG_VERSION)|g" \
 		   -e "s|@stampfile@|$(XFS_SCRUB_ALL_AUTO_MEDIA_SCAN_STAMP)|g" \
 		   -e "s|@scrub_service_args@|$(XFS_SCRUB_SERVICE_ARGS)|g" \
-		   -e "s|@scrub_args@|$(XFS_SCRUB_ARGS)|g" < $< > $@
+		   -e "s|@scrub_args@|$(XFS_SCRUB_ARGS)|g" \
+		   -e '/@INIT_GETTEXT@/r $(TOPDIR)/libfrog/gettext.py' \
+		   -e '/@INIT_GETTEXT@/d' \
+		   < $< > $@
 	$(Q)chmod a+x $@
 
 xfs_scrub_fail: xfs_scrub_fail.in $(builddefs)
