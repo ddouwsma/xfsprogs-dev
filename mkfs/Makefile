@@ -6,7 +6,7 @@ TOPDIR = ..
 include $(TOPDIR)/include/builddefs
 
 LTCOMMAND = mkfs.xfs
-XFS_PROTOFILE = xfs_protofile
+XFS_PROTOFILE = xfs_protofile.py
 
 HFILES =
 CFILES = proto.c xfs_mkfs.c
@@ -38,7 +38,7 @@ $(XFS_PROTOFILE): $(XFS_PROTOFILE).in
 install: default
 	$(INSTALL) -m 755 -d $(PKG_SBIN_DIR)
 	$(LTINSTALL) -m 755 $(LTCOMMAND) $(PKG_SBIN_DIR)
-	$(INSTALL) -m 755 $(XFS_PROTOFILE) $(PKG_SBIN_DIR)
+	$(INSTALL) -m 755 $(XFS_PROTOFILE) $(PKG_SBIN_DIR)/xfs_protofile
 	$(INSTALL) -m 755 -d $(MKFS_CFG_DIR)
 	$(INSTALL) -m 644 $(CFGFILES) $(MKFS_CFG_DIR)
 
