@@ -64,17 +64,33 @@ randbytes.h \
 scrub.h \
 workqueue.h
 
+GETTEXT_PY = \
+	gettext.py
+
 LSRCFILES += gen_crc32table.c
 
 LDIRT = gen_crc32table crc32table.h
 
-default: ltdepend $(LTLIBRARY)
+ifeq ($(ENABLE_GETTEXT),yes)
+HAVE_GETTEXT = True
+else
+HAVE_GETTEXT = False
+endif
+
+default: ltdepend $(LTLIBRARY) $(GETTEXT_PY)
 
 crc32table.h: gen_crc32table.c crc32defs.h
 	@echo "    [CC]     gen_crc32table"
 	$(Q) $(BUILD_CC) $(BUILD_CFLAGS) -o gen_crc32table $<
 	@echo "    [GENERATE] $@"
 	$(Q) ./gen_crc32table > crc32table.h
+
+$(GETTEXT_PY): $(GETTEXT_PY).in $(TOPDIR)/include/builddefs
+	@echo "    [SED]    $@"
+	$(Q)$(SED) -e "s|@HAVE_GETTEXT@|$(HAVE_GETTEXT)|g" \
+		   -e "s|@PACKAGE@|$(PKG_NAME)|g" \
+		   -e "s|@LOCALEDIR@|$(PKG_LOCALE_DIR)|g" \
+		   < $< > $@
 
 include $(BUILDRULES)
 

@@ -1,0 +1,12 @@
+
+if __name__ == '__main__':
+	if @HAVE_GETTEXT@:
+		import gettext
+		# set up gettext before main so that we can set up _().
+		gettext.bindtextdomain("@PACKAGE@", "@LOCALEDIR@")
+		gettext.textdomain("@PACKAGE@")
+		_ = gettext.gettext
+	else:
+		def _(a):
+			return a
+

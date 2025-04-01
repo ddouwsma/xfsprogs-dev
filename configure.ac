@@ -130,7 +130,7 @@ test -n "$multiarch" && enable_lib64=no
 # to "find" is required, to avoid including such directories in the
 # list.
 LOCALIZED_FILES=""
-for lfile in `find ${srcdir} -path './.??*' -prune -o -name '*.c' -type f -print || exit 1`; do
+for lfile in `find ${srcdir} -path './.??*' -prune -o -name '*.c' -print -o -name '*.py.in' -print || exit 1`; do
     LOCALIZED_FILES="$LOCALIZED_FILES \$(TOPDIR)/$lfile"
 done
 AC_SUBST(LOCALIZED_FILES)

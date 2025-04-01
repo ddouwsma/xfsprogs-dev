@@ -7,6 +7,7 @@
 
 # Walk a filesystem tree to generate a protofile for mkfs.
 
+@INIT_GETTEXT@
 import os
 import argparse
 import sys
@@ -86,12 +87,12 @@ def walk_tree(path, depth):
 
 	for fname in files:
 		if ' ' in fname:
-			raise ValueError( \
-				f'{fname}: Spaces not allowed in file names.')
+			msg = _("Spaces not allowed in file names.")
+			raise ValueError(f'{fname}: {msg}')
 	for fname in dirs:
 		if ' ' in fname:
-			raise Exception( \
-				f'{fname}: Spaces not allowed in file names.')
+			msg = _("Spaces not allowed in subdirectory names.")
+			raise Exception(f'{fname}: {msg}')
 
 	fname_width = max_fname_len(files)
 	for fname in files:
@@ -114,15 +115,17 @@ def walk_tree(path, depth):
 
 def main():
 	parser = argparse.ArgumentParser( \
-			description = "Generate mkfs.xfs protofile for a directory tree.")
-	parser.add_argument('paths', metavar = 'paths', type = str, \
-			nargs = '*', help = 'Directory paths to walk.')
-	parser.add_argument("-V", help = "Report version and exit.", \
+			description = _("Generate mkfs.xfs protofile for a directory tree."))
+	parser.add_argument('paths', metavar = _('paths'), type = str, \
+			nargs = '*', help = _('Directory paths to walk.'))
+	parser.add_argument("-V", help = _("Report version and exit."), \
 			action = "store_true")
 	args = parser.parse_args()
 
 	if args.V:
-		print("xfs_protofile version @pkg_version@")
+		msg = _("xfs_protofile version")
+		pkgver = "@pkg_version@"
+		print(f"{msg} {pkgver}")
 		sys.exit(0)
 
 	emit_proto_header()

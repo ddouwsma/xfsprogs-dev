@@ -30,9 +30,12 @@ default: depend $(LTCOMMAND) $(CFGFILES) $(XFS_PROTOFILE)
 
 include $(BUILDRULES)
 
-$(XFS_PROTOFILE): $(XFS_PROTOFILE).in
+$(XFS_PROTOFILE): $(XFS_PROTOFILE).in $(TOPDIR)/include/builddefs $(TOPDIR)/libfrog/gettext.py
 	@echo "    [SED]    $@"
-	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" < $< > $@
+	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
+		   -e '/@INIT_GETTEXT@/r $(TOPDIR)/libfrog/gettext.py' \
+		   -e '/@INIT_GETTEXT@/d' \
+		   < $< > $@
 	$(Q)chmod a+x $@
 
 install: default

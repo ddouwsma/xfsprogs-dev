@@ -86,7 +86,6 @@ endif
 
 ifdef POTHEAD
 XGETTEXT_FLAGS=\
-	--language=C \
 	--keyword=_ \
 	--keyword=N_ \
 	--package-name=$(PKG_NAME) \
