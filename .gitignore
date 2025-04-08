@@ -65,13 +65,13 @@ cscope.*
 /mdrestore/xfs_mdrestore
 /mkfs/fstyp
 /mkfs/mkfs.xfs
-/mkfs/xfs_protofile
+/mkfs/xfs_protofile.py
 /quota/xfs_quota
 /repair/xfs_repair
 /rtcp/xfs_rtcp
 /spaceman/xfs_spaceman
 /scrub/xfs_scrub
-/scrub/xfs_scrub_all
+/scrub/xfs_scrub_all.py
 /scrub/xfs_scrub_all.timer
 /scrub/xfs_scrub_fail
 /scrub/*.cron
@@ -81,6 +81,7 @@ cscope.*
 /libfrog/crc32selftest
 /libfrog/crc32table.h
 /libfrog/gen_crc32table
+/libfrog/gettext.py
 
 # docs
 /man/man8/mkfs.xfs.8
