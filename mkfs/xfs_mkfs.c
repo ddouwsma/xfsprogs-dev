@@ -1048,13 +1048,13 @@ struct cli_params {
 	int	data_concurrency;
 	int	log_concurrency;
 	int	rtvol_concurrency;
+	int	imaxpct;
 
 	/* parameters where 0 is not a valid value */
 	int64_t	agcount;
 	int64_t	rgcount;
 	int	inodesize;
 	int	inopblock;
-	int	imaxpct;
 	int	lsectorsize;
 	uuid_t	uuid;
 
@@ -4048,9 +4048,10 @@ calculate_imaxpct(
 	struct mkfs_params	*cfg,
 	struct cli_params	*cli)
 {
-	cfg->imaxpct = cli->imaxpct;
-	if (cfg->imaxpct)
+	if (cli->imaxpct >= 0) {
+		cfg->imaxpct = cli->imaxpct;
 		return;
+	}
 
 	/*
 	 * This returns the % of the disk space that is used for
@@ -5181,6 +5182,7 @@ main(
 		.log_concurrency = -1, /* auto detect non-mechanical ddev */
 		.rtvol_concurrency = -1, /* auto detect non-mechanical rtdev */
 		.autofsck = FSPROP_AUTOFSCK_UNSET,
+		.imaxpct = -1, /* set sb_imax_pct automatically */
 	};
 	struct mkfs_params	cfg = {};
 
