@@ -341,7 +341,8 @@ _("Kernel metadata repair facility is not available.  Use -n to scrub."));
 _("Unable to find log device path."));
 		return ECANCELED;
 	}
-	if (ctx->mnt.fsgeom.rtblocks && ctx->fsinfo.fs_rt == NULL) {
+	if (ctx->mnt.fsgeom.rtblocks && ctx->fsinfo.fs_rt == NULL &&
+	    !ctx->mnt.fsgeom.rtstart) {
 		str_error(ctx, ctx->mntpoint,
 _("Unable to find realtime device path."));
 		return ECANCELED;

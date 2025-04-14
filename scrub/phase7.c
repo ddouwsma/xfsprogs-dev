@@ -68,25 +68,37 @@ count_block_summary(
 	void			*arg)
 {
 	struct summary_counts	*counts;
+	bool			is_rt = false;
 	unsigned long long	len;
 	int			ret;
+
+	if (ctx->mnt.fsgeom.rtstart) {
+		if (fsmap->fmr_device == XFS_DEV_LOG)
+			return 0;
+		if (fsmap->fmr_device == XFS_DEV_RT)
+			is_rt = true;
+	} else {
+		if (fsmap->fmr_device == ctx->fsinfo.fs_logdev)
+			return 0;
+		if (fsmap->fmr_device == ctx->fsinfo.fs_rtdev)
+			is_rt = true;
+	}
 
 	counts = ptvar_get((struct ptvar *)arg, &ret);
 	if (ret) {
 		str_liberror(ctx, -ret, _("retrieving summary counts"));
 		return -ret;
 	}
-	if (fsmap->fmr_device == ctx->fsinfo.fs_logdev)
-		return 0;
+
 	if ((fsmap->fmr_flags & FMR_OF_SPECIAL_OWNER) &&
 	    fsmap->fmr_owner == XFS_FMR_OWN_FREE) {
 		uint64_t	blocks;
 
 		blocks = cvt_b_to_off_fsbt(&ctx->mnt, fsmap->fmr_length);
-		if (fsmap->fmr_device == ctx->fsinfo.fs_datadev)
-			hist_add(&counts->datadev_hist, blocks);
-		else if (fsmap->fmr_device == ctx->fsinfo.fs_rtdev)
+		if (is_rt)
 			hist_add(&counts->rtdev_hist, blocks);
+		else
+			hist_add(&counts->datadev_hist, blocks);
 		return 0;
 	}
 
@@ -94,10 +106,10 @@ count_block_summary(
 
 	/* freesp btrees live in free space, need to adjust counters later. */
 	if ((fsmap->fmr_flags & FMR_OF_SPECIAL_OWNER) &&
-	    fsmap->fmr_owner == XFS_FMR_OWN_AG) {
+	    fsmap->fmr_owner == XFS_FMR_OWN_AG)
 		counts->agbytes += fsmap->fmr_length;
-	}
-	if (fsmap->fmr_device == ctx->fsinfo.fs_rtdev) {
+
+	if (is_rt) {
 		/* Count realtime extents. */
 		counts->rbytes += len;
 	} else {

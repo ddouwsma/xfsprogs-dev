@@ -56,12 +56,21 @@ dev_to_pool(
 	struct media_verify_state	*vs,
 	dev_t				dev)
 {
-	if (dev == ctx->fsinfo.fs_datadev)
-		return vs->rvp_data;
-	else if (dev == ctx->fsinfo.fs_logdev)
-		return vs->rvp_log;
-	else if (dev == ctx->fsinfo.fs_rtdev)
-		return vs->rvp_realtime;
+	if (ctx->mnt.fsgeom.rtstart) {
+		if (dev == XFS_DEV_DATA)
+			return vs->rvp_data;
+		if (dev == XFS_DEV_LOG)
+			return vs->rvp_log;
+		if (dev == XFS_DEV_RT)
+			return vs->rvp_realtime;
+	} else {
+		if (dev == ctx->fsinfo.fs_datadev)
+			return vs->rvp_data;
+		if (dev == ctx->fsinfo.fs_logdev)
+			return vs->rvp_log;
+		if (dev == ctx->fsinfo.fs_rtdev)
+			return vs->rvp_realtime;
+	}
 	abort();
 }
 
@@ -71,12 +80,21 @@ disk_to_dev(
 	struct scrub_ctx	*ctx,
 	struct disk		*disk)
 {
-	if (disk == ctx->datadev)
-		return ctx->fsinfo.fs_datadev;
-	else if (disk == ctx->logdev)
-		return ctx->fsinfo.fs_logdev;
-	else if (disk == ctx->rtdev)
-		return ctx->fsinfo.fs_rtdev;
+	if (ctx->mnt.fsgeom.rtstart) {
+		if (disk == ctx->datadev)
+			return XFS_DEV_DATA;
+		if (disk == ctx->logdev)
+			return XFS_DEV_LOG;
+		if (disk == ctx->rtdev)
+			return XFS_DEV_RT;
+	} else {
+		if (disk == ctx->datadev)
+			return ctx->fsinfo.fs_datadev;
+		if (disk == ctx->logdev)
+			return ctx->fsinfo.fs_logdev;
+		if (disk == ctx->rtdev)
+			return ctx->fsinfo.fs_rtdev;
+	}
 	abort();
 }
 
@@ -87,11 +105,9 @@ bitmap_for_disk(
 	struct disk			*disk,
 	struct media_verify_state	*vs)
 {
-	dev_t				dev = disk_to_dev(ctx, disk);
-
-	if (dev == ctx->fsinfo.fs_datadev)
+	if (disk == ctx->datadev)
 		return vs->d_bad;
-	else if (dev == ctx->fsinfo.fs_rtdev)
+	if (disk == ctx->rtdev)
 		return vs->r_bad;
 	return NULL;
 }
@@ -501,14 +517,11 @@ report_ioerr(
 		.length			= length,
 	};
 	struct disk_ioerr_report	*dioerr = arg;
-	dev_t				dev;
-
-	dev = disk_to_dev(dioerr->ctx, dioerr->disk);
 
 	/* Go figure out which blocks are bad from the fsmap. */
-	keys[0].fmr_device = dev;
+	keys[0].fmr_device = disk_to_dev(dioerr->ctx, dioerr->disk);
 	keys[0].fmr_physical = start;
-	keys[1].fmr_device = dev;
+	keys[1].fmr_device = keys[0].fmr_device;
 	keys[1].fmr_physical = start + length - 1;
 	keys[1].fmr_owner = ULLONG_MAX;
 	keys[1].fmr_offset = ULLONG_MAX;
@@ -675,14 +688,12 @@ remember_ioerr(
 	int				ret;
 
 	if (!length) {
-		dev_t			dev = disk_to_dev(ctx, disk);
-
-		if (dev == ctx->fsinfo.fs_datadev)
+		if (disk == ctx->datadev)
 			vs->d_trunc = true;
-		else if (dev == ctx->fsinfo.fs_rtdev)
-			vs->r_trunc = true;
-		else if (dev == ctx->fsinfo.fs_logdev)
+		else if (disk == ctx->logdev)
 			vs->l_trunc = true;
+		else if (disk == ctx->rtdev)
+			vs->r_trunc = true;
 		return;
 	}
 
