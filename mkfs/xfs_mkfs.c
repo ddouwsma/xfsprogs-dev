@@ -3951,6 +3951,42 @@ out:
 }
 
 static void
+validate_rtgroup_geometry(
+	struct mkfs_params	*cfg)
+{
+	if (cfg->rgsize > XFS_MAX_RGBLOCKS) {
+		fprintf(stderr,
+_("realtime group size (%llu) must be less than the maximum (%u)\n"),
+				(unsigned long long)cfg->rgsize,
+				XFS_MAX_RGBLOCKS);
+		usage();
+	}
+
+	if (cfg->rgsize % cfg->rtextblocks != 0) {
+		fprintf(stderr,
+_("realtime group size (%llu) not a multiple of rt extent size (%llu)\n"),
+				(unsigned long long)cfg->rgsize,
+				(unsigned long long)cfg->rtextblocks);
+		usage();
+	}
+
+	if (cfg->rgsize <= cfg->rtextblocks) {
+		fprintf(stderr,
+_("realtime group size (%llu) must be at least two realtime extents\n"),
+				(unsigned long long)cfg->rgsize);
+		usage();
+	}
+
+	if (cfg->rgcount > XFS_MAX_RGNUMBER) {
+		fprintf(stderr,
+_("realtime group count (%llu) must be less than the maximum (%u)\n"),
+				(unsigned long long)cfg->rgcount,
+				XFS_MAX_RGNUMBER);
+		usage();
+	}
+}
+
+static void
 calculate_rtgroup_geometry(
 	struct mkfs_params	*cfg,
 	struct cli_params	*cli,
@@ -4007,36 +4043,7 @@ _("rgsize (%s) not a multiple of fs blk size (%d)\n"),
 				(cfg->rtblocks % cfg->rgsize != 0);
 	}
 
-	if (cfg->rgsize > XFS_MAX_RGBLOCKS) {
-		fprintf(stderr,
-_("realtime group size (%llu) must be less than the maximum (%u)\n"),
-				(unsigned long long)cfg->rgsize,
-				XFS_MAX_RGBLOCKS);
-		usage();
-	}
-
-	if (cfg->rgsize % cfg->rtextblocks != 0) {
-		fprintf(stderr,
-_("realtime group size (%llu) not a multiple of rt extent size (%llu)\n"),
-				(unsigned long long)cfg->rgsize,
-				(unsigned long long)cfg->rtextblocks);
-		usage();
-	}
-
-	if (cfg->rgsize <= cfg->rtextblocks) {
-		fprintf(stderr,
-_("realtime group size (%llu) must be at least two realtime extents\n"),
-				(unsigned long long)cfg->rgsize);
-		usage();
-	}
-
-	if (cfg->rgcount > XFS_MAX_RGNUMBER) {
-		fprintf(stderr,
-_("realtime group count (%llu) must be less than the maximum (%u)\n"),
-				(unsigned long long)cfg->rgcount,
-				XFS_MAX_RGNUMBER);
-		usage();
-	}
+	validate_rtgroup_geometry(cfg);
 
 	if (cfg->rtextents)
 		cfg->rtbmblocks = howmany(cfg->rgsize / cfg->rtextblocks,
