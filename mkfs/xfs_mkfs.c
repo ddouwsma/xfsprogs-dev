@@ -2966,6 +2966,14 @@ _("rt extent size not supported on realtime devices with zoned mode\n"));
 			}
 			cli->rtextsize = 0;
 		}
+		if (cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices with zoned mode specified\n"));
+				usage();
+			}
+			cli->sb_feat.reflink = false;
+		}
 
 		/*
 		 * Set the rtinherit by default for zoned file systems as they
