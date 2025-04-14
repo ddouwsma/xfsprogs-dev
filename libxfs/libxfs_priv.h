@@ -209,7 +209,7 @@ static inline bool WARN_ON(bool expr) {
 }
 
 #define WARN_ON_ONCE(e)			WARN_ON(e)
-#define percpu_counter_read(x)		(*x)
+
 #define percpu_counter_read_positive(x)	((*x) > 0 ? (*x) : 0)
 #define percpu_counter_sum_positive(x)	((*x) > 0 ? (*x) : 0)
 
@@ -218,17 +218,6 @@ uint32_t get_random_u32(void);
 #else
 #define get_random_u32()	(0)
 #endif
-
-static inline int
-__percpu_counter_compare(uint64_t *count, int64_t rhs, int32_t batch)
-{
-	if (*count > rhs)
-		return 1;
-	else if (*count < rhs)
-		return -1;
-	return 0;
-}
-
 
 #define PAGE_SIZE		getpagesize()
 extern unsigned int PAGE_SHIFT;

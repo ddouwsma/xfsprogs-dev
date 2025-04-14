@@ -63,8 +63,6 @@ typedef struct xfs_mount {
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
 #define m_icount	m_sb.sb_icount
 #define m_ifree		m_sb.sb_ifree
-#define m_fdblocks	m_sb.sb_fdblocks
-#define m_frextents	m_sb.sb_frextents
 	spinlock_t		m_sb_lock;
 
 	/*
@@ -331,6 +329,36 @@ static inline bool xfs_is_ ## name (struct xfs_mount *mp) \
 }
 __XFS_UNSUPP_OPSTATE(readonly)
 __XFS_UNSUPP_OPSTATE(shutdown)
+
+static inline int64_t xfs_sum_freecounter(struct xfs_mount *mp,
+		enum xfs_free_counter ctr)
+{
+	if (ctr == XC_FREE_RTEXTENTS)
+		return mp->m_sb.sb_frextents;
+	return mp->m_sb.sb_fdblocks;
+}
+
+static inline int64_t xfs_estimate_freecounter(struct xfs_mount *mp,
+		enum xfs_free_counter ctr)
+{
+	return xfs_sum_freecounter(mp, ctr);
+}
+
+static inline int xfs_compare_freecounter(struct xfs_mount *mp,
+		enum xfs_free_counter ctr, int64_t rhs, int32_t batch)
+{
+	uint64_t count;
+
+	if (ctr == XC_FREE_RTEXTENTS)
+		count = mp->m_sb.sb_frextents;
+	else
+		count = mp->m_sb.sb_fdblocks;
+	if (count > rhs)
+		return 1;
+	else if (count < rhs)
+		return -1;
+	return 0;
+}
 
 /* don't fail on device size or AG count checks */
 #define LIBXFS_MOUNT_DEBUGGER		(1U << 0)
