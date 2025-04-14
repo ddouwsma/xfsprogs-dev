@@ -50,7 +50,9 @@ struct xfs_fsop_geom {
 	__u32         sick;
 	__u32         checked;
 	__u64         rgextents;
-	__u64         reserved[16];
+	__u64	      rtstart;
+	__u64         rtreserved;
+	__u64         reserved[14];
 };
 .fi
 .in
@@ -143,6 +145,20 @@ for more details.
 .I rgextents
 Is the number of RT extents in each rtgroup.
 .PP
+.I rtstart
+Start of the internal RT device in fsblocks.  0 if an external RT device
+is used.
+This field is meaningful only if the flag
+.B  XFS_FSOP_GEOM_FLAGS_ZONED
+is set.
+.PP
+.I rtreserved
+The amount of space in the realtime section that is reserved for internal use
+by garbage collection and reorganization algorithms in fsblocks.
+This field is meaningful only if the flag
+.B  XFS_FSOP_GEOM_FLAGS_ZONED
+is set.
+.PP
 .I reserved
 is set to zero.
 .SH FILESYSTEM FEATURE FLAGS
@@ -221,6 +237,9 @@ Filesystem can exchange file contents atomically via XFS_IOC_EXCHANGE_RANGE.
 .TP
 .B XFS_FSOP_GEOM_FLAGS_METADIR
 Filesystem contains a metadata directory tree.
+.TP
+.B XFS_FSOP_GEOM_FLAGS_ZONED
+Filesystem uses the zoned allocator for the RT device.
 .RE
 .SH XFS METADATA HEALTH REPORTING
 .PP
