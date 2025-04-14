@@ -1248,6 +1248,23 @@ The magic value of
 .I 0
 forces use of the older rtgroups geometry calculations that is used for
 mechanical storage.
+.TP
+.BI zoned= value
+Controls if the zoned allocator is used for the realtime device.
+The value is either 0 to disable the feature, or 1 to enable it.
+Defaults to 1 for zoned block device, else 0.
+.TP
+.BI start= value
+Controls the start of the internal realtime section.  Defaults to 0
+for conventional block devices, or the start of the first sequential
+required zone for zoned block devices.
+This option is only valid if the zoned realtime allocator is used.
+.TP
+.BI reserved= value
+Controls the amount of space in the realtime section that is reserved for
+internal use by garbage collection and reorganization algorithms.
+Defaults to 0 if not set.
+This option is only valid if the zoned realtime allocator is used.
 .RE
 .PP
 .PD 0
