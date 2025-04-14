@@ -560,7 +560,7 @@ libxfs_buftarg_init(
 				progname);
 			exit(1);
 		}
-		if (xi->rt.dev &&
+		if ((xi->rt.dev || xi->rt.dev == xi->data.dev) &&
 		    (mp->m_rtdev_targp->bt_bdev != xi->rt.dev ||
 		     mp->m_rtdev_targp->bt_mount != mp)) {
 			fprintf(stderr,
@@ -577,7 +577,11 @@ libxfs_buftarg_init(
 	else
 		mp->m_logdev_targp = libxfs_buftarg_alloc(mp, xi, &xi->log,
 				lfail);
-	mp->m_rtdev_targp = libxfs_buftarg_alloc(mp, xi, &xi->rt, rfail);
+	if (!xi->rt.dev || xi->rt.dev == xi->data.dev)
+		mp->m_rtdev_targp = mp->m_ddev_targp;
+	else
+		mp->m_rtdev_targp = libxfs_buftarg_alloc(mp, xi, &xi->rt,
+				rfail);
 }
 
 /* Compute maximum possible height for per-AG btree types for this fs. */
@@ -978,7 +982,7 @@ libxfs_flush_mount(
 			error = err2;
 	}
 
-	if (mp->m_rtdev_targp) {
+	if (mp->m_rtdev_targp && mp->m_rtdev_targp != mp->m_ddev_targp) {
 		err2 = libxfs_flush_buftarg(mp->m_rtdev_targp,
 				_("realtime device"));
 		if (!error)
@@ -1031,7 +1035,8 @@ libxfs_umount(
 	free(mp->m_fsname);
 	mp->m_fsname = NULL;
 
-	libxfs_buftarg_free(mp->m_rtdev_targp);
+	if (mp->m_rtdev_targp != mp->m_ddev_targp)
+		libxfs_buftarg_free(mp->m_rtdev_targp);
 	if (mp->m_logdev_targp != mp->m_ddev_targp)
 		libxfs_buftarg_free(mp->m_logdev_targp);
 	libxfs_buftarg_free(mp->m_ddev_targp);
