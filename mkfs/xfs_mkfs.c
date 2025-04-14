@@ -2966,6 +2966,13 @@ _("rt extent size not supported on realtime devices with zoned mode\n"));
 			}
 			cli->rtextsize = 0;
 		}
+
+		/*
+		 * Set the rtinherit by default for zoned file systems as they
+		 * usually use the data device purely as a metadata container.
+		 */
+		if (!cli_opt_set(&dopts, D_RTINHERIT))
+			cli->fsx.fsx_xflags |= FS_XFLAG_RTINHERIT;
 	} else {
 		if (cli->rtstart) {
 			fprintf(stderr,
