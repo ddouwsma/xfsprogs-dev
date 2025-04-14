@@ -8,6 +8,20 @@
 #include "fsgeom.h"
 #include "util.h"
 
+static inline const char *
+rtdev_name(
+	struct xfs_fsop_geom	*geo,
+	const char		*rtname)
+{
+	if (!geo->rtblocks)
+		return _("none");
+	if (geo->rtstart)
+		return _("internal");
+	if (!rtname)
+		return _("external");
+	return rtname;
+}
+
 void
 xfs_report_geom(
 	struct xfs_fsop_geom	*geo,
@@ -34,6 +48,7 @@ xfs_report_geom(
 	int			exchangerange;
 	int			parent;
 	int			metadir;
+	int			zoned;
 
 	isint = geo->logstart > 0;
 	lazycount = geo->flags & XFS_FSOP_GEOM_FLAGS_LAZYSB ? 1 : 0;
@@ -55,6 +70,7 @@ xfs_report_geom(
 	exchangerange = geo->flags & XFS_FSOP_GEOM_FLAGS_EXCHANGE_RANGE ? 1 : 0;
 	parent = geo->flags & XFS_FSOP_GEOM_FLAGS_PARENT ? 1 : 0;
 	metadir = geo->flags & XFS_FSOP_GEOM_FLAGS_METADIR ? 1 : 0;
+	zoned = geo->flags & XFS_FSOP_GEOM_FLAGS_ZONED ? 1 : 0;
 
 	printf(_(
 "meta-data=%-22s isize=%-6d agcount=%u, agsize=%u blks\n"
@@ -68,7 +84,8 @@ xfs_report_geom(
 "log      =%-22s bsize=%-6d blocks=%u, version=%d\n"
 "         =%-22s sectsz=%-5u sunit=%d blks, lazy-count=%d\n"
 "realtime =%-22s extsz=%-6d blocks=%lld, rtextents=%lld\n"
-"         =%-22s rgcount=%-4d rgsize=%u extents\n"),
+"         =%-22s rgcount=%-4d rgsize=%u extents\n"
+"         =%-22s zoned=%-6d start=%llu reserved=%llu\n"),
 		mntpoint, geo->inodesize, geo->agcount, geo->agblocks,
 		"", geo->sectsize, attrversion, projid32bit,
 		"", crcs_enabled, finobt_enabled, spinodes, rmapbt_enabled,
@@ -81,10 +98,11 @@ xfs_report_geom(
 		isint ? _("internal log") : logname ? logname : _("external"),
 			geo->blocksize, geo->logblocks, logversion,
 		"", geo->logsectsize, geo->logsunit / geo->blocksize, lazycount,
-		!geo->rtblocks ? _("none") : rtname ? rtname : _("external"),
+		rtdev_name(geo, rtname),
 		geo->rtextsize * geo->blocksize, (unsigned long long)geo->rtblocks,
 			(unsigned long long)geo->rtextents,
-		"", geo->rgcount, geo->rgextents);
+		"", geo->rgcount, geo->rgextents,
+		"", zoned, geo->rtstart, geo->rtreserved);
 }
 
 /* Try to obtain the xfs geometry.  On error returns a negative error code. */
