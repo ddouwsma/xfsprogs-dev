@@ -44,10 +44,14 @@ xfs_daddr_to_rgno(
 	struct xfs_mount	*mp,
 	xfs_daddr_t		daddr)
 {
+	struct xfs_groups	*g = &mp->m_groups[XG_TYPE_RTG];
+
 	if (!xfs_has_rtgroups(mp))
 		return 0;
 
-	return XFS_BB_TO_FSBT(mp, daddr) / mp->m_groups[XG_TYPE_RTG].blocks;
+	if (g->has_daddr_gaps)
+		return XFS_BB_TO_FSBT(mp, daddr) / (1 << g->blklog);
+	return XFS_BB_TO_FSBT(mp, daddr) / g->blocks;
 }
 
 typedef enum {
