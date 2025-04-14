@@ -4422,6 +4422,49 @@ _("rgsize (%s) not a multiple of fs blk size (%d)\n"),
 			NBBY * (cfg->blocksize - sizeof(struct xfs_rtbuf_blkinfo)));
 }
 
+/*
+ * If we're creating a zoned filesystem and the user specified a size, add
+ * enough over-provisioning to be able to back the requested amount of
+ * writable space.
+ */
+static void
+adjust_nr_zones(
+	struct mkfs_params	*cfg,
+	struct cli_params	*cli,
+	struct libxfs_init	*xi,
+	struct zone_topology	*zt)
+{
+	uint64_t		new_rtblocks, slack;
+	unsigned int		max_zones;
+
+	if (zt->rt.nr_zones)
+		max_zones = zt->rt.nr_zones;
+	else
+		max_zones = DTOBT(xi->rt.size, cfg->blocklog) / cfg->rgsize;
+
+	if (!cli->rgcount)
+		cfg->rgcount += XFS_RESERVED_ZONES;
+	if (cfg->rgcount > max_zones) {
+		cfg->rgcount = max_zones;
+		fprintf(stderr,
+_("Warning: not enough zones for backing requested rt size due to\n"
+  "over-provisioning needs, writable size will be less than %s\n"),
+			cli->rtsize);
+	}
+	new_rtblocks = (cfg->rgcount * cfg->rgsize);
+	slack = (new_rtblocks - cfg->rtblocks) % cfg->rgsize;
+
+	cfg->rtblocks = new_rtblocks;
+	cfg->rtextents = cfg->rtblocks / cfg->rtextblocks;
+
+	/*
+	 * Add the slack to the end of the last zone to the reserved blocks.
+	 * This ensures the visible user capacity is exactly the one that the
+	 * user asked for.
+	 */
+	cfg->rtreserved += (slack * cfg->blocksize);
+}
+
 static void
 calculate_zone_geometry(
 	struct mkfs_params	*cfg,
@@ -4493,6 +4536,9 @@ _("rgsize (%s) not a multiple of fs blk size (%d)\n"),
 					(cfg->rtblocks % cfg->rgsize != 0);
 		}
 	}
+
+	if (cli->rtsize || cli->rgcount)
+		adjust_nr_zones(cfg, cli, xi, zt);
 
 	if (cfg->rgcount < XFS_MIN_ZONES)  {
 		fprintf(stderr,
