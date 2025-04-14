@@ -140,12 +140,19 @@ scan_ag(
 	if (agno != NULLAGNUMBER) {
 		l->fmr_physical = cvt_agbno_to_b(xfd, agno, 0);
 		h->fmr_physical = cvt_agbno_to_b(xfd, agno + 1, 0);
-		l->fmr_device = h->fmr_device = file->fs_path.fs_datadev;
+		if (file->xfd.fsgeom.rtstart)
+			l->fmr_device = XFS_DEV_DATA;
+		else
+			l->fmr_device = file->fs_path.fs_datadev;
 	} else {
 		l->fmr_physical = 0;
 		h->fmr_physical = ULLONG_MAX;
-		l->fmr_device = h->fmr_device = file->fs_path.fs_rtdev;
+		if (file->xfd.fsgeom.rtstart)
+			l->fmr_device = XFS_DEV_RT;
+		else
+			l->fmr_device = file->fs_path.fs_rtdev;
 	}
+		h->fmr_device = l->fmr_device;
 	h->fmr_owner = ULLONG_MAX;
 	h->fmr_flags = UINT_MAX;
 	h->fmr_offset = ULLONG_MAX;
