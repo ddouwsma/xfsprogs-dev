@@ -3469,8 +3469,10 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 		return;
 
 	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
-		ensure_rtgroup_bitmap(rtg);
-		ensure_rtgroup_summary(rtg);
+		if (!xfs_has_zoned(mp)) {
+			ensure_rtgroup_bitmap(rtg);
+			ensure_rtgroup_summary(rtg);
+		}
 		ensure_rtgroup_rmapbt(rtg, est_fdblocks);
 		ensure_rtgroup_refcountbt(rtg, est_fdblocks);
 	}

@@ -1388,16 +1388,19 @@ main(int argc, char **argv)
 	 * Done with the block usage maps, toss them.  Realtime metadata aren't
 	 * rebuilt until phase 6, so we have to keep them around.
 	 */
-	if (mp->m_sb.sb_rblocks == 0)
+	if (mp->m_sb.sb_rblocks == 0) {
 		rmaps_free(mp);
-	free_bmaps(mp);
+		free_bmaps(mp);
+	}
 
 	if (!bad_ino_btree)  {
 		phase6(mp);
 		phase_end(mp, 6);
 
-		if (mp->m_sb.sb_rblocks != 0)
+		if (mp->m_sb.sb_rblocks != 0) {
 			rmaps_free(mp);
+			free_bmaps(mp);
+		}
 		free_rtgroup_inodes();
 
 		phase7(mp, phase2_threads);

@@ -630,6 +630,19 @@ void
 check_rtmetadata(
 	struct xfs_mount	*mp)
 {
+	if (xfs_has_zoned(mp)) {
+		/*
+		 * Here we could/should verify the zone state a bit when we are
+		 * on actual zoned devices:
+		 *	- compare hw write pointer to last written
+		 *	- compare zone state to last written
+		 *
+		 * Note much we can do when running in zoned mode on a
+		 * conventional device.
+		 */
+		return;
+	}
+
 	generate_rtinfo(mp);
 	check_rtbitmap(mp);
 	check_rtsummary(mp);

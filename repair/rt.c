@@ -222,6 +222,8 @@ check_rtfile_contents(
 	xfs_fileoff_t		bno = 0;
 	int			error;
 
+	ASSERT(!xfs_has_zoned(mp));
+
 	if (!ip) {
 		do_warn(_("unable to open %s file\n"), filename);
 		return;

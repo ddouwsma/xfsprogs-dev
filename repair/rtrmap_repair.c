@@ -141,6 +141,37 @@ xrep_rtrmap_btree_load(
 	return error;
 }
 
+static void
+rtgroup_update_counters(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_inode	*rmapip = rtg->rtg_inodes[XFS_RTGI_RMAP];
+	struct xfs_mount	*mp = rtg_mount(rtg);
+	uint64_t		end =
+		xfs_rtbxlen_to_blen(mp, rtg->rtg_extents);
+	xfs_agblock_t		gbno = 0;
+	uint64_t		used = 0;
+
+	do {
+		int		bstate;
+		xfs_extlen_t	blen;
+
+		bstate = get_bmap_ext(rtg_rgno(rtg), gbno, end, &blen, true);
+		switch (bstate) {
+		case XR_E_INUSE:
+		case XR_E_INUSE_FS:
+			used += blen;
+			break;
+		default:
+			break;
+		}
+
+		gbno += blen;
+	} while (gbno < end);
+
+	rmapip->i_used_blocks = used;
+}
+
 /* Update the inode counters. */
 STATIC int
 xrep_rtrmap_reset_counters(
@@ -153,6 +184,8 @@ xrep_rtrmap_reset_counters(
 	 * generated.
 	 */
 	sc->ip->i_nblocks = rr->new_fork_info.ifake.if_blocks;
+	if (xfs_has_zoned(sc->mp))
+		rtgroup_update_counters(rr->rtg);
 	libxfs_trans_log_inode(sc->tp, sc->ip, XFS_ILOG_CORE);
 
 	/* Quotas don't exist so we're done. */

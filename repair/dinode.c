@@ -3585,7 +3585,9 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 
 	validate_extsize(mp, dino, lino, dirty);
 
-	if (dino->di_version >= 3)
+	if (dino->di_version >= 3 &&
+	    (!xfs_has_zoned(mp) ||
+	     dino->di_metatype != cpu_to_be16(XFS_METAFILE_RTRMAP)))
 		validate_cowextsize(mp, dino, lino, dirty);
 
 	/* nsec fields cannot be larger than 1 billion */
