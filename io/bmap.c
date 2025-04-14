@@ -257,18 +257,21 @@ bmap_f(
 #define	FLG_BSW		0000010	/* Not on begin of stripe width */
 #define	FLG_ESW		0000001	/* Not on end   of stripe width */
 		int	agno;
-		off_t	agoff, bbperag;
+		off_t	agoff, bbperag, bstart;
 		int	foff_w, boff_w, aoff_w, tot_w, agno_w;
-		char	rbuf[32], bbuf[32], abuf[32];
+		char	rbuf[32], bbuf[32], abuf[64];
 		int	sunit, swidth;
 
 		foff_w = boff_w = aoff_w = MINRANGE_WIDTH;
 		tot_w = MINTOT_WIDTH;
 		if (is_rt) {
+			bstart = fsgeo.rtstart *
+				(fsgeo.blocksize / BBSIZE);
 			bbperag = bytes_per_rtgroup(&fsgeo) / BBSIZE;
 			sunit = 0;
 			swidth = 0;
 		} else {
+			bstart = 0;
 			bbperag = (off_t)fsgeo.agblocks *
 				  (off_t)fsgeo.blocksize / BBSIZE;
 			sunit = (fsgeo.sunit * fsgeo.blocksize) / BBSIZE;
@@ -298,9 +301,11 @@ bmap_f(
 						map[i + 1].bmv_length - 1LL));
 				boff_w = max(boff_w, strlen(bbuf));
 				if (bbperag > 0) {
-					agno = map[i + 1].bmv_block / bbperag;
-					agoff = map[i + 1].bmv_block -
-							(agno * bbperag);
+					off_t bno;
+
+					bno = map[i + 1].bmv_block - bstart;
+					agno = bno / bbperag;
+					agoff = bno % bbperag;
 					snprintf(abuf, sizeof(abuf),
 						"(%lld..%lld)",
 						(long long)agoff,
@@ -387,9 +392,11 @@ bmap_f(
 				printf("%4d: %-*s %-*s", i, foff_w, rbuf,
 					boff_w, bbuf);
 				if (bbperag > 0) {
-					agno = map[i + 1].bmv_block / bbperag;
-					agoff = map[i + 1].bmv_block -
-							(agno * bbperag);
+					off_t bno;
+
+					bno = map[i + 1].bmv_block - bstart;
+					agno = bno / bbperag;
+					agoff = bno % bbperag;
 					snprintf(abuf, sizeof(abuf),
 						"(%lld..%lld)",
 						(long long)agoff,
