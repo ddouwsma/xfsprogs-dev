@@ -5103,8 +5103,6 @@ check_rt_meta_prealloc(
 	struct xfs_mount	*mp)
 {
 	struct xfs_perag	*pag = NULL;
-	struct xfs_rtgroup	*rtg = NULL;
-	xfs_filblks_t		ask;
 	int			error;
 
 	/*
@@ -5124,27 +5122,12 @@ check_rt_meta_prealloc(
 		}
 	}
 
-	/* Realtime metadata btree inode */
-	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
-		ask = libxfs_rtrmapbt_calc_reserves(mp);
-		error = -libxfs_metafile_resv_init(rtg_rmap(rtg), ask);
-		if (error)
-			prealloc_fail(mp, error, ask, _("realtime rmap btree"));
+	error = -libxfs_metafile_resv_init(mp);
+	if (error)
+		prealloc_fail(mp, error, 0, _("metadata files"));
 
-		ask = libxfs_rtrefcountbt_calc_reserves(mp);
-		error = -libxfs_metafile_resv_init(rtg_refcount(rtg), ask);
-		if (error)
-			prealloc_fail(mp, error, ask,
-					_("realtime refcount btree"));
-	}
+	libxfs_metafile_resv_free(mp);
 
-	/* Unreserve the realtime metadata reservations. */
-	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
-		libxfs_metafile_resv_free(rtg_rmap(rtg));
-		libxfs_metafile_resv_free(rtg_refcount(rtg));
-	}
-
-	/* Unreserve the per-AG reservations. */
 	while ((pag = xfs_perag_next(mp, pag)))
 		libxfs_ag_resv_free(pag);
 

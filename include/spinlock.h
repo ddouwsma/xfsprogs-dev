@@ -22,4 +22,9 @@ typedef pthread_mutex_t	spinlock_t;
 #define spin_trylock(l)		(pthread_mutex_trylock(l) != EBUSY)
 #define spin_unlock(l)		pthread_mutex_unlock(l)
 
+#define mutex_init(l)		pthread_mutex_init(l, NULL)
+#define mutex_lock(l)		pthread_mutex_lock(l)
+#define mutex_trylock(l)	(pthread_mutex_trylock(l) != EBUSY)
+#define mutex_unlock(l)		pthread_mutex_unlock(l)
+
 #endif /* __LIBXFS_SPINLOCK_H__ */
