@@ -21,6 +21,7 @@
 #include "rmap.h"
 #include "bulkload.h"
 #include "agbtree.h"
+#include "zoned.h"
 
 static uint64_t	*sb_icount_ag;		/* allocated inodes per ag */
 static uint64_t	*sb_ifree_ag;		/* free inodes per ag */
@@ -631,15 +632,7 @@ check_rtmetadata(
 	struct xfs_mount	*mp)
 {
 	if (xfs_has_zoned(mp)) {
-		/*
-		 * Here we could/should verify the zone state a bit when we are
-		 * on actual zoned devices:
-		 *	- compare hw write pointer to last written
-		 *	- compare zone state to last written
-		 *
-		 * Note much we can do when running in zoned mode on a
-		 * conventional device.
-		 */
+		check_zones(mp);
 		return;
 	}
 

@@ -81,6 +81,7 @@ CFILES = \
 	strblobs.c \
 	threads.c \
 	versions.c \
+	zoned.c \
 	xfs_repair.c
 
 LLDLIBS = $(LIBXFS) $(LIBXLOG) $(LIBXCMD) $(LIBFROG) $(LIBUUID) $(LIBRT) \
