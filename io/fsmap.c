@@ -14,6 +14,7 @@
 
 static cmdinfo_t	fsmap_cmd;
 static dev_t		xfs_data_dev;
+static dev_t		xfs_log_dev;
 static dev_t		xfs_rt_dev;
 
 static void
@@ -405,8 +406,6 @@ fsmap_f(
 	int			c;
 	unsigned long long	nr = 0;
 	size_t			fsblocksize, fssectsize;
-	struct fs_path		*fs;
-	static bool		tab_init;
 	bool			dumped_flags = false;
 	int			dflag, lflag, rflag;
 
@@ -491,15 +490,19 @@ fsmap_f(
 		return 0;
 	}
 
+	xfs_data_dev = file->fs_path.fs_datadev;
+	xfs_log_dev = file->fs_path.fs_logdev;
+	xfs_rt_dev = file->fs_path.fs_rtdev;
+
 	memset(head, 0, sizeof(*head));
 	l = head->fmh_keys;
 	h = head->fmh_keys + 1;
 	if (dflag) {
-		l->fmr_device = h->fmr_device = file->fs_path.fs_datadev;
+		l->fmr_device = h->fmr_device = xfs_data_dev;
 	} else if (lflag) {
-		l->fmr_device = h->fmr_device = file->fs_path.fs_logdev;
+		l->fmr_device = h->fmr_device = xfs_log_dev;
 	} else if (rflag) {
-		l->fmr_device = h->fmr_device = file->fs_path.fs_rtdev;
+		l->fmr_device = h->fmr_device = xfs_rt_dev;
 	} else {
 		l->fmr_device = 0;
 		h->fmr_device = UINT_MAX;
@@ -509,18 +512,6 @@ fsmap_f(
 	h->fmr_owner = ULLONG_MAX;
 	h->fmr_flags = UINT_MAX;
 	h->fmr_offset = ULLONG_MAX;
-
-	/*
-	 * If this is an XFS filesystem, remember the data device.
-	 * (We report AG number/block for data device extents on XFS).
-	 */
-	if (!tab_init) {
-		fs_table_initialise(0, NULL, 0, NULL);
-		tab_init = true;
-	}
-	fs = fs_table_lookup(file->name, FS_MOUNT_POINT);
-	xfs_data_dev = fs ? fs->fs_datadev : 0;
-	xfs_rt_dev = fs ? fs->fs_rtdev : 0;
 
 	head->fmh_count = map_size;
 	do {
