@@ -471,6 +471,8 @@ static inline int retzero(void) { return 0; }
 #define xfs_sb_validate_fsb_count(sbp, nblks)		(0)
 #define xlog_calc_iovec_len(len)		roundup(len, sizeof(uint32_t))
 
+#define xfs_zoned_add_available(mp, rtxnum)	do { } while (0)
+
 /*
  * Prototypes for kernel static functions that are aren't in their
  * associated header files.
