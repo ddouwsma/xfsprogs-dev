@@ -247,8 +247,13 @@ dump_map_verbose(
 				(long long)BTOBBT(agoff),
 				(long long)BTOBBT(agoff + p->fmr_length - 1));
 		} else if (p->fmr_device == xfs_rt_dev && fsgeo->rgcount > 0) {
-			agno = p->fmr_physical / bperrtg;
-			agoff = p->fmr_physical % bperrtg;
+			uint64_t start = p->fmr_physical -
+				fsgeo->rtstart * fsgeo->blocksize;
+
+			agno = start / bperrtg;
+			if (agno < 0)
+				agno = -1;
+			agoff = start % bperrtg;
 			snprintf(abuf, sizeof(abuf),
 				"(%lld..%lld)",
 				(long long)BTOBBT(agoff),
@@ -326,8 +331,13 @@ dump_map_verbose(
 				"%lld",
 				(long long)agno);
 		} else if (p->fmr_device == xfs_rt_dev && fsgeo->rgcount > 0) {
-			agno = p->fmr_physical / bperrtg;
-			agoff = p->fmr_physical % bperrtg;
+			uint64_t start = p->fmr_physical -
+				fsgeo->rtstart * fsgeo->blocksize;
+
+			agno = start / bperrtg;
+			if (agno < 0)
+				agno = -1;
+			agoff = start % bperrtg;
 			snprintf(abuf, sizeof(abuf),
 				"(%lld..%lld)",
 				(long long)BTOBBT(agoff),
@@ -490,9 +500,18 @@ fsmap_f(
 		return 0;
 	}
 
-	xfs_data_dev = file->fs_path.fs_datadev;
-	xfs_log_dev = file->fs_path.fs_logdev;
-	xfs_rt_dev = file->fs_path.fs_rtdev;
+	/*
+	 * File systems with internal rt device use synthetic device values.
+	 */
+	if (file->geom.rtstart) {
+		xfs_data_dev = XFS_DEV_DATA;
+		xfs_log_dev = XFS_DEV_LOG;
+		xfs_rt_dev = XFS_DEV_RT;
+	} else {
+		xfs_data_dev = file->fs_path.fs_datadev;
+		xfs_log_dev = file->fs_path.fs_logdev;
+		xfs_rt_dev = file->fs_path.fs_rtdev;
+	}
 
 	memset(head, 0, sizeof(*head));
 	l = head->fmh_keys;
