@@ -251,7 +251,7 @@ libxfs_close_devices(
 		libxfs_device_close(&li->data);
 	if (li->log.dev && li->log.dev != li->data.dev)
 		libxfs_device_close(&li->log);
-	if (li->rt.dev)
+	if (li->rt.dev && li->rt.dev != li->data.dev)
 		libxfs_device_close(&li->rt);
 }
 
