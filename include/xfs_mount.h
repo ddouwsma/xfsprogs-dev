@@ -207,6 +207,7 @@ typedef struct xfs_mount {
 #define XFS_FEAT_NREXT64	(1ULL << 26)	/* large extent counters */
 #define XFS_FEAT_EXCHANGE_RANGE	(1ULL << 27)	/* exchange range */
 #define XFS_FEAT_METADIR	(1ULL << 28)	/* metadata directory tree */
+#define XFS_FEAT_ZONED		(1ULL << 29)	/* zoned RT device */
 
 #define __XFS_HAS_FEAT(name, NAME) \
 static inline bool xfs_has_ ## name (const struct xfs_mount *mp) \
@@ -253,7 +254,7 @@ __XFS_HAS_FEAT(needsrepair, NEEDSREPAIR)
 __XFS_HAS_FEAT(large_extent_counts, NREXT64)
 __XFS_HAS_FEAT(exchange_range, EXCHANGE_RANGE)
 __XFS_HAS_FEAT(metadir, METADIR)
-
+__XFS_HAS_FEAT(zoned, ZONED)
 
 static inline bool xfs_has_rtgroups(const struct xfs_mount *mp)
 {
@@ -264,7 +265,9 @@ static inline bool xfs_has_rtgroups(const struct xfs_mount *mp)
 static inline bool xfs_has_rtsb(const struct xfs_mount *mp)
 {
 	/* all rtgroups filesystems with an rt section have an rtsb */
-	return xfs_has_rtgroups(mp) && xfs_has_realtime(mp);
+	return xfs_has_rtgroups(mp) &&
+		xfs_has_realtime(mp) &&
+		!xfs_has_zoned(mp);
 }
 
 static inline bool xfs_has_rtrmapbt(const struct xfs_mount *mp)
@@ -277,6 +280,11 @@ static inline bool xfs_has_rtreflink(const struct xfs_mount *mp)
 {
 	return xfs_has_metadir(mp) && xfs_has_realtime(mp) &&
 	       xfs_has_reflink(mp);
+}
+
+static inline bool xfs_has_nonzoned(const struct xfs_mount *mp)
+{
+	return !xfs_has_zoned(mp);
 }
 
 /* Kernel mount features that we don't support */

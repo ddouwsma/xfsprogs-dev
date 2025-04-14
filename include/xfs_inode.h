@@ -232,8 +232,13 @@ typedef struct xfs_inode {
 	xfs_rfsblock_t		i_nblocks;	/* # of direct & btree blocks */
 	prid_t			i_projid;	/* owner's project id */
 	xfs_extlen_t		i_extsize;	/* basic/minimum extent size */
-	/* cowextsize is only used for v3 inodes, flushiter for v1/2 */
+	/*
+	 * i_used_blocks is used for zoned rtrmap inodes,
+	 * i_cowextsize is used for other v3 inodes,
+	 * i_flushiter for v1/2 inodes
+	 */
 	union {
+		uint32_t	i_used_blocks;	/* used blocks in RTG */
 		xfs_extlen_t	i_cowextsize;	/* basic cow extent size */
 		uint16_t	i_flushiter;	/* incremented on flush */
 	};
@@ -360,6 +365,11 @@ static inline xfs_fsize_t XFS_ISIZE(struct xfs_inode *ip)
 	return ip->i_disk_size;
 }
 #define XFS_IS_REALTIME_INODE(ip) ((ip)->i_diflags & XFS_DIFLAG_REALTIME)
+
+static inline bool xfs_is_zoned_inode(struct xfs_inode *ip)
+{
+	return xfs_has_zoned(ip->i_mount) && XFS_IS_REALTIME_INODE(ip);
+}
 
 /* inode link counts */
 static inline void set_nlink(struct inode *inode, uint32_t nlink)
