@@ -184,6 +184,20 @@ verify_device_size(
 }
 
 static void
+verify_main_device_size(
+	const struct mdrestore_dev	*dev,
+	struct xfs_sb			*sb)
+{
+	xfs_rfsblock_t			nr_blocks = sb->sb_dblocks;
+
+	/* internal RT device */
+	if (sb->sb_rtstart)
+		nr_blocks = sb->sb_rtstart + sb->sb_rblocks;
+
+	verify_device_size(dev, nr_blocks, sb->sb_blocksize);
+}
+
+static void
 read_header_v1(
 	union mdrestore_headers	*h,
 	FILE			*md_fp)
@@ -269,7 +283,7 @@ restore_v1(
 
 	((struct xfs_dsb*)block_buffer)->sb_inprogress = 1;
 
-	verify_device_size(ddev, sb.sb_dblocks, sb.sb_blocksize);
+	verify_main_device_size(ddev, &sb);
 
 	bytes_read = 0;
 
@@ -432,14 +446,14 @@ restore_v2(
 
 	((struct xfs_dsb *)block_buffer)->sb_inprogress = 1;
 
-	verify_device_size(ddev, sb.sb_dblocks, sb.sb_blocksize);
+	verify_main_device_size(ddev, &sb);
 
 	if (sb.sb_logstart == 0) {
 		ASSERT(mdrestore.external_log == true);
 		verify_device_size(logdev, sb.sb_logblocks, sb.sb_blocksize);
 	}
 
-	if (sb.sb_rblocks > 0) {
+	if (sb.sb_rblocks > 0 && !sb.sb_rtstart) {
 		ASSERT(mdrestore.realtime_data == true);
 		verify_device_size(rtdev, sb.sb_rblocks, sb.sb_blocksize);
 	}
