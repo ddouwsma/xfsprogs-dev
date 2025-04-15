@@ -1392,6 +1392,13 @@ _("name create failed in ino %" PRIu64 " (%d)\n"), ino, error);
 _("name create failed (%d) during rebuild\n"), error);
 	}
 
+	/*
+	 * If we added too few entries to retain longform, add the extra
+	 * ref for . as this is now a shortform directory.
+	 */
+	if (ip->i_df.if_format == XFS_DINODE_FMT_LOCAL)
+		add_inode_ref(irec, ino_offset);
+
 	return;
 
 out_bmap_cancel:
