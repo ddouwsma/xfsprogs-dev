@@ -2431,6 +2431,11 @@ longform_dir2_entry_check(
 			continue;
 		}
 
+		/* salvage any dirents that look ok */
+		longform_dir2_entry_check_data(mp, ip, num_illegal, need_dot,
+				irec, ino_offset, bp, hashtab,
+				&freetab, da_bno, fmt == XFS_DIR2_FMT_BLOCK);
+
 		/* check v5 metadata */
 		if (xfs_has_crc(mp)) {
 			error = check_dir3_header(mp, bp, ino);
@@ -2445,9 +2450,6 @@ longform_dir2_entry_check(
 			}
 		}
 
-		longform_dir2_entry_check_data(mp, ip, num_illegal, need_dot,
-				irec, ino_offset, bp, hashtab,
-				&freetab, da_bno, fmt == XFS_DIR2_FMT_BLOCK);
 		if (fmt == XFS_DIR2_FMT_BLOCK)
 			break;
 
