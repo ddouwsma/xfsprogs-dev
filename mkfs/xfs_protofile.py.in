@@ -44,7 +44,9 @@ def stat_to_str(statbuf):
 	else:
 		sgid = '-'
 
-	perms = stat.S_IMODE(statbuf.st_mode)
+	# We already register suid in the proto string, no need
+	# to also represent it into the octet
+	perms = stat.S_IMODE(statbuf.st_mode) & 0o777
 
 	return '%s%s%s%03o %d %d' % (type, suid, sgid, perms, statbuf.st_uid, \
 			statbuf.st_gid)
