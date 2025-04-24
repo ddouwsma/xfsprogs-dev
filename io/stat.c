@@ -365,9 +365,14 @@ dump_raw_statx(struct statx *stx)
 	printf("stat.rdev_minor = %u\n", stx->stx_rdev_minor);
 	printf("stat.dev_major = %u\n", stx->stx_dev_major);
 	printf("stat.dev_minor = %u\n", stx->stx_dev_minor);
+	printf("stat.mnt_id = 0x%llu\n", (unsigned long long)stx->stx_mnt_id);
+	printf("stat.dio_mem_align = %u\n", stx->stx_dio_mem_align);
+	printf("stat.dio_offset_align = %u\n", stx->stx_dio_offset_align);
+	printf("stat.subvol = 0x%llu\n", (unsigned long long)stx->stx_subvol);
 	printf("stat.atomic_write_unit_min = %u\n", stx->stx_atomic_write_unit_min);
 	printf("stat.atomic_write_unit_max = %u\n", stx->stx_atomic_write_unit_max);
 	printf("stat.atomic_write_segments_max = %u\n", stx->stx_atomic_write_segments_max);
+	printf("stat.dio_read_offset_align = %u\n", stx->stx_dio_read_offset_align);
 	return 0;
 }
 

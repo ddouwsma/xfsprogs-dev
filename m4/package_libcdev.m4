@@ -126,7 +126,7 @@ AC_DEFUN([AC_NEED_INTERNAL_FSCRYPT_POLICY_V2],
 AC_DEFUN([AC_NEED_INTERNAL_STATX],
   [ AC_CHECK_TYPE(struct statx,
       [
-        AC_CHECK_MEMBER(struct statx.stx_atomic_write_unit_min,
+        AC_CHECK_MEMBER(struct statx.stx_dio_read_offset_align,
           ,
           need_internal_statx=yes,
           [#include <linux/stat.h>]
