@@ -1000,6 +1000,17 @@ The default is to set STATX_BASIC_STATS and STATX_BTIME.
 .B \-m <mask>
 Specify a numeric field mask for the statx call.
 .TP
+.BI "\-m +" value
+Add this value to the statx field value.
+Values can be numeric, or they can be words describing the desired fields.
+See the help command output for a list of recognized words.
+.TP
+.BI "\-m -" value
+Remove this value from the statx field value.
+.TP
+.BI "\-m +" value ",-" value
+Add and remove multiple values from the statx field value.
+.TP
 .B \-F
 Force the attributes to be synced with the server.
 .TP

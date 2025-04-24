@@ -321,10 +321,41 @@ _statx(
 #endif
 }
 
+struct statx_masks {
+	const char	*name;
+	unsigned int	mask;
+};
+
+static const struct statx_masks statx_masks[] = {
+	{"basic",		STATX_BASIC_STATS},
+	{"all",			~STATX__RESERVED},
+
+	{"type",		STATX_TYPE},
+	{"mode",		STATX_MODE},
+	{"nlink",		STATX_NLINK},
+	{"uid",			STATX_UID},
+	{"gid",			STATX_GID},
+	{"atime",		STATX_ATIME},
+	{"mtime",		STATX_MTIME},
+	{"ctime",		STATX_CTIME},
+	{"ino",			STATX_INO},
+	{"size",		STATX_SIZE},
+	{"blocks",		STATX_BLOCKS},
+	{"btime",		STATX_BTIME},
+	{"mnt_id",		STATX_MNT_ID},
+	{"dioalign",		STATX_DIOALIGN},
+	{"mnt_id_unique",	STATX_MNT_ID_UNIQUE},
+	{"subvol",		STATX_SUBVOL},
+	{"write_atomic",	STATX_WRITE_ATOMIC},
+	{"dio_read_align",	STATX_DIO_READ_ALIGN},
+};
+
 static void
 statx_help(void)
 {
-        printf(_(
+	unsigned int	i;
+
+	printf(_(
 "\n"
 " Display extended file status.\n"
 "\n"
@@ -334,9 +365,16 @@ statx_help(void)
 " -m mask -- Specify the field mask for the statx call\n"
 "            (can also be 'basic' or 'all'; defaults to\n"
 "             STATX_BASIC_STATS | STATX_BTIME)\n"
+" -m +mask -- Add this to the field mask for the statx call\n"
+" -m -mask -- Remove this from the field mask for the statx call\n"
 " -D -- Don't sync attributes with the server\n"
 " -F -- Force the attributes to be sync'd with the server\n"
-"\n"));
+"\n"
+"statx mask values: "));
+
+	for (i = 0; i < ARRAY_SIZE(statx_masks); i++)
+		printf("%s%s", i == 0 ? "" : ", ", statx_masks[i].name);
+	printf("\n");
 }
 
 /* statx helper */
@@ -377,6 +415,68 @@ dump_raw_statx(struct statx *stx)
 	return 0;
 }
 
+enum statx_mask_op {
+	SET,
+	REMOVE,
+	ADD,
+};
+
+static bool
+parse_statx_masks(
+	char			*optarg,
+	unsigned int		*caller_mask)
+{
+	char			*arg = optarg;
+	char			*word;
+	unsigned int		i;
+
+	while ((word = strtok(arg, ",")) != NULL) {
+		enum statx_mask_op op;
+		unsigned int	mask;
+		char		*p;
+
+		arg = NULL;
+
+		if (*word == '+') {
+			op = ADD;
+			word++;
+		} else if (*word == '-') {
+			op = REMOVE;
+			word++;
+		} else {
+			op = SET;
+		}
+
+		for (i = 0; i < ARRAY_SIZE(statx_masks); i++) {
+			if (!strcmp(statx_masks[i].name, word)) {
+				mask = statx_masks[i].mask;
+				goto process_op;
+			}
+		}
+
+		mask = strtoul(word, &p, 0);
+		if (!p || p == word) {
+			printf( _("non-numeric mask -- %s\n"), word);
+			return false;
+		}
+
+process_op:
+		switch (op) {
+		case ADD:
+			*caller_mask |= mask;
+			continue;
+		case REMOVE:
+			*caller_mask &= ~mask;
+			continue;
+		case SET:
+			*caller_mask = mask;
+			continue;
+		}
+	}
+
+	return true;
+}
+
 /*
  * options:
  * 	- input flags - query type
@@ -389,7 +489,6 @@ statx_f(
 	char		**argv)
 {
 	int		c, verbose = 0, raw = 0;
-	char		*p;
 	struct statx	stx;
 	int		atflag = 0;
 	unsigned int	mask = STATX_BASIC_STATS | STATX_BTIME;
@@ -397,18 +496,9 @@ statx_f(
 	while ((c = getopt(argc, argv, "m:rvFD")) != EOF) {
 		switch (c) {
 		case 'm':
-			if (strcmp(optarg, "basic") == 0)
-				mask = STATX_BASIC_STATS;
-			else if (strcmp(optarg, "all") == 0)
-				mask = ~STATX__RESERVED;
-			else {
-				mask = strtoul(optarg, &p, 0);
-				if (!p || p == optarg) {
-					printf(
-				_("non-numeric mask -- %s\n"), optarg);
-					exitcode = 1;
-					return 0;
-				}
+			if (!parse_statx_masks(optarg, &mask)) {
+				exitcode = 1;
+				return 0;
 			}
 			break;
 		case 'r':
