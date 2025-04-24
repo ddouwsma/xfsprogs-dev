@@ -205,7 +205,8 @@ check_overwrite(
 out:
 	if (pr)
 		blkid_free_probe(pr);
-	if (ret == -1)
+	/* libblkid 2.38.1 lies and can return -EIO */
+	if (ret < 0)
 		fprintf(stderr,
 			_("%s: probe of %s failed, cannot detect "
 			  "existing filesystem.\n"), progname, device);
