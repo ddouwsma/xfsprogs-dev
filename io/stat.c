@@ -332,7 +332,8 @@ statx_help(void)
 " -v -- More verbose output\n"
 " -r -- Print raw statx structure fields\n"
 " -m mask -- Specify the field mask for the statx call\n"
-"            (can also be 'basic' or 'all'; default STATX_ALL)\n"
+"            (can also be 'basic' or 'all'; defaults to\n"
+"             STATX_BASIC_STATS | STATX_BTIME)\n"
 " -D -- Don't sync attributes with the server\n"
 " -F -- Force the attributes to be sync'd with the server\n"
 "\n"));
@@ -391,7 +392,7 @@ statx_f(
 	char		*p;
 	struct statx	stx;
 	int		atflag = 0;
-	unsigned int	mask = STATX_ALL;
+	unsigned int	mask = STATX_BASIC_STATS | STATX_BTIME;
 
 	while ((c = getopt(argc, argv, "m:rvFD")) != EOF) {
 		switch (c) {
@@ -399,7 +400,7 @@ statx_f(
 			if (strcmp(optarg, "basic") == 0)
 				mask = STATX_BASIC_STATS;
 			else if (strcmp(optarg, "all") == 0)
-				mask = STATX_ALL;
+				mask = ~STATX__RESERVED;
 			else {
 				mask = strtoul(optarg, &p, 0);
 				if (!p || p == optarg) {
