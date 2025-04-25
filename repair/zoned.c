@@ -30,7 +30,7 @@ report_zones_cb(
 	}
 
 	rgno = xfs_rtb_to_rgno(mp, zsbno);
-	rtg = xfs_rtgroup_grab(mp, rgno);
+	rtg = libxfs_rtgroup_grab(mp, rgno);
 	if (!rtg) {
 		do_error(_("realtime group not found for zone %u."), rgno);
 		return;
@@ -39,8 +39,8 @@ report_zones_cb(
 	if (!rtg_rmap(rtg))
 		do_warn(_("no rmap inode for zone %u."), rgno);
 	else
-		xfs_zone_validate(zone, rtg, &write_pointer);
-	xfs_rtgroup_rele(rtg);
+		libxfs_zone_validate(zone, rtg, &write_pointer);
+	libxfs_rtgroup_rele(rtg);
 }
 
 void

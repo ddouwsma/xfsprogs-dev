@@ -407,6 +407,7 @@
 #define xfs_verify_rgbno		libxfs_verify_rgbno
 #define xfs_verify_rtbno		libxfs_verify_rtbno
 #define xfs_zero_extent			libxfs_zero_extent
+#define xfs_zone_validate		libxfs_zone_validate
 
 /* Please keep this list alphabetized. */
 
