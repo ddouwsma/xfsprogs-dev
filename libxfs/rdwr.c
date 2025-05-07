@@ -770,7 +770,6 @@ int
 libxfs_buf_get_uncached(
 	struct xfs_buftarg	*targ,
 	size_t			bblen,
-	int			flags,
 	struct xfs_buf		**bpp)
 {
 	*bpp = libxfs_getbufr_uncached(targ, XFS_BUF_DADDR_NULL, bblen);

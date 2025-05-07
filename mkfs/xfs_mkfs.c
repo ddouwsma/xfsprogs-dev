@@ -5208,7 +5208,7 @@ alloc_write_buf(
 	struct xfs_buf		*bp;
 	int			error;
 
-	error = -libxfs_buf_get_uncached(btp, bblen, 0, &bp);
+	error = -libxfs_buf_get_uncached(btp, bblen, &bp);
 	if (error) {
 		fprintf(stderr, _("Could not get memory for buffer, err=%d\n"),
 				error);
@@ -5595,7 +5595,7 @@ write_rtsb(
 	}
 
 	error = -libxfs_buf_get_uncached(mp->m_rtdev_targp,
-				XFS_FSB_TO_BB(mp, 1), 0, &rtsb_bp);
+				XFS_FSB_TO_BB(mp, 1), &rtsb_bp);
 	if (error) {
 		fprintf(stderr,
  _("%s: couldn't grab realtime superblock buffer\n"), progname);

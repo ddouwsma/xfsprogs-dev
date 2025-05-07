@@ -69,7 +69,7 @@ xlog_get_bp(
 		nbblks += log->l_sectBBsize;
 	nbblks = round_up(nbblks, log->l_sectBBsize);
 
-	libxfs_buf_get_uncached(log->l_dev, nbblks, 0, &bp);
+	libxfs_buf_get_uncached(log->l_dev, nbblks, &bp);
 	return bp;
 }
 
