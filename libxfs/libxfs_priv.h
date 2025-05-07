@@ -359,7 +359,6 @@ static inline unsigned long long mask64_if_power2(unsigned long b)
 
 /* buffer management */
 #define XBF_TRYLOCK			0
-#define XBF_UNMAPPED			0
 #define XBF_DONE			0
 #define xfs_buf_stale(bp)		((bp)->b_flags |= LIBXFS_B_STALE)
 #define XFS_BUF_UNDELAYWRITE(bp)	((bp)->b_flags &= ~LIBXFS_B_DIRTY)
