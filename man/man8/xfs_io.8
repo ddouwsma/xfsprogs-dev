@@ -995,7 +995,9 @@ Set the field mask for the statx call to STATX_BASIC_STATS.
 .TP
 .B \-m all
 Set all bits in the field mask for the statx call except for STATX__RESERVED.
-The default is to set STATX_BASIC_STATS and STATX_BTIME.
+If no
+.B -m
+arguments are specified, the default is STATX_BASIC_STATS and STATX_BTIME.
 .TP
 .B \-m <mask>
 Specify a numeric field mask for the statx call.
