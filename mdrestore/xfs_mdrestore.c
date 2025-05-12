@@ -8,6 +8,7 @@
 #include "xfs_metadump.h"
 #include <libfrog/platform.h>
 #include "libfrog/div64.h"
+#include <linux/blkzoned.h>
 
 union mdrestore_headers {
 	__be32				magic;
@@ -148,6 +149,13 @@ open_device(
 	dev->fd = open(path, open_flags, 0644);
 	if (dev->fd < 0)
 		fatal("couldn't open \"%s\"\n", path);
+
+	if (!dev->is_file) {
+		uint32_t zone_size;
+
+		if (ioctl(dev->fd, BLKGETZONESZ, &zone_size) == 0 && zone_size)
+			fatal("can't restore to zoned device \"%s\"\n", path);
+	}
 }
 
 static void
